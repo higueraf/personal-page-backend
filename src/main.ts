@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { AppSeeder } from './database/app.seeder';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -16,6 +17,11 @@ async function bootstrap() {
   });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.use(cookieParser());
+
+  // Ejecutar el seed después de iniciar la aplicación
+  const seeder = app.get(AppSeeder);
+  await seeder.seed();
+  console.log('✅ Seed ejecutado - Datos verificados/creados exitosamente');
 
   const port = Number(process.env.PORT || 8000);
   await app.listen(port);

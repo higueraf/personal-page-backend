@@ -1,4 +1,4 @@
-import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import bcrypt from 'bcrypt';
@@ -19,7 +19,7 @@ import { Project, ProjectStatus } from '../entities/project.entity';
 import { Resource, ResourceType } from '../entities/resource.entity';
 
 @Injectable()
-export class AppSeeder implements OnApplicationBootstrap {
+export class AppSeeder {
   constructor(
     @InjectRepository(Role)          private readonly rolesRepo:         Repository<Role>,
     @InjectRepository(User)          private readonly usersRepo:         Repository<User>,
@@ -36,10 +36,6 @@ export class AppSeeder implements OnApplicationBootstrap {
     @InjectRepository(Project)       private readonly projectsRepo:      Repository<Project>,
     @InjectRepository(Resource)      private readonly resourcesRepo:     Repository<Resource>,
   ) {}
-
-  async onApplicationBootstrap() {
-    await this.seed();
-  }
 
   // ════════════════════════════════════════════════════════════════════════════
   async seed() {
