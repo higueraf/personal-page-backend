@@ -1,4 +1,3 @@
-import { OnApplicationBootstrap } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { ContentBlock } from '../entities/content-block.entity';
 import { Course } from '../entities/course.entity';
@@ -14,7 +13,7 @@ import { ContactInfo } from '../entities/contact-info.entity';
 import { ProfileItem } from '../entities/profile-item.entity';
 import { Project } from '../entities/project.entity';
 import { Resource } from '../entities/resource.entity';
-export declare class AppSeeder implements OnApplicationBootstrap {
+export declare class AppSeeder {
     private readonly rolesRepo;
     private readonly usersRepo;
     private readonly coursesRepo;
@@ -30,7 +29,6 @@ export declare class AppSeeder implements OnApplicationBootstrap {
     private readonly projectsRepo;
     private readonly resourcesRepo;
     constructor(rolesRepo: Repository<Role>, usersRepo: Repository<User>, coursesRepo: Repository<Course>, sectionsRepo: Repository<CourseSection>, lessonsRepo: Repository<Lesson>, pagesRepo: Repository<LessonPage>, blocksRepo: Repository<ContentBlock>, videoCoursesRepo: Repository<VideoCourse>, videoSectionsRepo: Repository<VideoSection>, videoLessonsRepo: Repository<VideoLesson>, contactInfoRepo: Repository<ContactInfo>, profileRepo: Repository<ProfileItem>, projectsRepo: Repository<Project>, resourcesRepo: Repository<Resource>);
-    onApplicationBootstrap(): Promise<void>;
     seed(): Promise<{
         ok: boolean;
     }>;

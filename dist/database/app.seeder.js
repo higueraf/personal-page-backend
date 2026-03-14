@@ -51,11 +51,6 @@ let AppSeeder = class AppSeeder {
         this.projectsRepo = projectsRepo;
         this.resourcesRepo = resourcesRepo;
     }
-    async onApplicationBootstrap() {
-        if (String(process.env.RUN_SEED || 'false') === 'true') {
-            await this.seed();
-        }
-    }
     async seed() {
         const adminRole = await this.ensureRole('admin', ['admin:*']);
         const teacherRole = await this.ensureRole('teacher', ['content:read', 'content:write']);
@@ -72,8 +67,6 @@ let AppSeeder = class AppSeeder {
         return { ok: true };
     }
     async seedContactInfo() {
-        if ((await this.contactInfoRepo.count()) > 0)
-            return;
         const items = [
             { key: 'email', label: 'Correo electrónico', value: 'franciscohiguera@gmail.com', icon: 'Mail', order: 0, is_visible: true },
             { key: 'phone', label: 'Teléfono', value: '+593 98 470 9901', icon: 'Phone', order: 1, is_visible: true },
@@ -81,7 +74,10 @@ let AppSeeder = class AppSeeder {
             { key: 'github', label: 'GitHub', value: 'https://github.com/higueraf', icon: 'Github', order: 3, is_visible: true },
         ];
         for (const i of items) {
-            await this.contactInfoRepo.save(this.contactInfoRepo.create(i));
+            const exists = await this.contactInfoRepo.findOne({ where: { key: i.key } });
+            if (!exists) {
+                await this.contactInfoRepo.save(this.contactInfoRepo.create(i));
+            }
         }
     }
     async seedProfile() {
@@ -255,7 +251,12 @@ let AppSeeder = class AppSeeder {
             },
         ];
         for (const p of items) {
-            await this.profileRepo.save(this.profileRepo.create({ ...p, is_visible: true }));
+            const exists = await this.profileRepo.findOne({
+                where: { type: p.type, title: p.title }
+            });
+            if (!exists) {
+                await this.profileRepo.save(this.profileRepo.create({ ...p, is_visible: true }));
+            }
         }
     }
     async seedProjects() {
@@ -390,13 +391,16 @@ Decisiones arquitectónicas y características:
             },
         ];
         for (const p of projects) {
-            await this.projectsRepo.save(this.projectsRepo.create(p));
+            const exists = await this.projectsRepo.findOne({ where: { slug: p.slug } });
+            if (!exists) {
+                await this.projectsRepo.save(this.projectsRepo.create(p));
+            }
         }
     }
     async seedTutorials() {
-        if ((await this.coursesRepo.count()) > 0)
-            return;
-        {
+        const t1Slug = 'django-rest-framework-desde-cero';
+        const t1Exists = await this.coursesRepo.findOne({ where: { slug: t1Slug } });
+        if (!t1Exists) {
             const course = await this.coursesRepo.save(this.coursesRepo.create({
                 title: 'Django REST Framework desde cero',
                 slug: 'django-rest-framework-desde-cero',
@@ -591,7 +595,9 @@ class ProfileView(APIView):
         return Response({"user": request.user.username})
 \`\`\``);
         }
-        {
+        const t2Slug = 'react-typescript-para-backend';
+        const t2Exists = await this.coursesRepo.findOne({ where: { slug: t2Slug } });
+        if (!t2Exists) {
             const course = await this.coursesRepo.save(this.coursesRepo.create({
                 title: 'React + TypeScript para desarrolladores backend',
                 slug: 'react-typescript-para-backend',
@@ -750,9 +756,9 @@ const { data: user } = useQuery({
         }
     }
     async seedVideoCourses() {
-        if ((await this.videoCoursesRepo.count()) > 0)
-            return;
-        {
+        const v1Slug = 'python-django-de-cero';
+        const v1Exists = await this.videoCoursesRepo.findOne({ where: { slug: v1Slug } });
+        if (!v1Exists) {
             const course = await this.videoCoursesRepo.save(this.videoCoursesRepo.create({
                 title: 'Python y Django — De cero a tu primera API',
                 slug: 'python-django-de-cero',
@@ -803,7 +809,9 @@ const { data: user } = useQuery({
                 markdown: `# Primera API con DRF\n\n\`\`\`python\nclass ArticleSerializer(serializers.ModelSerializer):\n    class Meta:\n        model  = Article\n        fields = '__all__'\n\nclass ArticleViewSet(viewsets.ModelViewSet):\n    queryset         = Article.objects.all()\n    serializer_class = ArticleSerializer\n\`\`\``,
             }));
         }
-        {
+        const v2Slug = 'react-typescript-intermedio';
+        const v2Exists = await this.videoCoursesRepo.findOne({ where: { slug: v2Slug } });
+        if (!v2Exists) {
             const course = await this.videoCoursesRepo.save(this.videoCoursesRepo.create({
                 title: 'React + TypeScript — Nivel intermedio',
                 slug: 'react-typescript-intermedio',
@@ -872,7 +880,10 @@ const { data: user } = useQuery({
             { title: 'Amigoscode — Spring Boot Tutorial', description: 'Tutorial completo de Spring Boot con Java: REST API, JPA, seguridad con Spring Security y deploy.', type: resource_entity_1.ResourceType.VIDEO, url: 'https://www.youtube.com/watch?v=9SGDpanrc8U', tags: ['Java', 'Spring Boot', 'Tutorial'], is_free: true, is_published: true, order: 18 },
         ];
         for (const r of resources) {
-            await this.resourcesRepo.save(this.resourcesRepo.create(r));
+            const exists = await this.resourcesRepo.findOne({ where: { title: r.title } });
+            if (!exists) {
+                await this.resourcesRepo.save(this.resourcesRepo.create(r));
+            }
         }
     }
     async makePage(lesson, title, order, minutes, markdown) {
