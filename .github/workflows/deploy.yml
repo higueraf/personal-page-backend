@@ -1,0 +1,77 @@
+name: 🚀 Deploy NestJS Personal Page API to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Copy project to VPS
+        uses: appleboy/scp-action@v0.1.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_KEY }}
+          source: "."
+          target: "/opt/personal-page-backend"
+
+      - name: Run deploy commands on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PRODUCTION_ENV: ${{ secrets.ENV_FILE }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_KEY }}
+          envs: PRODUCTION_ENV
+          script: |
+            set -e
+            cd /opt/personal-page-backend
+
+            export PATH="/root/n/bin:$PATH"
+
+            echo "USER=$(whoami)"
+            echo "HOME=$HOME"
+            echo "PATH=$PATH"
+            which node || true
+            which npm || true
+            node -v || true
+            npm -v || true
+
+            sudo lsof -t -i:3000 | xargs -r sudo kill -9 || true
+
+            printf '%s' "$PRODUCTION_ENV" > .env
+
+            if [ -f package-lock.json ]; then
+              /root/n/bin/npm ci
+            else
+              /root/n/bin/npm install
+            fi
+
+            NODE_OPTIONS="--max-old-space-size=4096" /root/n/bin/npm run build
+
+            pm2 stop personal-page-api || true
+            pm2 delete personal-page-api || true
+            pm2 start dist/main.js --name personal-page-api
+            pm2 save
+
+            # ── Nginx: aumentar límite de upload a 10MB ─────────────────────
+            NGINX_CONF="/etc/nginx/nginx.conf"
+            if [ -f "$NGINX_CONF" ]; then
+              if ! grep -q "client_max_body_size" "$NGINX_CONF"; then
+                sudo sed -i '/http {/a\    client_max_body_size 10M;' "$NGINX_CONF"
+                echo "✅ client_max_body_size añadido al bloque http"
+              else
+                sudo sed -i 's/client_max_body_size [^;]*/client_max_body_size 10M/' "$NGINX_CONF"
+                echo "✅ client_max_body_size actualizado a 10M"
+              fi
+              sudo nginx -t && sudo systemctl reload nginx && echo "✅ Nginx recargado"
+            else
+              echo "⚠️  nginx.conf no encontrado, omitiendo configuración de Nginx"
+            fi
