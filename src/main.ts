@@ -19,10 +19,11 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Ejecutar el seed después de iniciar la aplicación
+  /*
   const seeder = app.get(AppSeeder);
   await seeder.seed();
   console.log('✅ Seed ejecutado - Datos verificados/creados exitosamente');
-
+*/
   const port = Number(process.env.PORT || 8000);
   await app.listen(port);
   console.log(`API running on http://localhost:${port}/api`);

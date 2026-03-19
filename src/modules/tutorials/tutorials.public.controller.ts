@@ -5,7 +5,7 @@ import { TutorialsService } from './tutorials.service';
 
 @Controller('public')
 export class TutorialsPublicController {
-  constructor(private readonly service: TutorialsService) {}
+  constructor(private readonly service: TutorialsService) { }
 
   @Get('tutorials') listTutorials(@Query('search') search?: string) { return this.service.publicTutorials(search); }
   @Get('tutorials/:slug') tutorialMeta(@Param('slug') slug: string) { return this.service.publicTutorialMeta(slug); }
