@@ -1,4 +1,5 @@
-import { IsInt, IsObject, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsInt, IsObject, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpsertCourseDto {
   @IsString() title: string;
@@ -37,4 +38,16 @@ export class UpsertBlockDto {
   @IsString() type: string;
   @IsOptional() @IsInt() @Min(1) order?: number;
   @IsOptional() @IsObject() data?: Record<string, any>;
+}
+
+export class ReorderItemDto {
+  @IsString() id: string;
+  @IsInt() @Min(1) order: number;
+}
+
+export class ReorderLessonsDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ReorderItemDto)
+  items: ReorderItemDto[];
 }

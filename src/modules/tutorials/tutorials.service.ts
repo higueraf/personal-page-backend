@@ -9,7 +9,7 @@ import { Course } from '../../entities/course.entity';
 import { CourseSection } from '../../entities/course-section.entity';
 import { LessonPage } from '../../entities/lesson-page.entity';
 import { Lesson } from '../../entities/lesson.entity';
-import { UpsertBlockDto, UpsertCourseDto, UpsertLessonDto, UpsertPageDto, UpsertSectionDto } from './dto/tutorial.dto';
+import { UpsertBlockDto, UpsertCourseDto, UpsertLessonDto, UpsertPageDto, UpsertSectionDto, ReorderLessonsDto } from './dto/tutorial.dto';
 
 @Injectable()
 export class TutorialsService {
@@ -20,6 +20,13 @@ export class TutorialsService {
     @InjectRepository(LessonPage) private readonly pagesRepo: Repository<LessonPage>,
     @InjectRepository(ContentBlock) private readonly blocksRepo: Repository<ContentBlock>,
   ) {}
+
+  async reorderLessons(dto: ReorderLessonsDto) {
+    for (const item of dto.items) {
+      await this.lessonsRepo.update(item.id, { order: item.order });
+    }
+    return { success: true };
+  }
 
   async listCourses(params: any) {
     const where = params?.search ? { title: ILike(`%${params.search}%`) } : {};
