@@ -10,6 +10,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { ResourcesModule } from './modules/resources/resources.module';
 import { ContactModule } from './modules/contact/contact.module';
+import { PlaygroundModule } from './modules/playground/playground.module';
 import { AppSeeder } from './database/app.seeder';
 
 import { ContentBlock } from './entities/content-block.entity';
@@ -27,6 +28,8 @@ import { ProfileItem } from './entities/profile-item.entity';
 import { Resource } from './entities/resource.entity';
 import { ContactInfo } from './entities/contact-info.entity';
 import { ContactMessage } from './entities/contact-message.entity';
+import { PlaygroundProject } from './entities/playground-project.entity';
+import { PlaygroundFile } from './entities/playground-file.entity';
 
 const ALL_ENTITIES = [
   Role, User,
@@ -36,6 +39,7 @@ const ALL_ENTITIES = [
   ProfileItem,
   Resource,
   ContactInfo, ContactMessage,
+  PlaygroundProject, PlaygroundFile,
 ];
 
 @Module({
@@ -51,7 +55,7 @@ const ALL_ENTITIES = [
       entities: ALL_ENTITIES,
       synchronize: String(process.env.TYPEORM_SYNC || 'true') === 'true',
       autoLoadEntities: true,
-      ssl: { rejectUnauthorized: false },
+      //ssl: { rejectUnauthorized: false },
     }),
     TypeOrmModule.forFeature(ALL_ENTITIES),
     AuthModule,
@@ -62,6 +66,7 @@ const ALL_ENTITIES = [
     ProfileModule,
     ResourcesModule,
     ContactModule,
+    PlaygroundModule,
   ],
   providers: [AppSeeder],
 })
