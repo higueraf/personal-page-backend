@@ -98,11 +98,20 @@ export class VideoCoursesService {
 
   async deleteLesson(id: string) { await this.lessonsRepo.delete(id); }
 
-  async publicList(search?: string) {
+  async publicList(search?: string, page = 1, pageSize = 12) {
     const where: any = { status: 'PUBLISHED' };
     if (search) where.title = ILike(`%${search}%`);
-    const items = await this.coursesRepo.find({ where, order: { created_at: 'DESC' } });
-    return { data: items };
+    const skip = (page - 1) * pageSize;
+    const [items, total] = await this.coursesRepo.findAndCount({
+      where,
+      order: { created_at: 'DESC' },
+      skip,
+      take: pageSize,
+    });
+    return {
+      data: items,
+      meta: { total_records: total, page, page_size: pageSize },
+    };
   }
 
   async publicMeta(slug: string) {

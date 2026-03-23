@@ -7,7 +7,13 @@ import { TutorialsService } from './tutorials.service';
 export class TutorialsPublicController {
   constructor(private readonly service: TutorialsService) { }
 
-  @Get('tutorials') listTutorials(@Query('search') search?: string) { return this.service.publicTutorials(search); }
+  @Get('tutorials') listTutorials(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('page_size') pageSize?: string,
+  ) {
+    return this.service.publicTutorials(search, Number(page || 1), Number(pageSize || 12));
+  }
   @Get('tutorials/:slug') tutorialMeta(@Param('slug') slug: string) { return this.service.publicTutorialMeta(slug); }
 
   @UseGuards(OptionalJwtAuthGuard)

@@ -196,10 +196,20 @@ export class TutorialsService {
 
   async deleteBlock(id: string) { await this.blocksRepo.delete(id); }
 
-  async publicTutorials(search?: string) {
+  async publicTutorials(search?: string, page = 1, pageSize = 12) {
     const where: any = { status: 'PUBLISHED' };
     if (search) where.title = ILike(`%${search}%`);
-    return { data: await this.coursesRepo.find({ where, order: { created_at: 'DESC' } }) };
+    const skip = (page - 1) * pageSize;
+    const [items, total] = await this.coursesRepo.findAndCount({
+      where,
+      order: { created_at: 'DESC' },
+      skip,
+      take: pageSize,
+    });
+    return {
+      data: items,
+      meta: { total_records: total, page, page_size: pageSize },
+    };
   }
 
   async publicTutorialMeta(slug: string) {

@@ -7,7 +7,13 @@ import { VideoCoursesService } from './video-courses.service';
 export class VideoCoursesPublicController {
   constructor(private readonly service: VideoCoursesService) {}
 
-  @Get() list(@Query('search') search?: string) { return this.service.publicList(search); }
+  @Get() list(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('page_size') pageSize?: string,
+  ) {
+    return this.service.publicList(search, Number(page || 1), Number(pageSize || 12));
+  }
   @Get(':slug') meta(@Param('slug') slug: string) { return this.service.publicMeta(slug); }
 
   @UseGuards(OptionalJwtAuthGuard)
