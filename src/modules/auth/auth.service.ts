@@ -7,6 +7,14 @@ import { User, UserStatus } from '../../entities/user.entity';
 import { Role } from '../../entities/role.entity';
 import { RegisterDto } from './dto/register.dto';
 
+interface GoogleUserDto {
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatar?: string;
+  googleId: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -80,12 +88,57 @@ export class AuthService {
     });
   }
 
+  async findByEmail(email: string): Promise<User | null> {
+    return this.usersRepo.findOne({
+      where: { email },
+      relations: ['role'],
+    });
+  }
+
+  async createGoogleUser(googleUser: GoogleUserDto): Promise<User> {
+    const studentRole = await this.rolesRepo.findOne({ where: { name: 'student' } });
+    if (!studentRole) throw new BadRequestException('Configuración interna inválida');
+
+    const user = this.usersRepo.create({
+      first_name: googleUser.firstName,
+      last_name: googleUser.lastName,
+      email: googleUser.email,
+      google_id: googleUser.googleId,
+      avatar: googleUser.avatar,
+      role: studentRole,
+      status: UserStatus.APPROVED, // Los usuarios de Google se activan automáticamente
+      is_active: true,
+      password_hash: '', // No tienen contraseña
+    });
+
+    return this.usersRepo.save(user);
+  }
+
+  async updateGoogleInfo(userId: string, googleInfo: { googleId: string; avatar?: string }): Promise<User> {
+    await this.usersRepo.update(userId, {
+      google_id: googleInfo.googleId,
+      avatar: googleInfo.avatar,
+    });
+
+    const user = await this.usersRepo.findOne({
+      where: { id: userId },
+      relations: ['role'],
+    });
+
+    if (!user) {
+      throw new BadRequestException('Usuario no encontrado');
+    }
+
+    return user;
+  }
+
   publicUser(user: User) {
     return {
       id: user.id,
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
+      avatar: user.avatar,
       role: user.role
         ? { name: user.role.name, permissions: user.role.permissions || [] }
         : null,

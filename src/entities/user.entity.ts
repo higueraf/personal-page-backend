@@ -41,6 +41,12 @@ export class User {
   @Column()
   password_hash: string;
 
+  @Column({ nullable: true })
+  google_id?: string;
+
+  @Column({ nullable: true })
+  avatar?: string;
+
   @ManyToOne(() => Role, (role) => role.users, { eager: true, nullable: false })
   @JoinColumn({ name: 'role_id' })
   role: Role;
