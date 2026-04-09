@@ -6,8 +6,10 @@ import { PlaygroundService } from './playground.service';
 import { ExecutionService } from './execution.service';
 import { PlaygroundController } from './playground.controller';
 
+import { User } from '../../entities/user.entity';
+
 @Module({
-  imports: [TypeOrmModule.forFeature([PlaygroundProject, PlaygroundFile])],
+  imports: [TypeOrmModule.forFeature([PlaygroundProject, PlaygroundFile, User])],
   controllers: [PlaygroundController],
   providers: [PlaygroundService, ExecutionService],
   exports: [PlaygroundService, ExecutionService],

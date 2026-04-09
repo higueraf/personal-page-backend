@@ -30,9 +30,12 @@ import { ContactInfo } from './entities/contact-info.entity';
 import { ContactMessage } from './entities/contact-message.entity';
 import { PlaygroundProject } from './entities/playground-project.entity';
 import { PlaygroundFile } from './entities/playground-file.entity';
+import { Institution } from './entities/institution.entity';
+import { StudyCourse } from './entities/study-course.entity';
 
 const ALL_ENTITIES = [
   Role, User,
+  Institution, StudyCourse,
   Course, CourseSection, Lesson, LessonPage, ContentBlock,
   VideoCourse, VideoSection, VideoLesson,
   Project,

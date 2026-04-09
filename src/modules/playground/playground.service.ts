@@ -12,6 +12,8 @@ export class PlaygroundService {
     private projectRepo: Repository<PlaygroundProject>,
     @InjectRepository(PlaygroundFile)
     private fileRepo: Repository<PlaygroundFile>,
+    @InjectRepository(User)
+    private userRepo: Repository<User>,
   ) {}
 
   async findAllByUser(userId: string) {
@@ -29,6 +31,17 @@ export class PlaygroundService {
 
     if (!project) throw new NotFoundException('Project not found');
     
+    // Check time constraints for exams
+    if (project.is_exam) {
+      const now = new Date();
+      if (project.start_time && now < project.start_time) {
+        throw new ForbiddenException('Este examen aún no ha comenzado.');
+      }
+      if (project.end_time && now > project.end_time) {
+        throw new ForbiddenException('El tiempo de este examen ha expirado.');
+      }
+    }
+
     // Allow if owner or if admin (logic for admin can be added in controller)
     if (project.user_id !== userId) throw new ForbiddenException('Access denied');
 
@@ -102,14 +115,67 @@ export class PlaygroundService {
     return this.projectRepo.remove(project);
   }
   
+  async logCheat(projectId: string, userId: string, action: string, details?: string) {
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project || project.user_id !== userId) throw new ForbiddenException();
+
+    const timestamp = new Date().toISOString();
+    const currentLogs = Array.isArray(project.cheating_logs) ? project.cheating_logs : [];
+    
+    currentLogs.push({ timestamp, action, details });
+    project.cheating_logs = currentLogs;
+    
+    await this.projectRepo.save(project);
+    return { status: 'logged' };
+  }
+
   // Admin methods
-  async assignExam(teacherId: string, studentId: string, examData: Partial<PlaygroundProject>) {
-    const project = this.projectRepo.create({
-      ...examData,
-      user_id: studentId,
-      is_exam: true,
-      status: ProjectStatus.PENDING,
+  async getStudentsFromCourse(courseId: string) {
+    const students = await this.userRepo.find({
+      where: { study_course_id: courseId, user_type: 'student' as any, is_active: true },
     });
-    return this.projectRepo.save(project);
+    return students.map(s => s.id);
+  }
+
+  async assignExam(
+    teacherId: string,
+    studentId: string,
+    examData: Partial<PlaygroundProject> & { files?: { name: string; content?: string; path?: string }[] },
+  ) {
+    const { files, ...projectData } = examData as any;
+
+    const project = this.projectRepo.create({
+      ...projectData,
+      user_id:         studentId,
+      is_exam:         true,
+      allow_copy_paste: examData.allow_copy_paste ?? false,
+      status:          ProjectStatus.PENDING,
+    });
+    const saved = await this.projectRepo.save(project) as unknown as PlaygroundProject;
+    const projectId: string = saved.id;
+
+    // Save initial files if provided
+    if (Array.isArray(files) && files.length > 0) {
+      const fileEntities = files.map((f: any) =>
+        this.fileRepo.create({
+          project_id: projectId,
+          name:       f.name,
+          content:    f.content ?? '',
+          is_folder:  f.is_folder ?? false,
+          path:       f.path ?? `/${f.name}`,
+        }),
+      );
+      await this.fileRepo.save(fileEntities);
+    }
+
+    return this.projectRepo.findOne({ where: { id: projectId }, relations: ['files'] });
+  }
+
+  async findAllAdminExams() {
+    return this.projectRepo.find({
+      where: { is_exam: true },
+      order: { created_at: 'DESC' },
+      relations: ['user'], // Fetch student info
+    });
   }
 }

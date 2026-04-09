@@ -8,6 +8,8 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Role } from './role.entity';
+import { Institution } from './institution.entity';
+import { StudyCourse } from './study-course.entity';
 
 /**
  * Estado del ciclo de vida de un usuario.
@@ -22,6 +24,12 @@ export enum UserStatus {
   APPROVED  = 'APPROVED',
   SUSPENDED = 'SUSPENDED',
   REJECTED  = 'REJECTED',
+}
+
+/** Distingue si el usuario es alumno de una institución o público general. */
+export enum UserType {
+  STUDENT = 'student',
+  PUBLIC  = 'public',
 }
 
 @Entity('users')
@@ -60,6 +68,30 @@ export class User {
 
   @Column({ default: true })
   is_active: boolean;
+
+  /** Tipo de usuario: alumno de una institución o público general */
+  @Column({
+    type: 'enum',
+    enum: UserType,
+    default: UserType.PUBLIC,
+  })
+  user_type: UserType;
+
+  /** Institución educativa a la que pertenece (solo para alumnos) */
+  @ManyToOne(() => Institution, { nullable: true, onDelete: 'SET NULL', eager: false })
+  @JoinColumn({ name: 'institution_id' })
+  institution?: Institution;
+
+  @Column({ nullable: true })
+  institution_id?: string;
+
+  /** Curso/carrera que está estudiando */
+  @ManyToOne(() => StudyCourse, { nullable: true, onDelete: 'SET NULL', eager: false })
+  @JoinColumn({ name: 'study_course_id' })
+  study_course?: StudyCourse;
+
+  @Column({ nullable: true })
+  study_course_id?: string;
 
   @CreateDateColumn()
   created_at: Date;

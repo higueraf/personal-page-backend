@@ -60,6 +60,9 @@ export class PlaygroundProject {
   @Column({ type: 'text', nullable: true })
   feedback: string;
 
+  @Column({ type: 'jsonb', default: [] })
+  cheating_logs: Array<{ timestamp: string; action: string; details?: string }>;
+
   @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;

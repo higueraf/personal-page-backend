@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlaygroundService } from './playground.service';
 import { ExecutionService } from './execution.service';
@@ -23,9 +23,9 @@ export class PlaygroundController {
     const dockerAvailable = await this.executionService.checkDockerAvailability();
     return {
       docker: dockerAvailable,
-      message: dockerAvailable 
+      message: dockerAvailable
         ? 'Docker disponible - Playground listo para usar'
-        : 'Docker no disponible - Instala Docker para usar el playground'
+        : 'Docker no disponible - Instala Docker para usar el playground',
     };
   }
 
@@ -80,12 +80,83 @@ export class PlaygroundController {
     return this.executionService.getRuntimes();
   }
 
-  // Admin assigning exams
-  @Post('assign')
+  @Post(':id/log-cheat')
+  async logCheat(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body('action') action: string,
+    @Body('details') details?: string,
+  ) {
+    const user = req.user as any;
+    return this.playgroundService.logCheat(id, user.id, action, details);
+  }
+
+  /**
+   * Admin/Teacher: assign an exam project to one or more students.
+   * Body: {
+   *   studentIds: string[],        // array of user UUIDs
+   *   name: string,
+   *   language: string,
+   *   materia?: string,
+   *   start_time?: string,         // ISO date
+   *   end_time?: string,           // ISO date
+   *   allow_copy_paste?: boolean,  // defaults to false for exams
+   *   files?: { name, content, path }[]
+   * }
+   */
+  @Post('admin/assign-exam')
   async assignExam(@Req() req: Request, @Body() data: any) {
     const teacher = req.user as any;
-    // Simple role check: should check if teacher/admin
-    // (In your project roles are handled in User entity)
-    return this.playgroundService.assignExam(teacher.id, data.studentId, data.examData);
+
+    // Basic role guard: only admin or teacher roles may assign exams
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(teacher.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden asignar exámenes.');
+    }
+
+    let studentIds: string[] = [];
+    if (data.courseId) {
+      studentIds = await this.playgroundService.getStudentsFromCourse(data.courseId);
+      if (studentIds.length === 0) throw new ForbiddenException('El curso no tiene alumnos activos.');
+    } else {
+      studentIds = Array.isArray(data.studentIds)
+        ? data.studentIds
+        : data.studentId ? [data.studentId] : [];
+    }
+    
+    if (studentIds.length === 0) {
+      throw new ForbiddenException('No se han provisto estudiantes o curso para asignar el examen.');
+    }
+
+    const results = await Promise.all(
+      studentIds.map((studentId) =>
+        this.playgroundService.assignExam(teacher.id, studentId, {
+          name:             data.name,
+          language:         data.language ?? 'python',
+          materia:          data.materia,
+          start_time:       data.start_time ? new Date(data.start_time) : undefined,
+          end_time:         data.end_time   ? new Date(data.end_time)   : undefined,
+          allow_copy_paste: data.allow_copy_paste ?? false, // exams block copy-paste by default
+          files:            data.files,
+        }),
+      ),
+    );
+
+    return { data: results, count: results.length };
+  }
+
+  /**
+   * Admin/Teacher: list all assigned exams (Playground projects with is_exam=true)
+   */
+  @Get('admin/exams')
+  async getAllExams(@Req() req: Request) {
+    const teacher = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(teacher.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden ver los exámenes.');
+    }
+    
+    const exams = await this.playgroundService.findAllAdminExams();
+    return { data: exams };
   }
 }

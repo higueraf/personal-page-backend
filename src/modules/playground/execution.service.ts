@@ -56,6 +56,7 @@ export class ExecutionService {
     java: {
       image: 'openjdk:17-alpine',
       command: 'java',
+      directCommand: 'java',
       extension: '.java',
       timeout: 8000,
       compileCommand: 'javac',
@@ -63,6 +64,7 @@ export class ExecutionService {
     kotlin: {
       image: 'openjdk:17-alpine',
       command: 'kotlin',
+      directCommand: 'kotlin',
       extension: '.kt',
       timeout: 15000,
       compileCommand: 'kotlinc',
@@ -168,7 +170,20 @@ export class ExecutionService {
     const ext = runtime.extension;
     const mainFile = fileNames.find(f => f.endsWith(ext)) ?? fileNames[0];
     const mainFilePath = join(sessionDir, mainFile);
-    const command = `${runtime.directCommand} "${mainFilePath}"`;
+    
+    let command = '';
+    
+    if (runtime.compileCommand) {
+      if (language === 'java') {
+        const className = mainFile.replace('.java', '');
+        command = `cd "${sessionDir}" && ${runtime.compileCommand} "${mainFile}" && ${runtime.directCommand} "${className}"`;
+      } else if (language === 'kotlin') {
+        const jarName = mainFile.replace('.kt', '.jar');
+        command = `cd "${sessionDir}" && ${runtime.compileCommand} "${mainFile}" -include-runtime -d "${jarName}" && ${runtime.directCommand} -cp "${jarName}" MainKt`;
+      }
+    } else {
+      command = `cd "${sessionDir}" && ${runtime.directCommand} "${mainFile}"`;
+    }
 
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
