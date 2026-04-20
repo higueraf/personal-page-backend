@@ -191,7 +191,13 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
       const filesToCompile = ktFiles.length > 0 ? ktFiles : [mainFile];
       const jar = mainFile.replace('.kt', '.jar');
       const fileList = filesToCompile.map((f) => `"${f}"`).join(' ');
-      return `kotlinc ${fileList} -include-runtime -d "${jar}" 2>&1 && kotlin -cp "${jar}" MainKt`;
+      // Derive entry class from active file: "calculadora.kt" → "CalculadoraKt"
+      const baseName = mainFile.replace('.kt', '');
+      const className = baseName
+        .replace(/[-_](.)/g, (_, c: string) => c.toUpperCase())
+        .replace(/^(.)/, (c: string) => c.toUpperCase())
+        + 'Kt';
+      return `kotlinc ${fileList} -include-runtime -d "${jar}" 2>&1 && kotlin -cp "${jar}" ${className}`;
     }
     if (language === 'java') {
       const cls = mainFile.replace('.java', '');

@@ -183,7 +183,13 @@ export class ExecutionService {
         const filesToCompile = ktFiles.length > 0 ? ktFiles : [mainFile];
         const jarName = mainFile.replace('.kt', '.jar');
         const fileList = filesToCompile.map(f => `"${f}"`).join(' ');
-        command = `cd "${sessionDir}" && ${runtime.compileCommand} ${fileList} -include-runtime -d "${jarName}" 2>&1 && ${runtime.directCommand} -cp "${jarName}" MainKt`;
+        // Derive entry class from active file: "calculadora.kt" → "CalculadoraKt"
+        const baseName = mainFile.replace('.kt', '');
+        const className = baseName
+          .replace(/[-_](.)/g, (_: string, c: string) => c.toUpperCase())
+          .replace(/^(.)/, (c: string) => c.toUpperCase())
+          + 'Kt';
+        command = `cd "${sessionDir}" && ${runtime.compileCommand} ${fileList} -include-runtime -d "${jarName}" 2>&1 && ${runtime.directCommand} -cp "${jarName}" ${className}`;
       }
     } else {
       command = `cd "${sessionDir}" && ${runtime.directCommand} "${mainFile}"`;
@@ -286,7 +292,13 @@ export class ExecutionService {
         command += ` sh -c "${runtime.compileCommand} ${mainFile} && ${runtime.command} ${className}"`;
       } else if (language === 'kotlin') {
         // Kotlin: compilar y ejecutar
-        command += ` sh -c "${runtime.compileCommand} ${mainFile} -include-runtime -d ${mainFile.replace('.kt', '.jar')} && ${runtime.command} -cp ${mainFile.replace('.kt', '.jar')} MainKt"`;
+        const jarName = mainFile.replace('.kt', '.jar');
+        const baseName = mainFile.replace('.kt', '');
+        const className = baseName
+          .replace(/[-_](.)/g, (_: string, c: string) => c.toUpperCase())
+          .replace(/^(.)/, (c: string) => c.toUpperCase())
+          + 'Kt';
+        command += ` sh -c "${runtime.compileCommand} ${mainFile} -include-runtime -d ${jarName} && ${runtime.command} -cp ${jarName} ${className}"`;
       }
     } else {
       // Lenguajes interpretados - ejecutar solo archivos de código, no CSS/HTML
