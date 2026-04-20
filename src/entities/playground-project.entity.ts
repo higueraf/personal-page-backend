@@ -38,10 +38,10 @@ export class PlaygroundProject {
   @Column({ default: false })
   is_exam: boolean;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   start_time: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   end_time: Date;
 
   @Column({ default: true })
