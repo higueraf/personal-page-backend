@@ -12,6 +12,7 @@ import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { createHash } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 
 interface RunningSession {
@@ -46,9 +47,12 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   server: Server;
 
   private readonly TEMP_DIR = '/tmp/playground';
+  private readonly KOTLIN_CACHE_DIR = '/tmp/playground-kotlin-cache';
   private readonly sessions = new Map<string, RunningSession>();
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(private readonly jwtService: JwtService) {
+    fs.mkdir(this.KOTLIN_CACHE_DIR, { recursive: true }).catch(() => {});
+  }
 
   /** Validate JWT from the httpOnly "jwt" cookie on the upgrade handshake */
   handleConnection(client: Socket) {
@@ -118,7 +122,9 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
         f.name.includes('.') ? f.name : f.name + runtime.extension,
       );
 
-      const shellCmd = this.buildShellCommand(lang, mainFile, allFileNames, runtime);
+      const shellCmd = lang === 'kotlin'
+        ? await this.buildKotlinCommand(sessionDir, mainFile, allFileNames, validFiles)
+        : this.buildShellCommand(lang, mainFile, allFileNames, runtime);
 
       const child = spawn('sh', ['-c', shellCmd], {
         cwd: sessionDir,
@@ -175,6 +181,54 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
+  /** Derive the Kotlin entry class name from a file name.
+   *  "calculadora.kt" → "CalculadoraKt", "my_util.kt" → "MyUtilKt" */
+  private kotlinClassName(fileName: string): string {
+    return fileName
+      .replace('.kt', '')
+      .replace(/[-_](.)/g, (_: string, c: string) => c.toUpperCase())
+      .replace(/^(.)/, (c: string) => c.toUpperCase())
+      + 'Kt';
+  }
+
+  /** Build (and cache) the Kotlin compile+run command.
+   *  Cache key = SHA-256 of all .kt file contents sorted by name.
+   *  Cache hit  → skip kotlinc entirely; just run the cached JAR.
+   *  Cache miss → compile, copy JAR to cache, then run. */
+  private async buildKotlinCommand(
+    sessionDir: string,
+    mainFile: string,
+    allFileNames: string[],
+    ktSources: { name: string; content: string }[],
+  ): Promise<string> {
+    const ktFiles = allFileNames.filter((f) => f.endsWith('.kt'));
+    const filesToCompile = ktFiles.length > 0 ? ktFiles : [mainFile];
+    const fileList = filesToCompile.map((f) => `"${f}"`).join(' ');
+    const className = this.kotlinClassName(mainFile);
+    const localJar = mainFile.replace('.kt', '.jar');
+
+    // Build cache key from sorted file contents
+    const hash = createHash('sha256');
+    const sorted = [...ktSources].sort((a, b) => a.name.localeCompare(b.name));
+    for (const f of sorted) hash.update(f.name + '\0' + f.content + '\0');
+    hash.update(mainFile);
+    const cacheKey = hash.digest('hex');
+    const cachedJar = join(this.KOTLIN_CACHE_DIR, `${cacheKey}.jar`);
+
+    try {
+      await fs.access(cachedJar); // throws if not found
+      // Cache HIT — skip compilation entirely
+      return `kotlin -cp "${cachedJar}" ${className}`;
+    } catch {
+      // Cache MISS — compile and save to cache for next run
+      return (
+        `kotlinc ${fileList} -include-runtime -d "${localJar}" 2>&1 && ` +
+        `cp "${localJar}" "${cachedJar}" && ` +
+        `kotlin -cp "${localJar}" ${className}`
+      );
+    }
+  }
+
   /** Build the shell command (single string passed to `sh -c`). For compiled
    *  languages (Kotlin, Java) the compile + run steps are chained with `&&`
    *  so the compilation output is streamed before the program starts.
@@ -182,23 +236,9 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   private buildShellCommand(
     language: string,
     mainFile: string,
-    allFileNames: string[],
+    _allFileNames: string[],
     runtime: RuntimeConfig,
   ): string {
-    if (language === 'kotlin') {
-      // Compile ALL .kt files together into a single jar
-      const ktFiles = allFileNames.filter((f) => f.endsWith('.kt'));
-      const filesToCompile = ktFiles.length > 0 ? ktFiles : [mainFile];
-      const jar = mainFile.replace('.kt', '.jar');
-      const fileList = filesToCompile.map((f) => `"${f}"`).join(' ');
-      // Derive entry class from active file: "calculadora.kt" → "CalculadoraKt"
-      const baseName = mainFile.replace('.kt', '');
-      const className = baseName
-        .replace(/[-_](.)/g, (_, c: string) => c.toUpperCase())
-        .replace(/^(.)/, (c: string) => c.toUpperCase())
-        + 'Kt';
-      return `kotlinc ${fileList} -include-runtime -d "${jar}" 2>&1 && kotlin -cp "${jar}" ${className}`;
-    }
     if (language === 'java') {
       const cls = mainFile.replace('.java', '');
       return `javac "${mainFile}" && java "${cls}"`;
