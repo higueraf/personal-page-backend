@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { AppSeeder } from './database/app.seeder';
 
@@ -15,6 +16,7 @@ async function bootstrap() {
     ],
     credentials: true,
   });
+  app.useWebSocketAdapter(new IoAdapter(app));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.use(cookieParser());
 

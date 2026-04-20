@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Req, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlaygroundService } from './playground.service';
 import { ExecutionService } from './execution.service';
@@ -38,7 +38,7 @@ export class PlaygroundController {
   @Get(':id')
   async getProject(@Req() req: Request, @Param('id') id: string) {
     const user = req.user as any;
-    return this.playgroundService.findOne(id, user.id);
+    return this.playgroundService.findOne(id, user.id, user.role?.name);
   }
 
   @Put(':id/files/:name')
@@ -91,6 +91,12 @@ export class PlaygroundController {
     return this.playgroundService.logCheat(id, user.id, action, details);
   }
 
+  @Post(':id/submit')
+  async submitExam(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as any;
+    return this.playgroundService.submitExam(id, user.id);
+  }
+
   /**
    * Admin/Teacher: assign an exam project to one or more students.
    * Body: {
@@ -128,6 +134,10 @@ export class PlaygroundController {
       throw new ForbiddenException('No se han provisto estudiantes o curso para asignar el examen.');
     }
 
+    // All projects from this batch share the same exam_group_id
+    const { randomUUID } = await import('crypto');
+    const exam_group_id = randomUUID();
+
     const results = await Promise.all(
       studentIds.map((studentId) =>
         this.playgroundService.assignExam(teacher.id, studentId, {
@@ -136,13 +146,14 @@ export class PlaygroundController {
           materia:          data.materia,
           start_time:       data.start_time ? new Date(data.start_time) : undefined,
           end_time:         data.end_time   ? new Date(data.end_time)   : undefined,
-          allow_copy_paste: data.allow_copy_paste ?? false, // exams block copy-paste by default
+          allow_copy_paste: data.allow_copy_paste ?? false,
           files:            data.files,
+          exam_group_id,
         }),
       ),
     );
 
-    return { data: results, count: results.length };
+    return { data: results, count: results.length, exam_group_id };
   }
 
   /**
@@ -158,5 +169,113 @@ export class PlaygroundController {
     
     const exams = await this.playgroundService.findAllAdminExams();
     return { data: exams };
+  }
+
+  /**
+   * Admin/Teacher: list all playgrounds (exams and normal projects)
+   */
+  @Get('admin/playgrounds')
+  async getAllPlaygrounds(@Req() req: Request) {
+    const teacher = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(teacher.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden ver los playgrounds.');
+    }
+
+    const playgrounds = await this.playgroundService.findAllAdminPlaygrounds();
+    return { data: playgrounds };
+  }
+
+  /**
+   * Admin/Teacher: list exam groups (one entry per assignment batch)
+   */
+  @Get('admin/exam-groups')
+  async getExamGroups(@Req() req: Request) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden ver los exámenes.');
+    }
+    return { data: await this.playgroundService.findAdminExamGroups() };
+  }
+
+  /**
+   * Admin/Teacher: list all student projects for a specific exam group
+   */
+  @Get('admin/exam-groups/:groupId/projects')
+  async getExamGroupProjects(@Req() req: Request, @Param('groupId') groupId: string) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden ver los exámenes.');
+    }
+    return { data: await this.playgroundService.findAdminExamsByGroup(groupId) };
+  }
+
+  /**
+   * Admin/Teacher: change status of a single exam project
+   */
+  @Patch('admin/exam/:id/status')
+  async changeExamStatus(@Req() req: Request, @Param('id') id: string, @Body('status') status: string) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden cambiar el estado de exámenes.');
+    }
+    const { ProjectStatus } = await import('../../entities/playground-project.entity');
+    const validStatuses = Object.values(ProjectStatus);
+    if (!validStatuses.includes(status as any)) {
+      throw new ForbiddenException(`Estado inválido. Valores permitidos: ${validStatuses.join(', ')}`);
+    }
+    return this.playgroundService.changeExamStatus(id, status as any);
+  }
+
+  /**
+   * Admin/Teacher: change status of all projects in an exam group
+   */
+  @Patch('admin/exam-groups/:groupId/status')
+  async changeExamGroupStatus(@Req() req: Request, @Param('groupId') groupId: string, @Body('status') status: string) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden cambiar el estado de exámenes.');
+    }
+    const { ProjectStatus } = await import('../../entities/playground-project.entity');
+    const validStatuses = Object.values(ProjectStatus);
+    if (!validStatuses.includes(status as any)) {
+      throw new ForbiddenException(`Estado inválido. Valores permitidos: ${validStatuses.join(', ')}`);
+    }
+    return this.playgroundService.changeExamGroupStatus(groupId, status as any);
+  }
+
+  /**
+   * Admin/Teacher: update all projects in an exam group
+   */
+  @Patch('admin/exam-groups/:groupId')
+  async updateExamGroup(@Req() req: Request, @Param('groupId') groupId: string, @Body() body: any) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden editar exámenes.');
+    }
+    return this.playgroundService.updateAdminExamGroup(groupId, {
+      name:            body.name,
+      start_time:      body.start_time ? new Date(body.start_time) : body.start_time,
+      end_time:        body.end_time   ? new Date(body.end_time)   : body.end_time,
+      allow_copy_paste: body.allow_copy_paste,
+    });
+  }
+
+  /**
+   * Admin/Teacher: delete all projects in an exam group
+   */
+  @Delete('admin/exam-groups/:groupId')
+  async deleteExamGroup(@Req() req: Request, @Param('groupId') groupId: string) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden eliminar exámenes.');
+    }
+    return this.playgroundService.deleteAdminExamGroup(groupId);
   }
 }

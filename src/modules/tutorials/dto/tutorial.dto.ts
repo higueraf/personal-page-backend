@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsObject, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpsertCourseDto {
@@ -7,6 +7,8 @@ export class UpsertCourseDto {
   @IsOptional() @IsString() description?: string | null;
   @IsOptional() @IsString() level?: string | null;
   @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsBoolean() is_public?: boolean;
+  @IsOptional() @IsArray() @IsString({ each: true }) study_courses?: string[];
 }
 
 export class UpsertSectionDto {

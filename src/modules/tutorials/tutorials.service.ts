@@ -1,14 +1,16 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { paginate } from '../../common/pagination';
-import { hasContentAccess } from '../../common/roles';
+import { hasContentAccess, isAdminOrTeacher } from '../../common/roles';
 import { toSlug } from '../../common/slug.util';
 import { ContentBlock } from '../../entities/content-block.entity';
 import { Course } from '../../entities/course.entity';
 import { CourseSection } from '../../entities/course-section.entity';
 import { LessonPage } from '../../entities/lesson-page.entity';
 import { Lesson } from '../../entities/lesson.entity';
+import { StudyCourse } from '../../entities/study-course.entity';
+import { User } from '../../entities/user.entity';
 import { UpsertBlockDto, UpsertCourseDto, UpsertLessonDto, UpsertPageDto, UpsertSectionDto, ReorderLessonsDto } from './dto/tutorial.dto';
 
 @Injectable()
@@ -19,6 +21,8 @@ export class TutorialsService {
     @InjectRepository(Lesson) private readonly lessonsRepo: Repository<Lesson>,
     @InjectRepository(LessonPage) private readonly pagesRepo: Repository<LessonPage>,
     @InjectRepository(ContentBlock) private readonly blocksRepo: Repository<ContentBlock>,
+    @InjectRepository(StudyCourse) private readonly studyCoursesRepo: Repository<StudyCourse>,
+    @InjectRepository(User) private readonly usersRepo: Repository<User>,
   ) {}
 
   async reorderLessons(dto: ReorderLessonsDto) {
@@ -30,25 +34,44 @@ export class TutorialsService {
 
   async listCourses(params: any) {
     const where = params?.search ? { title: ILike(`%${params.search}%`) } : {};
-    const items = await this.coursesRepo.find({ where, order: { created_at: 'DESC' } });
+    const items = await this.coursesRepo.find({ where, relations: ['study_courses'], order: { created_at: 'DESC' } });
     return paginate(items, Number(params?.page || 1), Number(params?.page_size || 50));
   }
 
-  async getCourse(id: string) { return { data: await this.must(this.coursesRepo, id) }; }
+  async getCourse(id: string) {
+    const item = await this.coursesRepo.findOne({ where: { id }, relations: ['study_courses'] });
+    if (!item) throw new NotFoundException(`Recurso ${id} no encontrado`);
+    return { data: item };
+  }
 
-  async createCourse(dto: UpsertCourseDto) {
-    const saved = await this.coursesRepo.save(this.coursesRepo.create({
+  async createCourse({ study_courses, ...dto }: UpsertCourseDto) {
+    const course = this.coursesRepo.create({
       ...dto,
       slug: dto.slug || toSlug(dto.title),
       status: dto.status || 'DRAFT',
-    }));
+    });
+    if (study_courses && study_courses.length > 0) {
+      course.study_courses = await this.studyCoursesRepo.findBy({ id: In(study_courses) });
+    }
+    const saved = await this.coursesRepo.save(course);
     return { data: saved };
   }
 
-  async updateCourse(id: string, dto: Partial<UpsertCourseDto>) {
-    const entity = await this.must(this.coursesRepo, id);
+  async updateCourse(id: string, { study_courses, ...dto }: Partial<UpsertCourseDto>) {
+    const entity = await this.coursesRepo.findOne({ where: { id }, relations: ['study_courses'] });
+    if (!entity) throw new NotFoundException(`Recurso ${id} no encontrado`);
+    
     Object.assign(entity, dto);
     if (dto.title && !dto.slug) entity.slug = toSlug(dto.title);
+    
+    if (study_courses) {
+      if (study_courses.length > 0) {
+        entity.study_courses = await this.studyCoursesRepo.findBy({ id: In(study_courses) });
+      } else {
+        entity.study_courses = [];
+      }
+    }
+    
     return { data: await this.coursesRepo.save(entity) };
   }
 
@@ -196,32 +219,56 @@ export class TutorialsService {
 
   async deleteBlock(id: string) { await this.blocksRepo.delete(id); }
 
-  async publicTutorials(search?: string, page = 1, pageSize = 12) {
-    const where: any = { status: 'PUBLISHED' };
-    if (search) where.title = ILike(`%${search}%`);
-    const skip = (page - 1) * pageSize;
-    const [items, total] = await this.coursesRepo.findAndCount({
-      where,
-      order: { created_at: 'DESC' },
-      skip,
-      take: pageSize,
-    });
+  async publicTutorials(search?: string, page = 1, pageSize = 12, studyCourseId?: string) {
+    const qb = this.coursesRepo.createQueryBuilder('c')
+      .leftJoinAndSelect('c.study_courses', 'sc')
+      .where('c.status = :status', { status: 'PUBLISHED' });
+
+    if (search) qb.andWhere('c.title ILIKE :search', { search: `%${search}%` });
+    if (studyCourseId) {
+      qb.andWhere('sc.id = :scId', { scId: studyCourseId });
+    }
+
+    qb.orderBy('c.created_at', 'DESC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize);
+
+    const [items, total] = await qb.getManyAndCount();
     return {
-      data: items,
+      data: items.map((c) => ({
+        id: c.id, title: c.title, slug: c.slug,
+        description: c.description, level: c.level, status: c.status,
+        is_public: c.is_public,
+        study_courses: (c.study_courses ?? []).map((sc) => ({ id: sc.id, name: sc.name })),
+      })),
       meta: { total_records: total, page, page_size: pageSize },
     };
   }
 
   async publicTutorialMeta(slug: string) {
-    const course = await this.coursesRepo.findOne({ where: { slug, status: 'PUBLISHED' } });
+    const course = await this.coursesRepo.findOne({
+      where: { slug, status: 'PUBLISHED' },
+      relations: ['study_courses'],
+    });
     if (!course) throw new NotFoundException('Tutorial no encontrado');
-    return course;
+    return {
+      id: course.id, title: course.title, slug: course.slug,
+      description: course.description, level: course.level,
+      is_public: course.is_public,
+      study_courses: (course.study_courses ?? []).map((sc) => ({ id: sc.id, name: sc.name })),
+    };
   }
 
   async publicTutorialPages(slug: string, user?: any) {
-    if (!hasContentAccess(user?.role?.name)) throw new ForbiddenException('Contenido restringido');
-    const course = await this.coursesRepo.findOne({ where: { slug, status: 'PUBLISHED' } });
+    const course = await this.coursesRepo.findOne({
+      where: { slug, status: 'PUBLISHED' },
+      relations: ['study_courses'],
+    });
     if (!course) throw new NotFoundException('Tutorial no encontrado');
+    if (!course.is_public) {
+      if (!hasContentAccess(user?.role?.name)) throw new ForbiddenException('Contenido restringido');
+      await this.assertCourseStudyAccess(course, user);
+    }
     const sections = await this.sectionsRepo.find({ where: { course: { id: course.id } }, order: { order: 'ASC' } });
     const pages: Array<{ id: string; title: string; slug: string; order: number }> = [];
     let order = 1;
@@ -235,9 +282,15 @@ export class TutorialsService {
   }
 
   async publicTutorialContent(courseSlug: string, lessonSlug: string, user?: any) {
-    if (!hasContentAccess(user?.role?.name)) throw new ForbiddenException('Contenido restringido');
-    const course = await this.coursesRepo.findOne({ where: { slug: courseSlug, status: 'PUBLISHED' } });
+    const course = await this.coursesRepo.findOne({
+      where: { slug: courseSlug, status: 'PUBLISHED' },
+      relations: ['study_courses'],
+    });
     if (!course) throw new NotFoundException('Tutorial no encontrado');
+    if (!course.is_public) {
+      if (!hasContentAccess(user?.role?.name)) throw new ForbiddenException('Contenido restringido');
+      await this.assertCourseStudyAccess(course, user);
+    }
     const orderedLessons = await this.allPublishedLessonsByCourse(course.id);
     const lesson = orderedLessons.find((x) => x.slug === lessonSlug);
     if (!lesson) throw new NotFoundException('Lección no encontrada');
@@ -257,10 +310,25 @@ export class TutorialsService {
   }
 
   async publicCourses(params: any) {
-    const where: any = { status: 'PUBLISHED' };
-    if (params?.search) where.title = ILike(`%${params.search}%`);
-    const items = await this.coursesRepo.find({ where, order: { created_at: 'DESC' } });
+    const qb = this.coursesRepo.createQueryBuilder('c')
+      .where('c.status = :status', { status: 'PUBLISHED' });
+
+    if (params?.search) qb.andWhere('c.title ILIKE :search', { search: `%${params.search}%` });
+    if (params?.study_course_id) {
+      qb.innerJoin('c.study_courses', 'sc', 'sc.id = :scId', { scId: params.study_course_id });
+    }
+
+    qb.orderBy('c.created_at', 'DESC');
+    const items = await qb.getMany();
     return paginate(items, Number(params?.page || 1), Number(params?.page_size || 12));
+  }
+
+  async publicStudyCourses() {
+    const items = await this.studyCoursesRepo.find({
+      order: { name: 'ASC' },
+      relations: ['institution'],
+    });
+    return { data: items.map((sc) => ({ id: sc.id, name: sc.name, institution: sc.institution?.name ?? null })) };
   }
 
   async publicCourse(slug: string) {
@@ -338,6 +406,36 @@ export class TutorialsService {
     if (block.type === 'callout') return `> ${block.data?.text || ''}`;
     if (block.type === 'divider') return '---';
     return '';
+  }
+
+  /**
+   * Lanza ForbiddenException si el curso tiene restricción por carrera
+   * y el usuario autenticado no pertenece a ninguna de ellas.
+   * Admins y teachers siempre tienen acceso.
+   */
+  private async assertCourseStudyAccess(course: Course, user?: any): Promise<void> {
+    if (!course.study_courses || course.study_courses.length === 0) return; // sin restricción
+    if (isAdminOrTeacher(user?.role?.name)) return;                          // admin/teacher: libre
+
+    if (!user?.id) {
+      throw new ForbiddenException(
+        JSON.stringify({ code: 'COURSE_RESTRICTED', courses: course.study_courses.map((sc) => sc.name) }),
+      );
+    }
+
+    const scIds = course.study_courses.map((sc) => sc.id);
+    const match = await this.usersRepo
+      .createQueryBuilder('u')
+      .innerJoin('u.study_courses', 'sc')
+      .where('u.id = :uid', { uid: user.id })
+      .andWhere('sc.id IN (:...scIds)', { scIds })
+      .getCount();
+
+    if (!match) {
+      throw new ForbiddenException(
+        JSON.stringify({ code: 'COURSE_RESTRICTED', courses: course.study_courses.map((sc) => sc.name) }),
+      );
+    }
   }
 
   private async must<T extends { id: string }>(repo: Repository<T>, id: string) {

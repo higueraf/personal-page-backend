@@ -3,6 +3,8 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -85,13 +87,14 @@ export class User {
   @Column({ nullable: true })
   institution_id?: string;
 
-  /** Curso/carrera que está estudiando */
-  @ManyToOne(() => StudyCourse, { nullable: true, onDelete: 'SET NULL', eager: false })
-  @JoinColumn({ name: 'study_course_id' })
-  study_course?: StudyCourse;
-
-  @Column({ nullable: true })
-  study_course_id?: string;
+  /** Cursos/carreras que está estudiando (pueden ser varios) */
+  @ManyToMany(() => StudyCourse, { nullable: true, eager: false })
+  @JoinTable({
+    name: 'user_study_courses',
+    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'study_course_id', referencedColumnName: 'id' },
+  })
+  study_courses?: StudyCourse[];
 
   @CreateDateColumn()
   created_at: Date;

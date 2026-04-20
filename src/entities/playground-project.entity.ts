@@ -63,6 +63,10 @@ export class PlaygroundProject {
   @Column({ type: 'jsonb', default: [] })
   cheating_logs: Array<{ timestamp: string; action: string; details?: string }>;
 
+  /** Groups all PlaygroundProjects created from the same assignment batch */
+  @Column({ nullable: true })
+  exam_group_id: string;
+
   @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;

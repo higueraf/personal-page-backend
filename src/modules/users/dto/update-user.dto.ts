@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { UserStatus, UserType } from '../../../entities/user.entity';
 
 export class UpdateUserDto {
@@ -22,7 +22,8 @@ export class UpdateUserDto {
   @IsOptional()
   institution_id?: string | null;
 
-  @IsString()
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
-  study_course_id?: string | null;
+  study_course_ids?: string[];
 }

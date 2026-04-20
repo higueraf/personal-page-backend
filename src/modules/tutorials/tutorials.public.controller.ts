@@ -7,12 +7,15 @@ import { TutorialsService } from './tutorials.service';
 export class TutorialsPublicController {
   constructor(private readonly service: TutorialsService) { }
 
+  @Get('study-courses') listStudyCourses() { return this.service.publicStudyCourses(); }
+
   @Get('tutorials') listTutorials(
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('page_size') pageSize?: string,
+    @Query('study_course_id') studyCourseId?: string,
   ) {
-    return this.service.publicTutorials(search, Number(page || 1), Number(pageSize || 12));
+    return this.service.publicTutorials(search, Number(page || 1), Number(pageSize || 12), studyCourseId);
   }
   @Get('tutorials/:slug') tutorialMeta(@Param('slug') slug: string) { return this.service.publicTutorialMeta(slug); }
 

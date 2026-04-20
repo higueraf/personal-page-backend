@@ -62,11 +62,11 @@ export class ExecutionService {
       compileCommand: 'javac',
     },
     kotlin: {
-      image: 'openjdk:17-alpine',
+      image: 'zenika/kotlin:latest',
       command: 'kotlin',
       directCommand: 'kotlin',
       extension: '.kt',
-      timeout: 15000,
+      timeout: 30000,   // más tiempo: la imagen de Kotlin es más pesada
       compileCommand: 'kotlinc',
     },
     dart: {
@@ -178,8 +178,12 @@ export class ExecutionService {
         const className = mainFile.replace('.java', '');
         command = `cd "${sessionDir}" && ${runtime.compileCommand} "${mainFile}" && ${runtime.directCommand} "${className}"`;
       } else if (language === 'kotlin') {
+        // Compile ALL .kt files together so multi-file projects work
+        const ktFiles = fileNames.filter(f => f.endsWith('.kt'));
+        const filesToCompile = ktFiles.length > 0 ? ktFiles : [mainFile];
         const jarName = mainFile.replace('.kt', '.jar');
-        command = `cd "${sessionDir}" && ${runtime.compileCommand} "${mainFile}" -include-runtime -d "${jarName}" && ${runtime.directCommand} -cp "${jarName}" MainKt`;
+        const fileList = filesToCompile.map(f => `"${f}"`).join(' ');
+        command = `cd "${sessionDir}" && ${runtime.compileCommand} ${fileList} -include-runtime -d "${jarName}" 2>&1 && ${runtime.directCommand} -cp "${jarName}" MainKt`;
       }
     } else {
       command = `cd "${sessionDir}" && ${runtime.directCommand} "${mainFile}"`;

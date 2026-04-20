@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { User } from '../../entities/user.entity';
 import { Role } from '../../entities/role.entity';
 import { Institution } from '../../entities/institution.entity';
@@ -24,7 +24,7 @@ export class UsersService {
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.role', 'role')
       .leftJoinAndSelect('u.institution', 'institution')
-      .leftJoinAndSelect('u.study_course', 'study_course')
+      .leftJoinAndSelect('u.study_courses', 'study_courses')
       .orderBy('u.created_at', 'DESC')
       .skip((p - 1) * size)
       .take(size);
@@ -53,7 +53,7 @@ export class UsersService {
   async updateUser(id: string, dto: UpdateUserDto) {
     const user = await this.usersRepo.findOne({
       where: { id },
-      relations: ['role', 'institution', 'study_course'],
+      relations: ['role', 'institution', 'study_courses'],
     });
     if (!user) return { error: 'Usuario no encontrado' };
 
@@ -77,14 +77,12 @@ export class UsersService {
       }
     }
 
-    // study_course_id: same pattern
-    if (dto.study_course_id !== undefined) {
-      if (dto.study_course_id === null || dto.study_course_id === '') {
-        user.study_course_id = null;
-        user.study_course    = null;
+    // study_course_ids: [] → clear,  array → set,  undefined → keep
+    if (dto.study_course_ids !== undefined) {
+      if (dto.study_course_ids.length === 0) {
+        user.study_courses = [];
       } else {
-        const sc = await this.studyCoursesRepo.findOne({ where: { id: dto.study_course_id } });
-        if (sc) { user.study_course = sc; user.study_course_id = sc.id; }
+        user.study_courses = await this.studyCoursesRepo.findBy({ id: In(dto.study_course_ids) });
       }
     }
 
@@ -93,7 +91,7 @@ export class UsersService {
     // Reload relations to serialize correctly
     const reloaded = await this.usersRepo.findOne({
       where: { id: saved.id },
-      relations: ['role', 'institution', 'study_course'],
+      relations: ['role', 'institution', 'study_courses'],
     });
     return { data: this.serialize(reloaded!) };
   }
@@ -109,9 +107,9 @@ export class UsersService {
       user_type:   u.user_type,
       role:        u.role        ? { id: u.role.id,        name: u.role.name        } : null,
       institution: u.institution ? { id: u.institution.id, name: u.institution.name } : null,
-      study_course: u.study_course
-        ? { id: u.study_course.id, name: u.study_course.name, institution_id: u.study_course.institution_id }
-        : null,
+      study_courses: (u.study_courses ?? []).map((sc) => ({
+        id: sc.id, name: sc.name, institution_id: sc.institution_id ?? null,
+      })),
       created_at:  u.created_at,
     };
   }

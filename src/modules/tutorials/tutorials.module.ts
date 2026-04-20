@@ -5,12 +5,14 @@ import { Course } from '../../entities/course.entity';
 import { CourseSection } from '../../entities/course-section.entity';
 import { LessonPage } from '../../entities/lesson-page.entity';
 import { Lesson } from '../../entities/lesson.entity';
+import { StudyCourse } from '../../entities/study-course.entity';
+import { User } from '../../entities/user.entity';
 import { TutorialsAdminController } from './tutorials.admin.controller';
 import { TutorialsPublicController } from './tutorials.public.controller';
 import { TutorialsService } from './tutorials.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Course, CourseSection, Lesson, LessonPage, ContentBlock])],
+  imports: [TypeOrmModule.forFeature([Course, CourseSection, Lesson, LessonPage, ContentBlock, StudyCourse, User])],
   providers: [TutorialsService],
   controllers: [TutorialsAdminController, TutorialsPublicController],
 })
