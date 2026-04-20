@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
-import { promises as fs } from 'fs';
+import { promises as fs, existsSync } from 'fs';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
@@ -48,10 +48,13 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   private readonly TEMP_DIR = '/tmp/playground';
   private readonly KOTLIN_CACHE_DIR = '/tmp/playground-kotlin-cache';
+  private readonly KOTLIN_CDS_ARCHIVE = '/opt/kotlin-cds/kotlin.jsa';
   private readonly sessions = new Map<string, RunningSession>();
 
   constructor(private readonly jwtService: JwtService) {
     fs.mkdir(this.KOTLIN_CACHE_DIR, { recursive: true }).catch(() => {});
+    // Pre-warm the kotlinc daemon so the first student compile doesn't pay cold-start
+    spawn('sh', ['-c', 'kotlinc -version 2>/dev/null'], { stdio: 'ignore' }).unref();
   }
 
   /** Validate JWT from the httpOnly "jwt" cookie on the upgrade handshake */
@@ -194,7 +197,12 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   /** Build (and cache) the Kotlin compile+run command.
    *  Cache key = SHA-256 of all .kt file contents sorted by name.
    *  Cache hit  → skip kotlinc entirely; just run the cached JAR.
-   *  Cache miss → compile, copy JAR to cache, then run. */
+   *  Cache miss → compile (no -include-runtime, stdlib already on kotlin classpath),
+   *               copy tiny JAR to cache, then run.
+   *
+   *  JVM flags:
+   *    -XX:TieredStopAtLevel=1  — skip C2 JIT, faster startup for short-lived processes
+   *    -Xss256k                 — smaller stack (enough for typical student programs) */
   private async buildKotlinCommand(
     sessionDir: string,
     mainFile: string,
@@ -207,6 +215,13 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     const className = this.kotlinClassName(mainFile);
     const localJar = mainFile.replace('.kt', '.jar');
 
+    // JVM flags forwarded to both kotlinc and kotlin via -J prefix
+    const cdsFlags = existsSync(this.KOTLIN_CDS_ARCHIVE)
+      ? `-J-Xshare:on -J-XX:SharedArchiveFile=${this.KOTLIN_CDS_ARCHIVE}`
+      : '';
+    const runFlags  = [`-J-XX:TieredStopAtLevel=1`, `-J-Xss256k`, cdsFlags].filter(Boolean).join(' ');
+    const compFlags = '-J-XX:TieredStopAtLevel=1';
+
     // Build cache key from sorted file contents
     const hash = createHash('sha256');
     const sorted = [...ktSources].sort((a, b) => a.name.localeCompare(b.name));
@@ -217,14 +232,15 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     try {
       await fs.access(cachedJar); // throws if not found
-      // Cache HIT — skip compilation entirely
-      return `kotlin -cp "${cachedJar}" ${className}`;
+      // Cache HIT — skip compilation entirely, run with fast-startup flags
+      return `kotlin ${runFlags} -cp "${cachedJar}" ${className}`;
     } catch {
-      // Cache MISS — compile and save to cache for next run
+      // Cache MISS — compile WITHOUT -include-runtime (stdlib on kotlin's own classpath,
+      // no need to bundle 1.5 MB into the jar → ~10× smaller jar, faster compile + load)
       return (
-        `kotlinc ${fileList} -include-runtime -d "${localJar}" 2>&1 && ` +
+        `kotlinc ${compFlags} ${fileList} -d "${localJar}" 2>&1 && ` +
         `cp "${localJar}" "${cachedJar}" && ` +
-        `kotlin -cp "${localJar}" ${className}`
+        `kotlin ${runFlags} -cp "${localJar}" ${className}`
       );
     }
   }
