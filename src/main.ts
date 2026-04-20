@@ -1,13 +1,19 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import { AppModule } from './app.module';
 import { AppSeeder } from './database/app.seeder';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Ensure uploads directory exists before the server starts
+  mkdirSync(join(process.cwd(), 'uploads', 'avatars'), { recursive: true });
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.setGlobalPrefix('api');
   app.enableCors({
@@ -19,6 +25,9 @@ async function bootstrap() {
   app.useWebSocketAdapter(new IoAdapter(app));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.use(cookieParser());
+
+  // Serve uploaded files (avatars, etc.) at /uploads/* — no /api prefix
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
   // Ejecutar el seed después de iniciar la aplicación
   /*

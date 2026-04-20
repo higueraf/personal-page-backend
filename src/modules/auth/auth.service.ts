@@ -147,4 +147,16 @@ export class AuthService {
       is_active: user.is_active,
     };
   }
+
+  async updateProfile(userId: string, data: { first_name?: string; last_name?: string }) {
+    await this.usersRepo.update(userId, data);
+    const user = await this.usersRepo.findOne({ where: { id: userId }, relations: ['role'] });
+    return this.publicUser(user!);
+  }
+
+  async updateAvatar(userId: string, avatarPath: string) {
+    await this.usersRepo.update(userId, { avatar: avatarPath });
+    const user = await this.usersRepo.findOne({ where: { id: userId }, relations: ['role'] });
+    return this.publicUser(user!);
+  }
 }
