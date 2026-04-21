@@ -218,12 +218,15 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     const cdsFlags = existsSync(this.KOTLIN_CDS_ARCHIVE)
       ? `-J-Xshare:on -J-XX:SharedArchiveFile=${this.KOTLIN_CDS_ARCHIVE}`
       : '';
-    const runFlags  = [`-J-XX:TieredStopAtLevel=1`, `-J-Xss256k`, cdsFlags].filter(Boolean).join(' ');
+    const runFlags  = [`-J-XX:TieredStopAtLevel=1`, `-J-Xss512k`, cdsFlags].filter(Boolean).join(' ');
     const compFlags = '-J-XX:TieredStopAtLevel=1';
 
-    // Cache key based only on the target file's content — changes in other
-    // files won't invalidate this file's cache, and a failed compile never
-    // produces a cached JAR (cp only runs after successful &&-chained compile).
+    // Guarantee the cache dir exists (gets wiped on reboot since it's in /tmp)
+    await fs.mkdir(this.KOTLIN_CACHE_DIR, { recursive: true }).catch(() => {});
+
+    // Cache key: target file name + content only.
+    // Failed compiles never produce a cached JAR because the cp only runs
+    // after a successful (&&-chained) kotlinc.
     const targetSource = ktSources.find((f) => f.name === mainFile);
     const hash = createHash('sha256');
     hash.update(mainFile + '\0' + (targetSource?.content ?? ''));
@@ -232,14 +235,15 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     try {
       await fs.access(cachedJar); // throws if not found
-      // Cache HIT — skip compilation entirely, run with fast-startup flags
+      // Cache HIT — skip compilation entirely
       return `kotlin ${runFlags} -cp "${cachedJar}" ${className}`;
     } catch {
-      // Cache MISS — compile WITHOUT -include-runtime (stdlib on kotlin's own classpath,
-      // no need to bundle 1.5 MB into the jar → ~10× smaller jar, faster compile + load)
+      // Cache MISS — compile then run.
+      // The cp is wrapped with `|| true` so that a cache-write failure
+      // (permissions, disk full, dir missing) never blocks the kotlin run.
       return (
         `kotlinc ${compFlags} "${mainFile}" -d "${localJar}" 2>&1 && ` +
-        `cp "${localJar}" "${cachedJar}" && ` +
+        `(cp "${localJar}" "${cachedJar}" 2>/dev/null || true) && ` +
         `kotlin ${runFlags} -cp "${localJar}" ${className}`
       );
     }
