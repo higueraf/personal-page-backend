@@ -206,14 +206,13 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   private async buildKotlinCommand(
     sessionDir: string,
     mainFile: string,
-    allFileNames: string[],
+    _allFileNames: string[],
     ktSources: { name: string; content: string }[],
   ): Promise<string> {
-    const ktFiles = allFileNames.filter((f) => f.endsWith('.kt'));
-    const filesToCompile = ktFiles.length > 0 ? ktFiles : [mainFile];
-    const fileList = filesToCompile.map((f) => `"${f}"`).join(' ');
+    // Compile ONLY the target file — compiling all files together means that
+    // a syntax error in any other file blocks every run, even unrelated ones.
     const className = this.kotlinClassName(mainFile);
-    const localJar = mainFile.replace('.kt', '.jar');
+    const localJar  = mainFile.replace('.kt', '.jar');
 
     // JVM flags forwarded to both kotlinc and kotlin via -J prefix
     const cdsFlags = existsSync(this.KOTLIN_CDS_ARCHIVE)
@@ -222,12 +221,13 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     const runFlags  = [`-J-XX:TieredStopAtLevel=1`, `-J-Xss256k`, cdsFlags].filter(Boolean).join(' ');
     const compFlags = '-J-XX:TieredStopAtLevel=1';
 
-    // Build cache key from sorted file contents
+    // Cache key based only on the target file's content — changes in other
+    // files won't invalidate this file's cache, and a failed compile never
+    // produces a cached JAR (cp only runs after successful &&-chained compile).
+    const targetSource = ktSources.find((f) => f.name === mainFile);
     const hash = createHash('sha256');
-    const sorted = [...ktSources].sort((a, b) => a.name.localeCompare(b.name));
-    for (const f of sorted) hash.update(f.name + '\0' + f.content + '\0');
-    hash.update(mainFile);
-    const cacheKey = hash.digest('hex');
+    hash.update(mainFile + '\0' + (targetSource?.content ?? ''));
+    const cacheKey  = hash.digest('hex');
     const cachedJar = join(this.KOTLIN_CACHE_DIR, `${cacheKey}.jar`);
 
     try {
@@ -238,7 +238,7 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
       // Cache MISS — compile WITHOUT -include-runtime (stdlib on kotlin's own classpath,
       // no need to bundle 1.5 MB into the jar → ~10× smaller jar, faster compile + load)
       return (
-        `kotlinc ${compFlags} ${fileList} -d "${localJar}" 2>&1 && ` +
+        `kotlinc ${compFlags} "${mainFile}" -d "${localJar}" 2>&1 && ` +
         `cp "${localJar}" "${cachedJar}" && ` +
         `kotlin ${runFlags} -cp "${localJar}" ${className}`
       );
