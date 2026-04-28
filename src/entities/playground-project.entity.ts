@@ -47,6 +47,9 @@ export class PlaygroundProject {
   @Column({ default: true })
   allow_copy_paste: boolean;
 
+  @Column({ default: false })
+  require_seb: boolean;
+
   @Column({
     type: 'enum',
     enum: ProjectStatus,

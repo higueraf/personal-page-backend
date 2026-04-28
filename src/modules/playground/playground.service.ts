@@ -57,11 +57,6 @@ export class PlaygroundService {
       if (project.end_time && now > project.end_time) {
         throw new ForbiddenException('El tiempo de este examen ha expirado.');
       }
-      // Student re-entering a submitted exam within the valid period → reopen it
-      if (project.status === ProjectStatus.SUBMITTED) {
-        project.status = ProjectStatus.PENDING;
-        await this.projectRepo.save(project);
-      }
     }
 
     // Allow if owner or admin/teacher
@@ -231,6 +226,7 @@ export class PlaygroundService {
       user_id:          studentId,
       is_exam:          true,
       allow_copy_paste: examData.allow_copy_paste ?? false,
+      require_seb:      (examData as any).require_seb ?? false,
       status:           ProjectStatus.PENDING,
       exam_group_id:    exam_group_id ?? null,
     });
@@ -289,6 +285,7 @@ export class PlaygroundService {
         start_time:      first.start_time,
         end_time:        first.end_time,
         allow_copy_paste: first.allow_copy_paste,
+        require_seb:      first.require_seb,
         created_at:      first.created_at,
         total_count:     projects.length,
         submitted_count: projects.filter(p => p.status === ProjectStatus.SUBMITTED || p.status === ProjectStatus.GRADED).length,
@@ -329,7 +326,7 @@ export class PlaygroundService {
   /** Updates metadata on all student projects in an exam group */
   async updateAdminExamGroup(
     groupId: string,
-    data: { name?: string; start_time?: Date | null; end_time?: Date | null; allow_copy_paste?: boolean },
+    data: { name?: string; start_time?: Date | null; end_time?: Date | null; allow_copy_paste?: boolean; require_seb?: boolean },
   ) {
     const projects = await this.projectRepo.find({ where: { exam_group_id: groupId, is_exam: true } });
     if (projects.length === 0) {

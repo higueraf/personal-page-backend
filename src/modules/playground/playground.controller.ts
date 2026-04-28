@@ -1,8 +1,8 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Req, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Req, Res, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlaygroundService } from './playground.service';
 import { ExecutionService } from './execution.service';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 
 @Controller('playground')
 @UseGuards(JwtAuthGuard)
@@ -147,6 +147,7 @@ export class PlaygroundController {
           start_time:       data.start_time ? new Date(data.start_time) : undefined,
           end_time:         data.end_time   ? new Date(data.end_time)   : undefined,
           allow_copy_paste: data.allow_copy_paste ?? false,
+          require_seb:      data.require_seb ?? false,
           files:            data.files,
           exam_group_id,
         }),
@@ -263,7 +264,88 @@ export class PlaygroundController {
       start_time:      body.start_time ? new Date(body.start_time) : body.start_time,
       end_time:        body.end_time   ? new Date(body.end_time)   : body.end_time,
       allow_copy_paste: body.allow_copy_paste,
+      require_seb:      body.require_seb,
     });
+  }
+
+  /**
+   * Admin/Teacher: download Safe Exam Browser config file (.seb) for an exam group.
+   * The .seb file points to the frontend so SEB opens the app directly in kiosk mode.
+   */
+  @Get('admin/exam-groups/:groupId/seb-config')
+  async downloadSebConfig(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Param('groupId') groupId: string,
+  ) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden descargar la configuración SEB.');
+    }
+
+    // Resolve the exam group to get a name for the filename
+    const projects = await this.playgroundService.findAdminExamsByGroup(groupId);
+    if (!projects || projects.length === 0) throw new NotFoundException('Exam group not found');
+    const examName = (projects[0] as any).name ?? 'examen';
+
+    // Frontend base URL: use first origin from APP_ORIGINS or fallback
+    const origins = (process.env.APP_ORIGINS ?? 'http://localhost:5173').split(',');
+    const frontendUrl = origins[origins.length - 1].trim(); // prefer production URL (last entry)
+
+    // Build the start URL pointing directly to the student's exam list filtered by group
+    const startUrl = `${frontendUrl}/playground`;
+
+    const sebXml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>startURL</key>
+  <string>${startUrl}</string>
+  <key>sendBrowserExamKey</key>
+  <false/>
+  <key>allowQuit</key>
+  <false/>
+  <key>ignoreExitKey</key>
+  <true/>
+  <key>browserWindowAllowReload</key>
+  <false/>
+  <key>showReloadButton</key>
+  <false/>
+  <key>showTaskBar</key>
+  <false/>
+  <key>enablePrintScreen</key>
+  <false/>
+  <key>allowUserSwitching</key>
+  <false/>
+  <key>enableScreenCapture</key>
+  <false/>
+  <key>newBrowserWindowByLinkPolicy</key>
+  <integer>2</integer>
+  <key>URLFilterEnable</key>
+  <true/>
+  <key>URLFilterEnableContentFilter</key>
+  <false/>
+  <key>URLFilterRules</key>
+  <array>
+    <dict>
+      <key>active</key>
+      <true/>
+      <key>regex</key>
+      <false/>
+      <key>action</key>
+      <integer>1</integer>
+      <key>expression</key>
+      <string>${frontendUrl}/*</string>
+    </dict>
+  </array>
+</dict>
+</plist>`;
+
+    const safeExamName = examName.replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ ]/g, '_').trim();
+    res.setHeader('Content-Type', 'application/seb');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeExamName}.seb"`);
+    res.send(sebXml);
   }
 
   /**
