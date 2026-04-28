@@ -296,6 +296,8 @@ export class PlaygroundController {
     // Build the start URL pointing directly to the student's exam list filtered by group
     const startUrl = `${frontendUrl}/playground`;
 
+    const quitUrl = `${frontendUrl}/seb-quit`;
+
     const sebXml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -308,6 +310,10 @@ export class PlaygroundController {
   <false/>
   <key>ignoreExitKey</key>
   <true/>
+  <key>quitURL</key>
+  <string>${quitUrl}</string>
+  <key>quitURLConfirm</key>
+  <false/>
   <key>browserWindowAllowReload</key>
   <false/>
   <key>showReloadButton</key>
