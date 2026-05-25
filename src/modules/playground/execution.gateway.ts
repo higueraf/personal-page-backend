@@ -14,6 +14,7 @@ import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
+import { ExecutionService } from './execution.service';
 
 interface RunningSession {
   process: ChildProcessWithoutNullStreams;
@@ -51,7 +52,10 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   private readonly KOTLIN_CDS_ARCHIVE = '/opt/kotlin-cds/kotlin.jsa';
   private readonly sessions = new Map<string, RunningSession>();
 
-  constructor(private readonly jwtService: JwtService) {
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly executionService: ExecutionService,
+  ) {
     fs.mkdir(this.KOTLIN_CACHE_DIR, { recursive: true }).catch(() => {});
     // Pre-warm the kotlinc daemon so the first student compile doesn't pay cold-start
     spawn('sh', ['-c', 'kotlinc -version 2>/dev/null'], { stdio: 'ignore' }).unref();
@@ -129,9 +133,18 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
         ? await this.buildKotlinCommand(sessionDir, mainFile, allFileNames, validFiles)
         : this.buildShellCommand(lang, mainFile, allFileNames, runtime);
 
+      // Inject NODE_PATH for JS/TS so global modules (like readline-sync) are resolved
+      let execEnv: NodeJS.ProcessEnv = { ...process.env, TERM: 'xterm-256color', FORCE_COLOR: '1' };
+      if (lang === 'javascript' || lang === 'typescript') {
+        const globalModules = await this.executionService.getGlobalNodeModules();
+        if (globalModules) {
+          execEnv = { ...execEnv, NODE_PATH: globalModules };
+        }
+      }
+
       const child = spawn('sh', ['-c', shellCmd], {
         cwd: sessionDir,
-        env: { ...process.env, TERM: 'xterm-256color', FORCE_COLOR: '1' },
+        env: execEnv,
       });
 
       this.sessions.set(client.id, { process: child, sessionDir });

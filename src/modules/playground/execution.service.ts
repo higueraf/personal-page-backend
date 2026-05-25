@@ -166,7 +166,7 @@ export class ExecutionService {
   private cachedGlobalModules: string | null = null;
 
   /** Returns the global node_modules path for the host system */
-  private async getGlobalNodeModules(): Promise<string | null> {
+  public async getGlobalNodeModules(): Promise<string | null> {
     if (this.cachedGlobalModules) return this.cachedGlobalModules;
 
     // Optional environment variable override
