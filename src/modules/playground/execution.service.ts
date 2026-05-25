@@ -213,6 +213,7 @@ export class ExecutionService {
       : undefined;
 
     let command = '';
+    const nodePathPrefix = globalModules ? `NODE_PATH="${globalModules}" ` : '';
 
     if (runtime.compileCommand) {
       if (language === 'java') {
@@ -233,8 +234,11 @@ export class ExecutionService {
         command = `cd "${sessionDir}" && ${runtime.compileCommand} ${fileList} -include-runtime -d "${jarName}" 2>&1 && ${runtime.directCommand} -cp "${jarName}" ${className}`;
       }
     } else {
-      command = `cd "${sessionDir}" && ${runtime.directCommand} "${mainFile}"`;
+      command = `cd "${sessionDir}" && ${nodePathPrefix}${runtime.directCommand} "${mainFile}"`;
     }
+
+    console.info(`[Playground] Executing Direct Command: ${command}`);
+    console.info(`[Playground] Global Modules Path: ${globalModules}`);
 
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
