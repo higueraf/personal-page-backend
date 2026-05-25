@@ -283,6 +283,9 @@ export class ExecutionService {
       
     const dockerCmd = this.buildDockerCommand(sessionDir, mainFile, runtime, language, globalModules);
 
+    console.info(`[Playground] Executing Docker Command: ${dockerCmd}`);
+    console.info(`[Playground] Global Modules Path (Docker): ${globalModules}`);
+
     // Give extra time for potential image pull on first run
     const effectiveTimeout = runtime.timeout + 30_000; // +30 s for image download
 
