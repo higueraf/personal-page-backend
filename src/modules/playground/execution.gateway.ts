@@ -50,6 +50,7 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   private readonly TEMP_DIR = '/tmp/playground';
   private readonly KOTLIN_CACHE_DIR = '/tmp/playground-kotlin-cache';
   private readonly KOTLIN_CDS_ARCHIVE = '/opt/kotlin-cds/kotlin.jsa';
+  private readonly READLINE_SYNC_SHIM = join(__dirname, 'readline-sync-shim.js');
   private readonly sessions = new Map<string, RunningSession>();
 
   constructor(
@@ -140,6 +141,12 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
         if (globalModules) {
           execEnv = { ...execEnv, NODE_PATH: globalModules };
         }
+
+        // Inject a readline-sync shim into session's node_modules.
+        // The real readline-sync opens /dev/tty directly which fails in
+        // non-TTY environments. Our shim reads from stdin (fd 0) instead,
+        // which works with the WebSocket-piped input.
+        await this.injectReadlineSyncShim(sessionDir);
       }
 
       const child = spawn('sh', ['-c', shellCmd], {
@@ -277,6 +284,17 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
       return `javac "${mainFile}" && java "${cls}"`;
     }
     return `${runtime.directCommand} "${mainFile}"`;
+  }
+
+  /**
+   * Place a readline-sync shim in session's node_modules so that
+   * `require('readline-sync')` resolves our stdin-based implementation
+   * before the global TTY-based one.
+   */
+  private async injectReadlineSyncShim(sessionDir: string): Promise<void> {
+    const shimDir = join(sessionDir, 'node_modules', 'readline-sync');
+    await fs.mkdir(shimDir, { recursive: true });
+    await fs.copyFile(this.READLINE_SYNC_SHIM, join(shimDir, 'index.js'));
   }
 
   private killSession(clientId: string) {
