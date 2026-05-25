@@ -1,8 +1,14 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { exec } from 'child_process';
 import { promises as fs } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+
+// Use the exact Node.js binary that is running this NestJS process,
+// so student code always runs on the same version/installation as the backend.
+const NODE_EXEC = process.execPath; // e.g. /root/.nvm/versions/node/v22.22.1/bin/node
+// Derive global node_modules from the binary path: <nvm-root>/lib/node_modules
+const NODE_GLOBAL_MODULES = join(dirname(dirname(NODE_EXEC)), 'lib', 'node_modules');
 
 @Injectable()
 export class ExecutionService {
@@ -33,16 +39,14 @@ export class ExecutionService {
     javascript: {
       image: 'node:18-alpine',
       command: 'node',
-      directCommand: 'node',
+      directCommand: NODE_EXEC,  // same binary as the backend — avoids system vs NVM conflict
       extension: '.js',
       timeout: 5000,
     },
     typescript: {
       image: 'node:18-alpine',
-      // tsx is compatible with all modern TS versions; ts-node breaks on
-      // Node 20+ with certain tsconfig.json module settings (TS5109).
-      command: 'npx tsx',      // for Docker (no global install inside container)
-      directCommand: 'tsx',   // global install on host: npm i -g tsx
+      command: 'npx tsx',
+      directCommand: join(dirname(NODE_EXEC), 'tsx'),  // tsx installed globally alongside backend node
       extension: '.ts',
       timeout: 10000,
     },
@@ -159,6 +163,11 @@ export class ExecutionService {
     }
   }
 
+  /** Returns the global node_modules path for the backend's own Node.js installation */
+  private async getGlobalNodeModules(): Promise<string | null> {
+    return NODE_GLOBAL_MODULES;
+  }
+
   /** Run interpreter directly on the host (no Docker) */
   private async executeDirectly(
     sessionDir: string,
@@ -169,10 +178,15 @@ export class ExecutionService {
     // Find the best entry file: prefer the language-native extension
     const ext = runtime.extension;
     const mainFile = fileNames.find(f => f.endsWith(ext)) ?? fileNames[0];
-    const mainFilePath = join(sessionDir, mainFile);
-    
+
+    // For Node.js, expose globally installed packages via NODE_PATH
+    const globalModules = (language === 'javascript' || language === 'typescript')
+      ? await this.getGlobalNodeModules()
+      : null;
+    const nodePathPrefix = globalModules ? `NODE_PATH="${globalModules}" ` : '';
+
     let command = '';
-    
+
     if (runtime.compileCommand) {
       if (language === 'java') {
         const className = mainFile.replace('.java', '');
@@ -192,7 +206,7 @@ export class ExecutionService {
         command = `cd "${sessionDir}" && ${runtime.compileCommand} ${fileList} -include-runtime -d "${jarName}" 2>&1 && ${runtime.directCommand} -cp "${jarName}" ${className}`;
       }
     } else {
-      command = `cd "${sessionDir}" && ${runtime.directCommand} "${mainFile}"`;
+      command = `cd "${sessionDir}" && ${nodePathPrefix}${runtime.directCommand} "${mainFile}"`;
     }
 
     return new Promise((resolve) => {
@@ -281,8 +295,14 @@ export class ExecutionService {
 
   private buildDockerCommand(sessionDir: string, mainFile: string, runtime: any, language: string): string {
     const containerName = `playground-${Date.now()}`;
-    
-    let command = `docker run --rm --name ${containerName} -v "${sessionDir}:/app" -w /app ${runtime.image}`;
+
+    // Mount host global node_modules for JS/TS so students can use globally installed packages
+    const globalModules = this.getGlobalNodeModules;
+    const nodeVolume = (globalModules && (language === 'javascript' || language === 'typescript'))
+      ? `-v "${globalModules}:/host_modules" -e NODE_PATH=/host_modules `
+      : '';
+
+    let command = `docker run --rm --name ${containerName} -v "${sessionDir}:/app" -w /app ${nodeVolume}${runtime.image}`;
 
     // Lenguajes que necesitan compilación
     if (runtime.compileCommand) {
