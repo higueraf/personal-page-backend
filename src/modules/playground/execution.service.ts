@@ -183,7 +183,11 @@ export class ExecutionService {
     const globalModules = (language === 'javascript' || language === 'typescript')
       ? await this.getGlobalNodeModules()
       : null;
-    const nodePathPrefix = globalModules ? `NODE_PATH="${globalModules}" ` : '';
+
+    // Pass NODE_PATH via exec env options — more reliable than shell inline assignment
+    const execEnv = globalModules
+      ? { ...process.env, NODE_PATH: globalModules }
+      : undefined;
 
     let command = '';
 
@@ -206,7 +210,7 @@ export class ExecutionService {
         command = `cd "${sessionDir}" && ${runtime.compileCommand} ${fileList} -include-runtime -d "${jarName}" 2>&1 && ${runtime.directCommand} -cp "${jarName}" ${className}`;
       }
     } else {
-      command = `cd "${sessionDir}" && ${nodePathPrefix}${runtime.directCommand} "${mainFile}"`;
+      command = `cd "${sessionDir}" && ${runtime.directCommand} "${mainFile}"`;
     }
 
     return new Promise((resolve) => {
@@ -220,7 +224,7 @@ export class ExecutionService {
         });
       }, runtime.timeout);
 
-      exec(command, { maxBuffer: 1024 * 1024, timeout: runtime.timeout }, (error, stdout, stderr) => {
+      exec(command, { maxBuffer: 1024 * 1024, timeout: runtime.timeout, env: execEnv }, (error, stdout, stderr) => {
         clearTimeout(timer);
         if (error) {
           resolve({
