@@ -163,9 +163,32 @@ export class ExecutionService {
     }
   }
 
-  /** Returns the global node_modules path for the backend's own Node.js installation */
+  private cachedGlobalModules: string | null = null;
+
+  /** Returns the global node_modules path for the host system */
   private async getGlobalNodeModules(): Promise<string | null> {
-    return NODE_GLOBAL_MODULES;
+    if (this.cachedGlobalModules) return this.cachedGlobalModules;
+
+    // Optional environment variable override
+    if (process.env.PLAYGROUND_NODE_PATH) {
+      this.cachedGlobalModules = process.env.PLAYGROUND_NODE_PATH;
+      return this.cachedGlobalModules;
+    }
+
+    try {
+      // Find actual system global modules path
+      this.cachedGlobalModules = await new Promise((resolve, reject) => {
+        exec('npm root -g', { timeout: 2000 }, (error, stdout) => {
+          if (error) reject(error);
+          else resolve(stdout.trim());
+        });
+      });
+    } catch (e) {
+      // Fallback to the node binary's derivation
+      this.cachedGlobalModules = NODE_GLOBAL_MODULES;
+    }
+    
+    return this.cachedGlobalModules;
   }
 
   /** Run interpreter directly on the host (no Docker) */
@@ -249,7 +272,12 @@ export class ExecutionService {
 
   private async executeWithDocker(sessionDir: string, fileNames: string[], runtime: any, language: string): Promise<any> {
     const mainFile = fileNames[0];
-    const dockerCmd = this.buildDockerCommand(sessionDir, mainFile, runtime, language);
+    
+    const globalModules = (language === 'javascript' || language === 'typescript')
+      ? await this.getGlobalNodeModules()
+      : null;
+      
+    const dockerCmd = this.buildDockerCommand(sessionDir, mainFile, runtime, language, globalModules);
 
     // Give extra time for potential image pull on first run
     const effectiveTimeout = runtime.timeout + 30_000; // +30 s for image download
@@ -297,12 +325,11 @@ export class ExecutionService {
     );
   }
 
-  private buildDockerCommand(sessionDir: string, mainFile: string, runtime: any, language: string): string {
+  private buildDockerCommand(sessionDir: string, mainFile: string, runtime: any, language: string, globalModules: string | null): string {
     const containerName = `playground-${Date.now()}`;
 
     // Mount host global node_modules for JS/TS so students can use globally installed packages
-    const globalModules = this.getGlobalNodeModules;
-    const nodeVolume = (globalModules && (language === 'javascript' || language === 'typescript'))
+    const nodeVolume = globalModules
       ? `-v "${globalModules}:/host_modules" -e NODE_PATH=/host_modules `
       : '';
 
