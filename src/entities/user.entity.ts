@@ -96,6 +96,14 @@ export class User {
   })
   study_courses?: StudyCourse[];
 
+  /** Token para restablecer contraseña (hex aleatorio, expira en 1 hora) */
+  @Column({ nullable: true })
+  reset_token?: string;
+
+  /** Fecha de expiración del token de restablecimiento */
+  @Column({ type: 'timestamptz', nullable: true })
+  reset_token_expires?: Date;
+
   @CreateDateColumn()
   created_at: Date;
 

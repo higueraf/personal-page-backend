@@ -105,6 +105,80 @@ export class PlaygroundService {
     return this.findOne(saved.id, userId);
   }
 
+  /**
+   * Batch-upsert all files for a project.
+   * Lookup priority: DB UUID (if provided) → name+path → create new.
+   * This avoids URL-encoding issues with special chars in file names.
+   */
+  async saveAllFiles(
+    projectId: string,
+    files: { id?: string; name: string; content: string; path: string }[],
+    userId: string,
+  ) {
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project || project.user_id !== userId) throw new ForbiddenException();
+
+    for (const f of files) {
+      let file: PlaygroundFile | null = null;
+
+      // Primary: find by DB UUID (works after renames since the record moves)
+      if (f.id && !f.id.startsWith('local-')) {
+        file = await this.fileRepo.findOne({ where: { id: f.id, project_id: projectId } });
+      }
+
+      // Fallback: find by name + path
+      if (!file) {
+        file = await this.fileRepo.findOne({ where: { project_id: projectId, name: f.name, path: f.path } });
+      }
+
+      if (file) {
+        file.content = f.content;
+        file.name    = f.name;
+        file.path    = f.path;
+      } else {
+        file = this.fileRepo.create({
+          project_id: projectId,
+          name: f.name,
+          content: f.content,
+          is_folder: false,
+          path: f.path,
+        });
+      }
+      await this.fileRepo.save(file);
+    }
+
+    return { status: 'saved', count: files.length };
+  }
+
+  /** Rename a file or folder by its DB UUID. Updates child paths for folders. */
+  async renameFile(projectId: string, fileId: string, newName: string, userId: string) {
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project || project.user_id !== userId) throw new ForbiddenException();
+
+    const file = await this.fileRepo.findOne({ where: { id: fileId, project_id: projectId } });
+    if (!file) throw new NotFoundException('File not found');
+
+    const parentPath = file.path.substring(0, file.path.lastIndexOf('/') + 1);
+    const oldPath = file.path;
+    const newPath = `${parentPath}${newName}`;
+
+    if (file.is_folder) {
+      // Update all descendant paths
+      const all = await this.fileRepo.find({ where: { project_id: projectId } });
+      const oldPrefix = `${oldPath}/`;
+      const newPrefix = `${newPath}/`;
+      const toUpdate = all.filter(c => c.id !== fileId && c.path.startsWith(oldPrefix));
+      for (const child of toUpdate) {
+        child.path = newPrefix + child.path.slice(oldPrefix.length);
+        await this.fileRepo.save(child);
+      }
+    }
+
+    file.name = newName;
+    file.path = newPath;
+    return this.fileRepo.save(file);
+  }
+
   async updateFile(projectId: string, fileName: string, content: string, userId: string, isFolder: boolean = false, path: string = '') {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();

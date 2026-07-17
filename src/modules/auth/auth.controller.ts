@@ -7,6 +7,8 @@ import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { GoogleAuthGuard } from './google-auth.guard';
 
@@ -75,6 +77,19 @@ export class AuthController {
     if (!file) throw new BadRequestException('No se recibió ningún archivo');
     const avatarPath = `/uploads/avatars/${file.filename}`;
     return { data: await this.authService.updateAvatar(req.user.id, avatarPath) };
+  }
+
+  @Post('auth/forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.requestPasswordReset(dto.email);
+    // Siempre responder con el mismo mensaje para no revelar si el email existe
+    return { message: 'Si tu correo está registrado, recibirás un enlace para restablecer tu contraseña.' };
+  }
+
+  @Post('auth/reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.password, dto.password_confirm);
+    return { message: 'Contraseña actualizada exitosamente.' };
   }
 
   // Rutas de Google OAuth

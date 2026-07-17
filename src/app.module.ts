@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthModule } from './modules/auth/auth.module';
+import { MailModule } from './modules/mail/mail.module';
 import { TutorialsModule } from './modules/tutorials/tutorials.module';
 import { VideoCoursesModule } from './modules/video-courses/video-courses.module';
 import { UsersModule } from './modules/users/users.module';
@@ -70,6 +71,7 @@ const ALL_ENTITIES = [
     ResourcesModule,
     ContactModule,
     PlaygroundModule,
+    MailModule,
   ],
   providers: [AppSeeder],
 })

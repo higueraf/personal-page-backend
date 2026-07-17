@@ -2,10 +2,12 @@ import { BadRequestException, ForbiddenException, Injectable, UnauthorizedExcept
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
+import { randomBytes } from 'crypto';
 import bcrypt from 'bcrypt';
 import { User, UserStatus } from '../../entities/user.entity';
 import { Role } from '../../entities/role.entity';
 import { RegisterDto } from './dto/register.dto';
+import { MailService } from '../mail/mail.service';
 
 interface GoogleUserDto {
   email: string;
@@ -21,6 +23,7 @@ export class AuthService {
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(Role) private readonly rolesRepo: Repository<Role>,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -158,5 +161,91 @@ export class AuthService {
     await this.usersRepo.update(userId, { avatar: avatarPath });
     const user = await this.usersRepo.findOne({ where: { id: userId }, relations: ['role'] });
     return this.publicUser(user!);
+  }
+
+  // ── Recuperación de contraseña ──────────────────────────────────────────────
+
+  /**
+   * Genera un token de restablecimiento y envía el correo al usuario.
+   * Respuesta genérica para no revelar si el email existe en el sistema.
+   */
+  async requestPasswordReset(email: string): Promise<void> {
+    const user = await this.usersRepo.findOne({ where: { email } });
+    if (!user) return; // No revelar si el email existe
+
+    const token = randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+    await this.usersRepo.update(user.id, {
+      reset_token: token,
+      reset_token_expires: expires,
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetLink = `${frontendUrl}/reset-password?token=${token}`;
+
+    await this.mailService.send({
+      to: user.email,
+      subject: 'Restablecer contraseña — Plataforma Educativa',
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8f9fc;border-radius:12px;">
+          <h2 style="margin:0 0 8px;font-size:1.4rem;color:#111;">Hola, ${user.first_name} 👋</h2>
+          <p style="color:#555;line-height:1.6;margin:0 0 24px;">
+            Recibimos una solicitud para restablecer la contraseña de tu cuenta.<br>
+            Haz clic en el botón de abajo para crear una nueva contraseña.
+          </p>
+          <a href="${resetLink}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:.95rem;">
+            Restablecer contraseña
+          </a>
+          <p style="color:#888;font-size:.82rem;margin:24px 0 0;line-height:1.5;">
+            Este enlace es válido por <strong>1 hora</strong>.<br>
+            Si no solicitaste este cambio, puedes ignorar este correo con seguridad.
+          </p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px;">
+          <p style="color:#aaa;font-size:.78rem;margin:0;">Plataforma Educativa · No respondas a este correo</p>
+        </div>
+      `,
+    });
+  }
+
+  /**
+   * Valida el token, actualiza la contraseña y envía un correo de confirmación.
+   */
+  async resetPassword(token: string, password: string, passwordConfirm: string): Promise<void> {
+    if (password !== passwordConfirm) {
+      throw new BadRequestException('Las contraseñas no coinciden');
+    }
+
+    const user = await this.usersRepo.findOne({ where: { reset_token: token } });
+
+    if (!user || !user.reset_token_expires || user.reset_token_expires < new Date()) {
+      throw new BadRequestException('El enlace de restablecimiento es inválido o ha expirado');
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    await this.usersRepo.update(user.id, {
+      password_hash,
+      reset_token: undefined,
+      reset_token_expires: undefined,
+    });
+
+    await this.mailService.send({
+      to: user.email,
+      subject: 'Tu contraseña fue cambiada — Plataforma Educativa',
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8f9fc;border-radius:12px;">
+          <h2 style="margin:0 0 8px;font-size:1.4rem;color:#111;">Contraseña actualizada ✅</h2>
+          <p style="color:#555;line-height:1.6;margin:0 0 16px;">
+            Hola, <strong>${user.first_name}</strong>. Tu contraseña fue cambiada exitosamente.
+          </p>
+          <p style="color:#555;line-height:1.6;margin:0 0 24px;">
+            Si no realizaste este cambio, comunícate de inmediato con el administrador o restablece tu contraseña nuevamente.
+          </p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px;">
+          <p style="color:#aaa;font-size:.78rem;margin:0;">Plataforma Educativa · No respondas a este correo</p>
+        </div>
+      `,
+    });
   }
 }

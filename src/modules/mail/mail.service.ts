@@ -22,13 +22,12 @@ export class MailService {
 
   constructor(private config: ConfigService) {
     this.transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // STARTTLS
       auth: {
-        type: 'OAuth2',
         user: this.config.get<string>('GMAIL_FROM_EMAIL'),
-        clientId: this.config.get<string>('GMAIL_CLIENT_ID'),
-        clientSecret: this.config.get<string>('GMAIL_CLIENT_SECRET'),
-        refreshToken: this.config.get<string>('GMAIL_REFRESH_TOKEN'),
+        pass: this.config.get<string>('GMAIL_APP_PASSWORD'),
       },
     });
   }

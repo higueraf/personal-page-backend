@@ -29,6 +29,13 @@ export class PlaygroundController {
     };
   }
 
+  /** Returns the current server UTC time. Used by the frontend to sync the
+   *  exam countdown timer regardless of the student's machine clock accuracy. */
+  @Get('server-time')
+  getServerTime() {
+    return { serverTime: new Date().toISOString() };
+  }
+
   @Post()
   async createProject(@Req() req: Request, @Body() data: any) {
     const user = req.user as any;
@@ -39,6 +46,37 @@ export class PlaygroundController {
   async getProject(@Req() req: Request, @Param('id') id: string) {
     const user = req.user as any;
     return this.playgroundService.findOne(id, user.id, user.role?.name);
+  }
+
+  /**
+   * Batch-save all files for a project in a single request.
+   * Upserts each file by (project_id + name + path). Handles new files and
+   * renamed files transparently, avoiding URL-encoding issues with special
+   * characters (underscores, hyphens, dots) in file names.
+   */
+  @Put(':id/save-all')
+  async saveAllFiles(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body('files') files: Array<{ id?: string; name: string; content: string; path: string }>,
+  ) {
+    const user = req.user as any;
+    return this.playgroundService.saveAllFiles(id, files ?? [], user.id);
+  }
+
+  /**
+   * Rename a file (or folder) by its DB UUID.
+   * Also updates child paths when renaming a folder.
+   */
+  @Patch(':id/files/:fileId/rename')
+  async renameFile(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Param('fileId') fileId: string,
+    @Body('name') newName: string,
+  ) {
+    const user = req.user as any;
+    return this.playgroundService.renameFile(id, fileId, newName, user.id);
   }
 
   @Put(':id/files/:name')

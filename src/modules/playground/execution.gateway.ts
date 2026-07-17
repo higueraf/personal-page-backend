@@ -34,6 +34,7 @@ const RUNTIMES: Record<string, RuntimeConfig> = {
   kotlin:     { directCommand: 'kotlin',  extension: '.kt', compileCommand: 'kotlinc' },
   java:       { directCommand: 'java',    extension: '.java', compileCommand: 'javac' },
   dart:       { directCommand: 'dart',    extension: '.dart' },
+  r:          { directCommand: 'Rscript', extension: '.R' },
 };
 
 @WebSocketGateway({
@@ -42,6 +43,9 @@ const RUNTIMES: Record<string, RuntimeConfig> = {
     credentials: true,
   },
   namespace: '/execution',
+  // Allow payloads up to 10 MB so that uploaded data files (CSV, JSON, TXT…)
+  // can be sent together with source files without being rejected.
+  maxHttpBufferSize: 10 * 1024 * 1024,
 })
 export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
