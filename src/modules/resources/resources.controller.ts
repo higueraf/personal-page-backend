@@ -1,18 +1,19 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { ILike, Repository } from 'typeorm';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Resource, ResourceType } from '../../entities/resource.entity';
 
 class UpsertResourceDto {
-  title: string;
-  description?: string;
-  type?: ResourceType;
-  url?: string;
-  tags?: string[];
-  is_free?: boolean;
-  is_published?: boolean;
-  order?: number;
+  @IsString() title: string;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsEnum(ResourceType) type?: ResourceType;
+  @IsOptional() @IsString() url?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
+  @IsOptional() @IsBoolean() is_free?: boolean;
+  @IsOptional() @IsBoolean() is_published?: boolean;
+  @IsOptional() @IsInt() @Min(0) order?: number;
 }
 
 @Controller('resources')

@@ -1,22 +1,23 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ProfileItem, ProfileItemType } from '../../entities/profile-item.entity';
 
 class UpsertProfileItemDto {
-  type: ProfileItemType;
-  title: string;
-  subtitle?: string;
-  location?: string;
-  start_date?: string;
-  end_date?: string;
-  description?: string;
-  tags?: string[];
-  url?: string;
-  logo?: string;
-  order?: number;
-  is_visible?: boolean;
+  @IsEnum(ProfileItemType) type: ProfileItemType;
+  @IsString() title: string;
+  @IsOptional() @IsString() subtitle?: string;
+  @IsOptional() @IsString() location?: string;
+  @IsOptional() @IsString() start_date?: string;
+  @IsOptional() @IsString() end_date?: string;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
+  @IsOptional() @IsString() url?: string;
+  @IsOptional() @IsString() logo?: string;
+  @IsOptional() @IsInt() @Min(0) order?: number;
+  @IsOptional() @IsBoolean() is_visible?: boolean;
 }
 
 @Controller('profile')

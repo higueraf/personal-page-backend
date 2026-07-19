@@ -1,25 +1,30 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { IsBoolean, IsEmail, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ContactInfo } from '../../entities/contact-info.entity';
 import { ContactMessage, ContactMessageStatus } from '../../entities/contact-message.entity';
 
 class SendMessageDto {
-  name: string;
-  email: string;
-  phone?: string;
-  subject: string;
-  message: string;
+  @IsString() name: string;
+  @IsEmail() email: string;
+  @IsOptional() @IsString() phone?: string;
+  @IsString() subject: string;
+  @IsString() message: string;
 }
 
 class UpsertContactInfoDto {
-  key: string;
-  label: string;
-  value: string;
-  icon?: string;
-  is_visible?: boolean;
-  order?: number;
+  @IsString() key: string;
+  @IsString() label: string;
+  @IsString() value: string;
+  @IsOptional() @IsString() icon?: string;
+  @IsOptional() @IsBoolean() is_visible?: boolean;
+  @IsOptional() @IsInt() @Min(0) order?: number;
+}
+
+class UpdateMessageStatusDto {
+  @IsEnum(ContactMessageStatus) status: ContactMessageStatus;
 }
 
 // ── Público ───────────────────────────────────────────────────────────────────
@@ -104,7 +109,7 @@ export class ContactAdminController {
   }
 
   @Patch('messages/:id')
-  async updateMessage(@Param('id') id: string, @Body() body: { status: ContactMessageStatus }) {
+  async updateMessage(@Param('id') id: string, @Body() body: UpdateMessageStatusDto) {
     const item = await this.msgRepo.findOne({ where: { id } });
     if (!item) return { error: 'Not found' };
     item.status = body.status;

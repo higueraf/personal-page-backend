@@ -184,28 +184,33 @@ export class AuthService {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetLink = `${frontendUrl}/reset-password?token=${token}`;
 
-    await this.mailService.send({
-      to: user.email,
-      subject: 'Restablecer contraseña — Plataforma Educativa',
-      html: `
-        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8f9fc;border-radius:12px;">
-          <h2 style="margin:0 0 8px;font-size:1.4rem;color:#111;">Hola, ${user.first_name} 👋</h2>
-          <p style="color:#555;line-height:1.6;margin:0 0 24px;">
-            Recibimos una solicitud para restablecer la contraseña de tu cuenta.<br>
-            Haz clic en el botón de abajo para crear una nueva contraseña.
-          </p>
-          <a href="${resetLink}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:.95rem;">
-            Restablecer contraseña
-          </a>
-          <p style="color:#888;font-size:.82rem;margin:24px 0 0;line-height:1.5;">
-            Este enlace es válido por <strong>1 hora</strong>.<br>
-            Si no solicitaste este cambio, puedes ignorar este correo con seguridad.
-          </p>
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px;">
-          <p style="color:#aaa;font-size:.78rem;margin:0;">Plataforma Educativa · No respondas a este correo</p>
-        </div>
-      `,
-    });
+    try {
+      await this.mailService.send({
+        to: user.email,
+        subject: 'Restablecer contraseña — Plataforma Educativa',
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8f9fc;border-radius:12px;">
+            <h2 style="margin:0 0 8px;font-size:1.4rem;color:#111;">Hola, ${user.first_name} 👋</h2>
+            <p style="color:#555;line-height:1.6;margin:0 0 24px;">
+              Recibimos una solicitud para restablecer la contraseña de tu cuenta.<br>
+              Haz clic en el botón de abajo para crear una nueva contraseña.
+            </p>
+            <a href="${resetLink}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:.95rem;">
+              Restablecer contraseña
+            </a>
+            <p style="color:#888;font-size:.82rem;margin:24px 0 0;line-height:1.5;">
+              Este enlace es válido por <strong>1 hora</strong>.<br>
+              Si no solicitaste este cambio, puedes ignorar este correo con seguridad.
+            </p>
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px;">
+            <p style="color:#aaa;font-size:.78rem;margin:0;">Plataforma Educativa · No respondas a este correo</p>
+          </div>
+        `,
+      });
+    } catch {
+      // No se relanza: el token ya quedó guardado y la respuesta debe seguir siendo genérica
+      // para no revelar por código de estado si el correo existe o si el envío falló.
+    }
   }
 
   /**
@@ -230,22 +235,27 @@ export class AuthService {
       reset_token_expires: undefined,
     });
 
-    await this.mailService.send({
-      to: user.email,
-      subject: 'Tu contraseña fue cambiada — Plataforma Educativa',
-      html: `
-        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8f9fc;border-radius:12px;">
-          <h2 style="margin:0 0 8px;font-size:1.4rem;color:#111;">Contraseña actualizada ✅</h2>
-          <p style="color:#555;line-height:1.6;margin:0 0 16px;">
-            Hola, <strong>${user.first_name}</strong>. Tu contraseña fue cambiada exitosamente.
-          </p>
-          <p style="color:#555;line-height:1.6;margin:0 0 24px;">
-            Si no realizaste este cambio, comunícate de inmediato con el administrador o restablece tu contraseña nuevamente.
-          </p>
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px;">
-          <p style="color:#aaa;font-size:.78rem;margin:0;">Plataforma Educativa · No respondas a este correo</p>
-        </div>
-      `,
-    });
+    try {
+      await this.mailService.send({
+        to: user.email,
+        subject: 'Tu contraseña fue cambiada — Plataforma Educativa',
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8f9fc;border-radius:12px;">
+            <h2 style="margin:0 0 8px;font-size:1.4rem;color:#111;">Contraseña actualizada ✅</h2>
+            <p style="color:#555;line-height:1.6;margin:0 0 16px;">
+              Hola, <strong>${user.first_name}</strong>. Tu contraseña fue cambiada exitosamente.
+            </p>
+            <p style="color:#555;line-height:1.6;margin:0 0 24px;">
+              Si no realizaste este cambio, comunícate de inmediato con el administrador o restablece tu contraseña nuevamente.
+            </p>
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px;">
+            <p style="color:#aaa;font-size:.78rem;margin:0;">Plataforma Educativa · No respondas a este correo</p>
+          </div>
+        `,
+      });
+    } catch {
+      // No se relanza: la contraseña ya fue actualizada exitosamente;
+      // un fallo en el correo de confirmación no debe hacer fallar la operación.
+    }
   }
 }

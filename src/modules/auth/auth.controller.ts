@@ -9,6 +9,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { GoogleAuthGuard } from './google-auth.guard';
 
@@ -50,7 +51,7 @@ export class AuthController {
   @Patch('user')
   async updateProfile(
     @Req() req: Request & { user: any },
-    @Body() body: { first_name?: string; last_name?: string },
+    @Body() body: UpdateProfileDto,
   ) {
     return { data: await this.authService.updateProfile(req.user.id, body) };
   }

@@ -1,21 +1,22 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { IsArray, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { ILike, Repository } from 'typeorm';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Project, ProjectStatus } from '../../entities/project.entity';
 import { toSlug } from '../../common/slug.util';
 
 class UpsertProjectDto {
-  title: string;
-  slug?: string;
-  description?: string;
-  long_description?: string;
-  tech_stack?: string[];
-  url?: string;
-  repo_url?: string;
-  thumbnail?: string;
-  order?: number;
-  status?: ProjectStatus;
+  @IsString() title: string;
+  @IsOptional() @IsString() slug?: string;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsString() long_description?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) tech_stack?: string[];
+  @IsOptional() @IsString() url?: string;
+  @IsOptional() @IsString() repo_url?: string;
+  @IsOptional() @IsString() thumbnail?: string;
+  @IsOptional() @IsInt() @Min(0) order?: number;
+  @IsOptional() @IsEnum(ProjectStatus) status?: ProjectStatus;
 }
 
 @Controller('projects')
