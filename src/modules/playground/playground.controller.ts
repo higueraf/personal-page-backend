@@ -187,6 +187,7 @@ export class PlaygroundController {
           allow_copy_paste: data.allow_copy_paste ?? false,
           require_seb:      data.require_seb ?? false,
           files:            data.files,
+          templateId:       data.templateId,
           exam_group_id,
         }),
       ),

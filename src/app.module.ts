@@ -31,6 +31,7 @@ import { ContactInfo } from './entities/contact-info.entity';
 import { ContactMessage } from './entities/contact-message.entity';
 import { PlaygroundProject } from './entities/playground-project.entity';
 import { PlaygroundFile } from './entities/playground-file.entity';
+import { PlaygroundTemplate } from './entities/playground-template.entity';
 import { Institution } from './entities/institution.entity';
 import { StudyCourse } from './entities/study-course.entity';
 
@@ -43,7 +44,7 @@ const ALL_ENTITIES = [
   ProfileItem,
   Resource,
   ContactInfo, ContactMessage,
-  PlaygroundProject, PlaygroundFile,
+  PlaygroundProject, PlaygroundFile, PlaygroundTemplate,
 ];
 
 @Module({

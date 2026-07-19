@@ -17,6 +17,7 @@ import { ContactInfo }    from '../entities/contact-info.entity';
 import { ProfileItem, ProfileItemType } from '../entities/profile-item.entity';
 import { Project, ProjectStatus } from '../entities/project.entity';
 import { Resource, ResourceType } from '../entities/resource.entity';
+import { PlaygroundTemplate } from '../entities/playground-template.entity';
 
 @Injectable()
 export class AppSeeder {
@@ -35,6 +36,7 @@ export class AppSeeder {
     @InjectRepository(ProfileItem)   private readonly profileRepo:       Repository<ProfileItem>,
     @InjectRepository(Project)       private readonly projectsRepo:      Repository<Project>,
     @InjectRepository(Resource)      private readonly resourcesRepo:     Repository<Resource>,
+    @InjectRepository(PlaygroundTemplate) private readonly playgroundTemplatesRepo: Repository<PlaygroundTemplate>,
   ) {}
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -43,7 +45,7 @@ export class AppSeeder {
     const teacherRole = await this.ensureRole('teacher', ['content:read', 'content:write']);
     const studentRole = await this.ensureRole('student', ['content:read']);
 
-    await this.ensureUser('admin@higueraf.dev',   'Admin123*',   'Francisco', 'Higuera',  adminRole,   UserStatus.APPROVED);
+    const adminUser = await this.ensureUser('admin@higueraf.dev',   'Admin123*',   'Francisco', 'Higuera',  adminRole,   UserStatus.APPROVED);
     await this.ensureUser('student@higueraf.dev', 'Student123*', 'Demo',      'Student',  studentRole, UserStatus.APPROVED);
     await this.ensureUser('teacher@higueraf.dev', 'Teacher123*', 'Demo',      'Teacher',  teacherRole, UserStatus.APPROVED);
 
@@ -53,6 +55,7 @@ export class AppSeeder {
     await this.seedTutorials();
     await this.seedVideoCourses();
     await this.seedResources();
+    await this.seedPlaygroundTemplates(adminUser);
 
     return { ok: true };
   }
@@ -935,6 +938,131 @@ const { data: user } = useQuery({
       const exists = await this.resourcesRepo.findOne({ where: { title: r.title } });
       if (!exists) {
         await this.resourcesRepo.save(this.resourcesRepo.create(r));
+      }
+    }
+  }
+
+  // ── 7. Plantillas de Playground (Hello World básico por lenguaje) ────────────
+  private async seedPlaygroundTemplates(admin: User) {
+    const templates: {
+      name: string;
+      language: string;
+      description: string;
+      files: PlaygroundTemplate['files'];
+    }[] = [
+      {
+        name: 'Hello World — Python', language: 'python',
+        description: 'Ejemplo básico de Python: imprime un saludo por consola.',
+        files: [{ name: 'main.py', path: '/main.py', is_folder: false, content: 'print("Hello World!")\n' }],
+      },
+      {
+        name: 'Hello World — JavaScript', language: 'javascript',
+        description: 'Ejemplo básico de JavaScript: imprime un saludo por consola.',
+        files: [{ name: 'main.js', path: '/main.js', is_folder: false, content: 'console.log("Hello World!");\n' }],
+      },
+      {
+        name: 'Hello World — TypeScript', language: 'typescript',
+        description: 'Ejemplo básico de TypeScript: imprime un saludo por consola.',
+        files: [{ name: 'main.ts', path: '/main.ts', is_folder: false, content: 'const message: string = "Hello World!";\nconsole.log(message);\n' }],
+      },
+      {
+        name: 'Hello World — Kotlin', language: 'kotlin',
+        description: 'Ejemplo básico de Kotlin: imprime un saludo por consola.',
+        files: [{ name: 'main.kt', path: '/main.kt', is_folder: false, content: 'fun main() {\n    println("Hello World!")\n}\n' }],
+      },
+      {
+        name: 'Hello World — Dart', language: 'dart',
+        description: 'Ejemplo básico de Dart: imprime un saludo por consola.',
+        files: [{ name: 'main.dart', path: '/main.dart', is_folder: false, content: 'void main() {\n  print("Hello World!");\n}\n' }],
+      },
+      {
+        name: 'Hello World — R', language: 'r',
+        description: 'Ejemplo básico de R: imprime un saludo por consola.',
+        files: [{ name: 'main.R', path: '/main.R', is_folder: false, content: 'cat("Hello World!\\n")\n' }],
+      },
+      {
+        name: 'Hello World — HTML/CSS/JS', language: 'html',
+        description: 'Ejemplo básico web: una página con un saludo.',
+        files: [
+          { name: 'index.html', path: '/index.html', is_folder: false, content: '<!DOCTYPE html>\n<html>\n<head>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1>Hello World!</h1>\n  <script src="script.js"></script>\n</body>\n</html>\n' },
+          { name: 'style.css', path: '/style.css', is_folder: false, content: 'h1 { color: #333; text-align: center; font-family: sans-serif; }\n' },
+          { name: 'script.js', path: '/script.js', is_folder: false, content: 'console.log("Hello World!");\n' },
+        ],
+      },
+      {
+        name: 'Hello World — React', language: 'react',
+        description: 'Ejemplo básico de React + TypeScript: componente que muestra un saludo.',
+        files: [
+          { name: 'src', path: '/src', is_folder: true, content: '' },
+          {
+            name: 'main.tsx', path: '/src/main.tsx', is_folder: false,
+            content: `import React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport App from './App';\n\nconst root = ReactDOM.createRoot(document.getElementById('root')!);\nroot.render(<App />);\n`,
+          },
+          {
+            name: 'App.tsx', path: '/src/App.tsx', is_folder: false,
+            content: `import React from 'react';\n\nexport default function App() {\n  return (\n    <div style={{ fontFamily: 'sans-serif', padding: '2rem', textAlign: 'center' }}>\n      <h1>Hello World!</h1>\n    </div>\n  );\n}\n`,
+          },
+        ],
+      },
+      {
+        name: 'Hello World — Flutter', language: 'flutter',
+        description: 'Ejemplo básico de Flutter: una pantalla con un saludo.',
+        files: [
+          { name: 'lib', path: '/lib', is_folder: true, content: '' },
+          {
+            name: 'main.dart', path: '/lib/main.dart', is_folder: false,
+            content: `import 'package:flutter/material.dart';\n\nvoid main() {\n  runApp(const MyApp());\n}\n\nclass MyApp extends StatelessWidget {\n  const MyApp({super.key});\n\n  @override\n  Widget build(BuildContext context) {\n    return MaterialApp(\n      debugShowCheckedModeBanner: false,\n      home: Scaffold(\n        body: Center(\n          child: Text('Hello World!', style: TextStyle(fontSize: 24)),\n        ),\n      ),\n    );\n  }\n}\n`,
+          },
+          {
+            name: 'pubspec.yaml', path: '/pubspec.yaml', is_folder: false,
+            content: `name: flutter_hello_world\ndescription: Ejemplo básico de Flutter.\n\nenvironment:\n  sdk: '>=3.0.0 <4.0.0'\n  flutter: '>=3.10.0'\n\ndependencies:\n  flutter:\n    sdk: flutter\n`,
+          },
+        ],
+      },
+      {
+        name: 'Hello World — React Native', language: 'react-native',
+        description: 'Ejemplo básico de React Native: una pantalla con un saludo.',
+        files: [
+          {
+            name: 'App.tsx', path: '/App.tsx', is_folder: false,
+            content: `import { Text, View } from 'react-native';\n\nexport default function App() {\n  return (\n    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>\n      <Text>Hello World!</Text>\n    </View>\n  );\n}\n`,
+          },
+        ],
+      },
+      {
+        name: 'Hello World — Vue', language: 'vue',
+        description: 'Ejemplo básico de Vue: un componente que muestra un saludo.',
+        files: [
+          {
+            name: 'App.js', path: '/App.js', is_folder: false,
+            content: `const { createApp } = Vue;\n\ncreateApp({\n  template: \`<h1 style="text-align: center; font-family: sans-serif; margin-top: 2rem;">Hello World!</h1>\`\n}).mount("#app");\n`,
+          },
+        ],
+      },
+      {
+        name: 'Hello World — Angular', language: 'angular',
+        description: 'Ejemplo básico de Angular: muestra un saludo en pantalla.',
+        files: [
+          {
+            name: 'app.ts', path: '/app.ts', is_folder: false,
+            content: `document.body.innerHTML = \`<h1 style="text-align: center; font-family: sans-serif; margin-top: 2rem;">Hello World!</h1>\`;\n`,
+          },
+        ],
+      },
+    ];
+
+    for (const t of templates) {
+      const exists = await this.playgroundTemplatesRepo.findOne({ where: { name: t.name } });
+      if (!exists) {
+        await this.playgroundTemplatesRepo.save(
+          this.playgroundTemplatesRepo.create({
+            name: t.name,
+            description: t.description,
+            language: t.language,
+            files: t.files,
+            created_by: admin.id,
+          }),
+        );
       }
     }
   }

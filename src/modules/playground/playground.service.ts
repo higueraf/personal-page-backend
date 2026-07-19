@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { PlaygroundProject, ProjectStatus } from '../../entities/playground-project.entity';
 import { PlaygroundFile } from '../../entities/playground-file.entity';
+import { PlaygroundTemplate } from '../../entities/playground-template.entity';
 import { User } from '../../entities/user.entity';
 import { MailService } from '../mail/mail.service';
 
@@ -28,6 +29,8 @@ export class PlaygroundService {
     private fileRepo: Repository<PlaygroundFile>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    @InjectRepository(PlaygroundTemplate)
+    private templateRepo: Repository<PlaygroundTemplate>,
     private mailService: MailService,
   ) {}
 
@@ -291,9 +294,9 @@ export class PlaygroundService {
   async assignExam(
     teacherId: string,
     studentId: string,
-    examData: Partial<PlaygroundProject> & { files?: { name: string; content?: string; path?: string }[]; exam_group_id?: string },
+    examData: Partial<PlaygroundProject> & { files?: { name: string; content?: string; path?: string }[]; exam_group_id?: string; templateId?: string },
   ) {
-    const { files, exam_group_id, ...projectData } = examData as any;
+    const { files, exam_group_id, templateId, ...projectData } = examData as any;
 
     const project = this.projectRepo.create({
       ...projectData,
@@ -307,10 +310,17 @@ export class PlaygroundService {
     const saved = await this.projectRepo.save(project) as unknown as PlaygroundProject;
     const projectId: string = saved.id;
 
-    // Save initial files — use provided files or fall back to language defaults
-    const resolvedFiles = (Array.isArray(files) && files.length > 0)
-      ? files
-      : (DEFAULT_FILES[projectData.language ?? 'python'] ?? DEFAULT_FILES.python);
+    // Save initial files — priority: explicit files > template files > language defaults
+    let resolvedFiles = files;
+    if (!Array.isArray(resolvedFiles) || resolvedFiles.length === 0) {
+      if (templateId) {
+        const template = await this.templateRepo.findOne({ where: { id: templateId } });
+        resolvedFiles = template?.files;
+      }
+    }
+    if (!Array.isArray(resolvedFiles) || resolvedFiles.length === 0) {
+      resolvedFiles = DEFAULT_FILES[projectData.language ?? 'python'] ?? DEFAULT_FILES.python;
+    }
 
     const fileEntities = resolvedFiles.map((f: any) =>
       this.fileRepo.create({
