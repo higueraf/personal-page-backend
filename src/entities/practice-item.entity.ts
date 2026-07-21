@@ -11,10 +11,11 @@ import {
  * los alumnos consuman un CRUD real (ej. desde un examen de Flutter) sin
  * afectar ni relacionarse con las tablas/entidades del sitio.
  *
- * `type` es un namespace liviano (ej. "ropa", "libros", "farmacia", "tareas")
- * que separa lógicamente los datos de cada variante de examen sin necesidad
- * de aislar por alumno — la corrección se hace leyendo el código del alumno,
- * no el estado de esta tabla.
+ * `type` es la variante de examen (ej. "ropa", "libros", "farmacia", "tareas")
+ * y también el segmento de URL del endpoint (`/practice-api/:type/items`).
+ * `data` guarda los campos propios de cada variante (mínimo 7, distintos
+ * nombres por variante — ver `practice-variants.config.ts`) en formato libre,
+ * para no necesitar una tabla ni columnas distintas por variante.
  */
 @Entity('practice_items')
 export class PracticeItem {
@@ -24,23 +25,8 @@ export class PracticeItem {
   @Column()
   type: string;
 
-  @Column()
-  name: string;
-
-  @Column({ type: 'text', nullable: true })
-  description: string;
-
-  @Column({ nullable: true })
-  category: string;
-
-  @Column('decimal', { precision: 10, scale: 2, default: 0 })
-  price: number;
-
-  @Column({ default: 1 })
-  quantity: number;
-
-  @Column({ default: true })
-  active: boolean;
+  @Column('jsonb', { default: {} })
+  data: Record<string, any>;
 
   @CreateDateColumn()
   created_at: Date;

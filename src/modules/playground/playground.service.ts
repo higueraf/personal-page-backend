@@ -8,6 +8,27 @@ import { PlaygroundTemplate } from '../../entities/playground-template.entity';
 import { ExamVersion, ExamQuestion } from '../../entities/exam-version.entity';
 import { User } from '../../entities/user.entity';
 import { MailService } from '../mail/mail.service';
+import { getVariantConfig, VariantField, DartFieldType } from '../practice-api/practice-variants.config';
+
+/** Valor Dart por defecto según el tipo del campo, usado al parsear la respuesta de la API. */
+function dartDefault(type: DartFieldType): string {
+  if (type === 'string') return "''";
+  if (type === 'bool') return 'true';
+  return '0';
+}
+
+/** Expresión Dart para leer `json['key']` con el tipo y valor por defecto correctos. */
+function dartFromJson(field: VariantField): string {
+  const { key, type } = field;
+  if (type === 'string') return `json['${key}'] as String? ?? ''`;
+  if (type === 'int') return `(json['${key}'] as num?)?.toInt() ?? 0`;
+  if (type === 'double') return `(json['${key}'] as num?)?.toDouble() ?? 0`;
+  return `json['${key}'] as bool? ?? true`;
+}
+
+function dartType(type: DartFieldType): string {
+  return type === 'string' ? 'String' : type === 'int' ? 'int' : type === 'double' ? 'double' : 'bool';
+}
 
 /** Slug simple para el "type" (namespace) de la API de práctica, derivado del theme_name de la variante. */
 function slugify(text: string): string {
@@ -96,16 +117,25 @@ export class PlaygroundService {
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
     const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0);
     const typeSlug = slugify(version.theme_name);
+    const fields = getVariantConfig(typeSlug).fields;
+    const endpoint = `https://TU-BACKEND/api/practice-api/${typeSlug}/items`;
 
     const enunciado = [
       `# Examen Flutter — ${version.theme_name}`,
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
-      `> API de práctica: usá \`type=${typeSlug}\` en tus llamadas (ya viene configurado en \`lib/services/api_service.dart\`).`,
+      `> API de práctica: \`GET/POST ${endpoint}\` y \`GET/PATCH/DELETE ${endpoint}/:id\` (ya viene configurado en \`lib/services/api_service.dart\`).`,
+      '',
+      `> Campos del recurso: ${fields.map((f) => `\`${f.key}\` (${dartType(f.type)})`).join(', ')}.`,
       '',
       ...questions.map((q) => `## Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
     ].join('\n');
+
+    const constructorParams = fields.map((f) => `    required this.${f.key},`).join('\n');
+    const classProps = fields.map((f) => `  final ${dartType(f.type)} ${f.key};`).join('\n');
+    const fromJsonProps = fields.map((f) => `      ${f.key}: ${dartFromJson(f)},`).join('\n');
+    const toJsonProps = fields.map((f) => `      '${f.key}': ${f.key},`).join('\n');
 
     return [
       { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
@@ -121,47 +151,23 @@ export class PlaygroundService {
         content:
 `class Item {
   final String? id;
-  final String type;
-  final String name;
-  final String? description;
-  final String? category;
-  final double price;
-  final int quantity;
-  final bool active;
+${classProps}
 
   Item({
     this.id,
-    required this.type,
-    required this.name,
-    this.description,
-    this.category,
-    this.price = 0,
-    this.quantity = 1,
-    this.active = true,
+${constructorParams}
   });
 
   factory Item.fromJson(Map<String, dynamic> json) {
     return Item(
       id: json['id'] as String?,
-      type: json['type'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String?,
-      category: json['category'] as String?,
-      price: double.tryParse(json['price'].toString()) ?? 0,
-      quantity: json['quantity'] as int? ?? 1,
-      active: json['active'] as bool? ?? true,
+${fromJsonProps}
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'type': type,
-      'name': name,
-      'description': description,
-      'category': category,
-      'price': price,
-      'quantity': quantity,
-      'active': active,
+${toJsonProps}
     };
   }
 }
@@ -174,13 +180,12 @@ export class PlaygroundService {
 import 'package:http/http.dart' as http;
 import '../models/item.dart';
 
-/// Cliente mínimo de la API de práctica — cambiá [type] por el indicado en ENUNCIADO.md.
+/// Cliente mínimo de la API de práctica de esta variante (ver ENUNCIADO.md).
 class ApiService {
-  static const String baseUrl = 'https://TU-BACKEND/api/practice-api/items';
-  static const String type = '${typeSlug}';
+  static const String baseUrl = '${endpoint}';
 
   Future<List<Item>> fetchItems() async {
-    final res = await http.get(Uri.parse('\$baseUrl?type=\$type'));
+    final res = await http.get(Uri.parse(baseUrl));
     final List<dynamic> data = jsonDecode(res.body);
     return data.map((e) => Item.fromJson(e)).toList();
   }
@@ -189,7 +194,7 @@ class ApiService {
     final res = await http.post(
       Uri.parse(baseUrl),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({...item.toJson(), 'type': type}),
+      body: jsonEncode(item.toJson()),
     );
     return Item.fromJson(jsonDecode(res.body));
   }
@@ -275,9 +280,12 @@ class _HomePageState extends State<HomePage> {
               itemCount: _items.length,
               itemBuilder: (context, i) {
                 final item = _items[i];
+                final fields = item.toJson().entries.toList();
+                final title = fields.isNotEmpty ? fields.first.value.toString() : '(sin datos)';
+                final subtitle = fields.skip(1).map((e) => '\${e.key}: \${e.value}').join(' · ');
                 return ListTile(
-                  title: Text(item.name),
-                  subtitle: Text('\${item.category ?? ''} — \\\$\${item.price}'),
+                  title: Text(title),
+                  subtitle: Text(subtitle),
                 );
               },
             ),

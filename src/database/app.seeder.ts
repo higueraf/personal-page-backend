@@ -1390,22 +1390,24 @@ const { data: user } = useQuery({
     if (exists) return;
 
     // Cada variante: Q1 CRUD contra la API de práctica (7 pts) + Q2/Q3 lógica interviniente (1.5 pts c/u).
-    // El `theme_name` es también el "type" (namespace) usado en la API de práctica — ver PracticeApiService.
+    // El `theme_name` define el segmento de URL (`/practice-api/<slug>/items`) y los 7 campos propios
+    // de esa variante — ver `practice-variants.config.ts`. Endpoint y campos son distintos por variante
+    // a propósito, para que no se pueda reusar el mismo proyecto entre variantes sin cambios reales.
     const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
       {
         theme_name: 'Ropa', order_index: 0,
         questions: [
           {
             order: 1, points: 7, title: 'CRUD de tienda de ropa contra la API',
-            statement: 'Construye una app Flutter que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart, con type="ropa") para gestionar el catálogo de una tienda de ropa. Debe permitir: (1) listar las prendas mostrando nombre, categoría, precio y stock; (2) crear una prenda nueva desde un formulario; (3) editar una prenda existente; (4) eliminar una prenda. Usa las funciones ya provistas en ApiService (fetchItems, createItem, updateItem, deleteItem) y actualiza la lista en pantalla después de cada operación.',
+            statement: 'Construye una app Flutter que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el catálogo de una tienda de ropa. El recurso maneja los campos: prenda, talla, color, categoria, precio, stock y disponible. Debe permitir: (1) listar las prendas mostrando al menos prenda, categoria, precio y stock; (2) crear una prenda nueva desde un formulario con todos los campos; (3) editar una prenda existente; (4) eliminar una prenda. Usa las funciones ya provistas en ApiService (fetchItems, createItem, updateItem, deleteItem) y actualiza la lista en pantalla después de cada operación.',
           },
           {
             order: 2, points: 1.5, title: 'Valor total del inventario',
-            statement: 'En la pantalla de listado, calcula y muestra el valor total del inventario (suma de precio × stock de todas las prendas cargadas) en un texto visible, por ejemplo en la parte superior de la lista.',
+            statement: 'En la pantalla de listado, calcula y muestra el valor total del inventario (suma de precio × stock de todas las prendas con disponible == true) en un texto visible, por ejemplo en la parte superior de la lista.',
           },
           {
             order: 3, points: 1.5, title: 'Filtro por categoría',
-            statement: 'Agrega un buscador o selector que permita filtrar la lista de prendas por categoría (ej. Camisetas, Pantalones, Calzado), mostrando solo las que coincidan con la categoría seleccionada.',
+            statement: 'Agrega un buscador o selector que permita filtrar la lista de prendas por categoria (ej. Camisetas, Pantalones, Calzado), mostrando solo las que coincidan con la categoría seleccionada.',
           },
         ],
       },
@@ -1414,15 +1416,15 @@ const { data: user } = useQuery({
         questions: [
           {
             order: 1, points: 7, title: 'CRUD de biblioteca contra la API',
-            statement: 'Construye una app Flutter que consuma la API de práctica (type="libros") para gestionar el catálogo de una biblioteca. Debe permitir: (1) listar los libros mostrando nombre, categoría, precio y cantidad disponible; (2) crear un libro nuevo desde un formulario; (3) editar un libro existente; (4) eliminar un libro. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
+            statement: 'Construye una app Flutter que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el catálogo de una biblioteca. El recurso maneja los campos: titulo, autor, genero, precio, ejemplares, anioPublicacion y disponible. Debe permitir: (1) listar los libros mostrando al menos titulo, autor, precio y ejemplares; (2) crear un libro nuevo desde un formulario con todos los campos; (3) editar un libro existente; (4) eliminar un libro. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
           },
           {
             order: 2, points: 1.5, title: 'Libros agotados',
-            statement: 'En la pantalla de listado, cuenta cuántos libros tienen cantidad disponible igual a 0 ("agotados") y muestra ese total en un texto visible.',
+            statement: 'En la pantalla de listado, cuenta cuántos libros tienen ejemplares igual a 0 ("agotados") y muestra ese total en un texto visible.',
           },
           {
             order: 3, points: 1.5, title: 'Ordenar la lista',
-            statement: 'Agrega un botón que permita ordenar la lista de libros alfabéticamente por nombre (o por precio), alternando el orden cada vez que se presiona.',
+            statement: 'Agrega un botón que permita ordenar la lista de libros alfabéticamente por titulo (o por precio), alternando el orden cada vez que se presiona.',
           },
         ],
       },
@@ -1431,15 +1433,15 @@ const { data: user } = useQuery({
         questions: [
           {
             order: 1, points: 7, title: 'CRUD de farmacia contra la API',
-            statement: 'Construye una app Flutter que consuma la API de práctica (type="farmacia") para gestionar el inventario de una farmacia. Debe permitir: (1) listar los medicamentos mostrando nombre, categoría, precio y stock; (2) crear un medicamento nuevo desde un formulario; (3) editar un medicamento existente; (4) eliminar un medicamento. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
+            statement: 'Construye una app Flutter que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el inventario de una farmacia. El recurso maneja los campos: medicamento, presentacion, laboratorio, precio, existencias, requiereReceta y fechaVencimiento. Debe permitir: (1) listar los medicamentos mostrando al menos medicamento, presentacion, precio y existencias; (2) crear un medicamento nuevo desde un formulario con todos los campos; (3) editar un medicamento existente; (4) eliminar un medicamento. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
           },
           {
             order: 2, points: 1.5, title: 'Alerta de stock bajo',
-            statement: 'En la pantalla de listado, resalta (por ejemplo con color rojo o un ícono) los medicamentos cuyo stock sea menor a 5 unidades, para indicar visualmente que deben reabastecerse.',
+            statement: 'En la pantalla de listado, resalta (por ejemplo con color rojo o un ícono) los medicamentos cuyas existencias sean menores a 5 unidades, para indicar visualmente que deben reabastecerse.',
           },
           {
             order: 3, points: 1.5, title: 'Precio con descuento por volumen',
-            statement: 'Para cada medicamento, calcula y muestra junto al precio original un "precio con descuento" aplicando un 10% de descuento cuando el stock sea mayor a 20 unidades (promoción por exceso de inventario).',
+            statement: 'Para cada medicamento, calcula y muestra junto al precio original un "precio con descuento" aplicando un 10% de descuento cuando las existencias sean mayores a 20 unidades (promoción por exceso de inventario).',
           },
         ],
       },
@@ -1448,15 +1450,15 @@ const { data: user } = useQuery({
         questions: [
           {
             order: 1, points: 7, title: 'CRUD de lista de tareas contra la API',
-            statement: 'Construye una app Flutter que consuma la API de práctica (type="tareas") para gestionar una lista de tareas/pendientes. Debe permitir: (1) listar las tareas mostrando nombre y descripción; (2) crear una tarea nueva desde un formulario; (3) editar una tarea existente; (4) eliminar una tarea. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación (usa el campo `active` del ítem como "pendiente" (true) / "completada" (false)).',
+            statement: 'Construye una app Flutter que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar una lista de tareas. El recurso maneja los campos: tarea, materia, prioridad, progreso, fechaLimite, responsable y completada. Debe permitir: (1) listar las tareas mostrando al menos tarea, materia, prioridad y progreso; (2) crear una tarea nueva desde un formulario con todos los campos; (3) editar una tarea existente; (4) eliminar una tarea. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
           },
           {
             order: 2, points: 1.5, title: 'Contador de pendientes y completadas',
-            statement: 'En la pantalla de listado, cuenta cuántas tareas están pendientes (`active == true`) y cuántas están completadas (`active == false`), y muestra ambos totales en pantalla.',
+            statement: 'En la pantalla de listado, cuenta cuántas tareas están completadas (`completada == true`) y cuántas están pendientes (`completada == false`), y muestra ambos totales en pantalla.',
           },
           {
             order: 3, points: 1.5, title: 'Validación del formulario',
-            statement: 'En el formulario de creación/edición de tareas, valida que el nombre no esté vacío antes de guardar; si está vacío, muestra un mensaje de error en pantalla y no permite continuar.',
+            statement: 'En el formulario de creación/edición de tareas, valida que el campo tarea no esté vacío antes de guardar; si está vacío, muestra un mensaje de error en pantalla y no permite continuar.',
           },
         ],
       },
