@@ -69,6 +69,7 @@ export class AppSeeder {
     await this.seedExamTemplates(adminUser);
     await this.seedExamTemplateTypeScriptV2(adminUser);
     await this.seedExamTemplateFlutter(adminUser);
+    await this.seedExamTemplateFlutterSingle(adminUser);
 
     return { ok: true };
   }
@@ -1520,6 +1521,73 @@ const { data: user } = useQuery({
           }),
         );
       }
+    }
+  }
+
+  private async seedExamTemplateFlutterSingle(admin: User) {
+    const templateName = 'Programación IV — Flutter, CRUD contra API (Ejercicio único)';
+    const description =
+      'Examen de Flutter con un solo ejercicio (10 pts): CRUD completo contra la API de práctica ' +
+      '(variante Papelería), partiendo del ejemplo de referencia ToDo (ver ENUNCIADO.md).';
+
+    // Una sola variante, un solo ejercicio (CRUD completo, 10 pts). El `theme_name` define el
+    // segmento de URL (`/practice-api/<slug>/<resource>`) y los 7 campos propios — ver
+    // `practice-variants.config.ts` (clave `papeleria`).
+    const version: { theme_name: string; order_index: number; questions: ExamQuestion[] } = {
+      theme_name: 'Papelería',
+      order_index: 0,
+      questions: [
+        {
+          order: 1, points: 10, title: 'CRUD de papelería contra la API',
+          statement: 'Construye el CRUD (duplicando/adaptando el ejemplo de referencia ToDo, ver ENUNCIADO.md) para gestionar el inventario de una papelería, consumiendo la API de práctica de tu variante. El recurso maneja los campos: producto, marca, categoria, precio, stock, codigo y disponible. Debe permitir: (1) listar los productos mostrando al menos producto, categoria, precio y stock; (2) crear un producto nuevo desde un formulario con todos los campos; (3) editar un producto existente; (4) eliminar un producto. Actualiza la lista en pantalla después de cada operación.',
+        },
+      ],
+    };
+
+    // Upsert: mismo criterio que seedExamTemplateFlutter (conserva IDs si el template ya existe).
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'flutter',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions: version.questions,
+        }),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'flutter';
+    await this.examTemplatesRepo.save(template);
+
+    const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
+    if (existing) {
+      existing.order_index = version.order_index;
+      existing.questions = version.questions;
+      await this.examVersionsRepo.save(existing);
+    } else {
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions: version.questions,
+        }),
+      );
     }
   }
 

@@ -104,6 +104,25 @@ export const PRACTICE_VARIANTS: Record<string, VariantConfig> = {
       { tarea: 'Revisar correos pendientes', materia: 'Administración', prioridad: 'Baja', progreso: 100, fechaLimite: '2026-07-15', responsable: 'Luis Salas', completada: true },
     ],
   },
+  papeleria: {
+    resource: 'productos',
+    fields: [
+      { key: 'producto', type: 'string', label: 'Producto' },
+      { key: 'marca', type: 'string', label: 'Marca' },
+      { key: 'categoria', type: 'string', label: 'Categoría' },
+      { key: 'precio', type: 'double', label: 'Precio' },
+      { key: 'stock', type: 'int', label: 'Stock' },
+      { key: 'codigo', type: 'string', label: 'Código' },
+      { key: 'disponible', type: 'bool', label: 'Disponible' },
+    ],
+    seeds: [
+      { producto: 'Cuaderno universitario 100 hojas', marca: 'Norma', categoria: 'Cuadernos', precio: 3.5, stock: 40, codigo: 'PAP-001', disponible: true },
+      { producto: 'Lápiz HB', marca: 'Faber-Castell', categoria: 'Lápices', precio: 0.5, stock: 200, codigo: 'PAP-002', disponible: true },
+      { producto: 'Resma de papel bond A4', marca: 'Reprograf', categoria: 'Papel', precio: 6.0, stock: 15, codigo: 'PAP-003', disponible: true },
+      { producto: 'Marcador permanente negro', marca: 'Sharpie', categoria: 'Marcadores', precio: 2.2, stock: 0, codigo: 'PAP-004', disponible: false },
+      { producto: 'Calculadora científica', marca: 'Casio', categoria: 'Electrónica', precio: 25.0, stock: 8, codigo: 'PAP-005', disponible: true },
+    ],
+  },
 };
 
 export const GENERIC_VARIANT: VariantConfig = {
