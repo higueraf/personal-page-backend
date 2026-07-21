@@ -53,6 +53,12 @@ export class AppSeeder {
     await this.ensureUser('student@higueraf.dev', 'Student123*', 'Demo',      'Student',  studentRole, UserStatus.APPROVED);
     await this.ensureUser('teacher@higueraf.dev', 'Teacher123*', 'Demo',      'Teacher',  teacherRole, UserStatus.APPROVED);
 
+    // ── Alumnos ficticios para probar la distribución round-robin de variantes ──
+    await this.ensureUser('alumno1.prueba@higueraf.dev', 'Alumno123*', 'Alumno', 'Uno',    studentRole, UserStatus.APPROVED);
+    await this.ensureUser('alumno2.prueba@higueraf.dev', 'Alumno123*', 'Alumno', 'Dos',    studentRole, UserStatus.APPROVED);
+    await this.ensureUser('alumno3.prueba@higueraf.dev', 'Alumno123*', 'Alumno', 'Tres',   studentRole, UserStatus.APPROVED);
+    await this.ensureUser('alumno4.prueba@higueraf.dev', 'Alumno123*', 'Alumno', 'Cuatro', studentRole, UserStatus.APPROVED);
+
     await this.seedContactInfo();
     await this.seedProfile();
     await this.seedProjects();
