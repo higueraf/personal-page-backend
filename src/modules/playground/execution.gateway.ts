@@ -27,15 +27,22 @@ interface RuntimeConfig {
   compileCommand?: string;
 }
 
+/** Resolve `tsx` by absolute path next to the backend's own node_modules
+ *  instead of a bare command name — a bare `tsx` depends on the PATH
+ *  inherited by the pm2-managed process, which on the VPS doesn't
+ *  necessarily include wherever a global `tsx` install would live. */
+const LOCAL_TSX_BIN = join(process.cwd(), 'node_modules', '.bin', 'tsx');
+const TSX_COMMAND = existsSync(LOCAL_TSX_BIN) ? LOCAL_TSX_BIN : 'tsx';
+
 const RUNTIMES: Record<string, RuntimeConfig> = {
-  javascript: { directCommand: 'node',    extension: '.js' },
-  typescript: { directCommand: 'tsx',     extension: '.ts' },
-  nestjs:     { directCommand: 'tsx',     extension: '.ts' },
-  python:     { directCommand: 'python3', extension: '.py' },
-  kotlin:     { directCommand: 'kotlin',  extension: '.kt', compileCommand: 'kotlinc' },
-  java:       { directCommand: 'java',    extension: '.java', compileCommand: 'javac' },
-  dart:       { directCommand: 'dart',    extension: '.dart' },
-  r:          { directCommand: 'Rscript', extension: '.R' },
+  javascript: { directCommand: 'node',       extension: '.js' },
+  typescript: { directCommand: TSX_COMMAND,  extension: '.ts' },
+  nestjs:     { directCommand: TSX_COMMAND,  extension: '.ts' },
+  python:     { directCommand: 'python3',    extension: '.py' },
+  kotlin:     { directCommand: 'kotlin',     extension: '.kt', compileCommand: 'kotlinc' },
+  java:       { directCommand: 'java',       extension: '.java', compileCommand: 'javac' },
+  dart:       { directCommand: 'dart',       extension: '.dart' },
+  r:          { directCommand: 'Rscript',    extension: '.R' },
 };
 
 /** Packages installed globally on the host that a Vitest run needs.

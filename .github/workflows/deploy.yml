@@ -49,7 +49,7 @@ jobs:
             printf '%s' "$PRODUCTION_ENV" > .env
 
             if [ -f package-lock.json ]; then
-              /root/n/bin/npm ci
+              /root/n/bin/npm ci || /root/n/bin/npm install
             else
               /root/n/bin/npm install
             fi
