@@ -5,8 +5,25 @@ import { randomUUID } from 'crypto';
 import { PlaygroundProject, ProjectStatus } from '../../entities/playground-project.entity';
 import { PlaygroundFile } from '../../entities/playground-file.entity';
 import { PlaygroundTemplate } from '../../entities/playground-template.entity';
+import { ExamVersion, ExamQuestion } from '../../entities/exam-version.entity';
 import { User } from '../../entities/user.entity';
 import { MailService } from '../mail/mail.service';
+
+function wrapStatement(text: string, width = 90): string {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length > width) {
+      lines.push(current.trim());
+      current = word;
+    } else {
+      current = `${current} ${word}`.trim();
+    }
+  }
+  if (current) lines.push(current.trim());
+  return lines.map(l => ` * ${l}`).join('\n');
+}
 
 /** Fallback starter files when an exam is assigned without explicit files */
 const DEFAULT_FILES: Record<string, { name: string; content: string; path: string }[]> = {
@@ -31,8 +48,32 @@ export class PlaygroundService {
     private userRepo: Repository<User>,
     @InjectRepository(PlaygroundTemplate)
     private templateRepo: Repository<PlaygroundTemplate>,
+    @InjectRepository(ExamVersion)
+    private examVersionRepo: Repository<ExamVersion>,
     private mailService: MailService,
   ) {}
+
+  /** Builds blank exam files with only the question statement as a top comment, per the requested file mode. */
+  private buildExamVersionFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion') {
+    const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
+
+    const block = (q: ExamQuestion) =>
+      `/**\n * Ejercicio ${q.order}: ${q.title} (${q.points} pts)\n *\n${wrapStatement(q.statement)}\n */\n\n`;
+
+    if (fileMode === 'single') {
+      const content = questions
+        .map((q, i) => (i > 0 ? `// ─────────────────────────────\n\n${block(q)}` : block(q)))
+        .join('');
+      return [{ name: 'examen.ts', path: '/examen.ts', content, is_folder: false }];
+    }
+
+    return questions.map((q) => ({
+      name: `ejercicio-${q.order}.ts`,
+      path: `/ejercicio-${q.order}.ts`,
+      content: block(q),
+      is_folder: false,
+    }));
+  }
 
   async findAllByUser(userId: string) {
     return this.projectRepo.find({
@@ -294,9 +335,15 @@ export class PlaygroundService {
   async assignExam(
     teacherId: string,
     studentId: string,
-    examData: Partial<PlaygroundProject> & { files?: { name: string; content?: string; path?: string }[]; exam_group_id?: string; templateId?: string },
+    examData: Partial<PlaygroundProject> & {
+      files?: { name: string; content?: string; path?: string }[];
+      exam_group_id?: string;
+      templateId?: string;
+      examVersionId?: string;
+      fileMode?: 'single' | 'perQuestion';
+    },
   ) {
-    const { files, exam_group_id, templateId, ...projectData } = examData as any;
+    const { files, exam_group_id, templateId, examVersionId, fileMode, ...projectData } = examData as any;
 
     const project = this.projectRepo.create({
       ...projectData,
@@ -306,12 +353,19 @@ export class PlaygroundService {
       require_seb:      (examData as any).require_seb ?? false,
       status:           ProjectStatus.PENDING,
       exam_group_id:    exam_group_id ?? null,
+      exam_version_id:  examVersionId ?? null,
     });
     const saved = await this.projectRepo.save(project) as unknown as PlaygroundProject;
     const projectId: string = saved.id;
 
-    // Save initial files — priority: explicit files > template files > language defaults
+    // Save initial files — priority: explicit files > exam version (variant) > template files > language defaults
     let resolvedFiles = files;
+    if (!Array.isArray(resolvedFiles) || resolvedFiles.length === 0) {
+      if (examVersionId) {
+        const version = await this.examVersionRepo.findOne({ where: { id: examVersionId } });
+        if (version) resolvedFiles = this.buildExamVersionFiles(version, fileMode ?? 'perQuestion');
+      }
+    }
     if (!Array.isArray(resolvedFiles) || resolvedFiles.length === 0) {
       if (templateId) {
         const template = await this.templateRepo.findOne({ where: { id: templateId } });
@@ -334,6 +388,56 @@ export class PlaygroundService {
     await this.fileRepo.save(fileEntities);
 
     return this.projectRepo.findOne({ where: { id: projectId }, relations: ['files'] });
+  }
+
+  async gradeExam(id: string, grade: number, feedback?: string) {
+    if (typeof grade !== 'number' || Number.isNaN(grade) || grade < 0 || grade > 10) {
+      throw new ForbiddenException('La nota debe ser un número entre 0 y 10.');
+    }
+    const project = await this.projectRepo.findOne({ where: { id } });
+    if (!project) throw new NotFoundException('Project not found');
+
+    project.grade = grade;
+    project.feedback = feedback ?? project.feedback;
+    project.status = ProjectStatus.GRADED;
+    return this.projectRepo.save(project);
+  }
+
+  async buildGradingPrompt(id: string): Promise<{ prompt: string }> {
+    const project = await this.projectRepo.findOne({ where: { id }, relations: ['files'] });
+    if (!project) throw new NotFoundException('Project not found');
+
+    let rubric = '';
+    if (project.exam_version_id) {
+      const version = await this.examVersionRepo.findOne({ where: { id: project.exam_version_id } });
+      if (version) {
+        const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
+        rubric = questions
+          .map(
+            (q) =>
+              `Ejercicio ${q.order} — ${q.title} (${q.points} pts)\nEnunciado: ${q.statement}`,
+          )
+          .join('\n\n');
+      }
+    }
+
+    const files = (project.files ?? [])
+      .filter((f) => !f.is_folder)
+      .map((f) => `--- Archivo: ${f.path} ---\n\`\`\`${project.language}\n${f.content ?? ''}\n\`\`\``)
+      .join('\n\n');
+
+    const prompt = [
+      'Actuá como corrector de exámenes de programación. A continuación te doy la rúbrica del examen y el código que efectivamente escribió el alumno.',
+      'Corregí cada ejercicio por separado indicando qué está bien, qué está mal o incompleto, y asigná el puntaje correspondiente (máximo indicado por ejercicio). Al final sumá el puntaje total sobre 10 y da una breve devolución general.',
+      '',
+      '=== RÚBRICA ===',
+      rubric || '(No hay rúbrica asociada a este examen; evaluá el código de forma general.)',
+      '',
+      '=== CÓDIGO DEL ALUMNO ===',
+      files || '(El alumno no tiene archivos.)',
+    ].join('\n');
+
+    return { prompt };
   }
 
   async findAllAdminExams() {
@@ -383,11 +487,11 @@ export class PlaygroundService {
     const projects = await this.projectRepo.find({
       where: { exam_group_id: groupId, is_exam: true },
       order: { created_at: 'ASC' },
-      relations: ['user'],
+      relations: ['user', 'examVersion'],
     });
     // Legacy: group_id might be a project id (no exam_group_id set)
     if (projects.length === 0) {
-      const single = await this.projectRepo.findOne({ where: { id: groupId, is_exam: true }, relations: ['user'] });
+      const single = await this.projectRepo.findOne({ where: { id: groupId, is_exam: true }, relations: ['user', 'examVersion'] });
       if (single) return [single];
     }
     return projects;

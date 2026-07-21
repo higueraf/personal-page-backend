@@ -18,6 +18,8 @@ import { ProfileItem, ProfileItemType } from '../entities/profile-item.entity';
 import { Project, ProjectStatus } from '../entities/project.entity';
 import { Resource, ResourceType } from '../entities/resource.entity';
 import { PlaygroundTemplate } from '../entities/playground-template.entity';
+import { ExamTemplate } from '../entities/exam-template.entity';
+import { ExamVersion, ExamQuestion } from '../entities/exam-version.entity';
 
 @Injectable()
 export class AppSeeder {
@@ -37,6 +39,8 @@ export class AppSeeder {
     @InjectRepository(Project)       private readonly projectsRepo:      Repository<Project>,
     @InjectRepository(Resource)      private readonly resourcesRepo:     Repository<Resource>,
     @InjectRepository(PlaygroundTemplate) private readonly playgroundTemplatesRepo: Repository<PlaygroundTemplate>,
+    @InjectRepository(ExamTemplate)  private readonly examTemplatesRepo: Repository<ExamTemplate>,
+    @InjectRepository(ExamVersion)   private readonly examVersionsRepo:  Repository<ExamVersion>,
   ) {}
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -56,6 +60,7 @@ export class AppSeeder {
     await this.seedVideoCourses();
     await this.seedResources();
     await this.seedPlaygroundTemplates(adminUser);
+    await this.seedExamTemplates(adminUser);
 
     return { ok: true };
   }
@@ -1049,6 +1054,73 @@ const { data: user } = useQuery({
           },
         ],
       },
+      {
+        name: 'React + Vitest — Servicio y Controlador', language: 'react',
+        description: 'Proyecto de práctica con un servicio y un componente controlador, cada uno con su test (Vitest + Testing Library). Usa el botón "Ejecutar tests".',
+        files: [
+          { name: 'src', path: '/src', is_folder: true, content: '' },
+          { name: 'services', path: '/src/services', is_folder: true, content: '' },
+          { name: 'controllers', path: '/src/controllers', is_folder: true, content: '' },
+          {
+            name: 'main.tsx', path: '/src/main.tsx', is_folder: false,
+            content: `import React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport App from './App';\n\nconst root = ReactDOM.createRoot(document.getElementById('root')!);\nroot.render(<App />);\n`,
+          },
+          {
+            name: 'App.tsx', path: '/src/App.tsx', is_folder: false,
+            content: `import React from 'react';\nimport UserController from './controllers/UserController';\n\nexport default function App() {\n  return (\n    <div style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 600, margin: '0 auto' }}>\n      <h1>Servicio y Controlador</h1>\n      <UserController />\n    </div>\n  );\n}\n`,
+          },
+          {
+            name: 'userService.ts', path: '/src/services/userService.ts', is_folder: false,
+            content: `export interface Usuario {\n  id: number;\n  nombre: string;\n}\n\nconst USUARIOS: Usuario[] = [\n  { id: 1, nombre: 'Ada Lovelace' },\n  { id: 2, nombre: 'Alan Turing' },\n];\n\n/** Devuelve el listado de usuarios. */\nexport function obtenerUsuarios(): Usuario[] {\n  return USUARIOS;\n}\n\n/** Busca un usuario por id, o undefined si no existe. */\nexport function buscarUsuarioPorId(id: number): Usuario | undefined {\n  return USUARIOS.find((u) => u.id === id);\n}\n`,
+          },
+          {
+            name: 'userService.test.ts', path: '/src/services/userService.test.ts', is_folder: false,
+            content: `import { describe, it, expect } from 'vitest';\nimport { obtenerUsuarios, buscarUsuarioPorId } from './userService';\n\ndescribe('userService', () => {\n  it('obtenerUsuarios devuelve el listado completo', () => {\n    expect(obtenerUsuarios()).toHaveLength(2);\n  });\n\n  it('buscarUsuarioPorId encuentra un usuario existente', () => {\n    const usuario = buscarUsuarioPorId(1);\n    expect(usuario?.nombre).toBe('Ada Lovelace');\n  });\n\n  it('buscarUsuarioPorId devuelve undefined si no existe', () => {\n    expect(buscarUsuarioPorId(999)).toBeUndefined();\n  });\n});\n`,
+          },
+          {
+            name: 'UserController.tsx', path: '/src/controllers/UserController.tsx', is_folder: false,
+            content: `import React, { useState } from 'react';\nimport { obtenerUsuarios } from '../services/userService';\n\nexport default function UserController() {\n  const [usuarios] = useState(obtenerUsuarios());\n\n  return (\n    <div>\n      <h2>Usuarios</h2>\n      <ul>\n        {usuarios.map((u) => (\n          <li key={u.id}>{u.nombre}</li>\n        ))}\n      </ul>\n    </div>\n  );\n}\n`,
+          },
+          {
+            name: 'UserController.test.tsx', path: '/src/controllers/UserController.test.tsx', is_folder: false,
+            content: `import { render, screen } from '@testing-library/react';\nimport { describe, it, expect } from 'vitest';\nimport UserController from './UserController';\n\ndescribe('UserController', () => {\n  it('renderiza la lista de usuarios del servicio', () => {\n    render(<UserController />);\n    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();\n    expect(screen.getByText('Alan Turing')).toBeInTheDocument();\n  });\n});\n`,
+          },
+        ],
+      },
+      {
+        name: 'NestJS + Jest — Servicio, Controlador y Endpoint', language: 'nestjs',
+        description: 'Proyecto de práctica con un servicio (lógica simple) y un controlador con un endpoint GET, cada uno con su test (Jest + ts-jest, endpoint probado con supertest). Usa el botón "Ejecutar" para ver el bootstrap y "Ejecutar tests" para correr Jest.',
+        files: [
+          { name: 'src', path: '/src', is_folder: true, content: '' },
+          {
+            name: 'main.ts', path: '/src/main.ts', is_folder: false,
+            content: `import 'reflect-metadata';\nimport { NestFactory } from '@nestjs/core';\nimport { AppModule } from './app.module';\n\nasync function bootstrap() {\n  const app = await NestFactory.create(AppModule);\n  await app.listen(3000);\n  console.log('🐱 Nest application is running (bootstrap OK)');\n}\nbootstrap();\n`,
+          },
+          {
+            name: 'app.module.ts', path: '/src/app.module.ts', is_folder: false,
+            content: `import { Module } from '@nestjs/common';\nimport { AppController } from './app.controller';\nimport { AppService } from './app.service';\n\n@Module({\n  controllers: [AppController],\n  providers: [AppService],\n})\nexport class AppModule {}\n`,
+          },
+          {
+            name: 'app.service.ts', path: '/src/app.service.ts', is_folder: false,
+            content: `import { Injectable } from '@nestjs/common';\n\nexport interface Tarea {\n  id: number;\n  titulo: string;\n  completada: boolean;\n}\n\n@Injectable()\nexport class AppService {\n  private tareas: Tarea[] = [\n    { id: 1, titulo: 'Aprender NestJS', completada: false },\n    { id: 2, titulo: 'Escribir tests con Jest', completada: false },\n  ];\n\n  /** Devuelve todas las tareas. */\n  obtenerTareas(): Tarea[] {\n    return this.tareas;\n  }\n\n  /** Marca una tarea como completada. Devuelve la tarea actualizada o undefined si no existe. */\n  completarTarea(id: number): Tarea | undefined {\n    const tarea = this.tareas.find((t) => t.id === id);\n    if (tarea) tarea.completada = true;\n    return tarea;\n  }\n}\n`,
+          },
+          // Unit test — run it with the "Ejecutar tests" button (Jest)
+          {
+            name: 'app.service.spec.ts', path: '/src/app.service.spec.ts', is_folder: false,
+            content: `import { Test, TestingModule } from '@nestjs/testing';\nimport { AppService } from './app.service';\n\ndescribe('AppService', () => {\n  let service: AppService;\n\n  beforeEach(async () => {\n    const module: TestingModule = await Test.createTestingModule({\n      providers: [AppService],\n    }).compile();\n\n    service = module.get<AppService>(AppService);\n  });\n\n  it('obtenerTareas devuelve el listado inicial', () => {\n    expect(service.obtenerTareas()).toHaveLength(2);\n  });\n\n  it('completarTarea marca una tarea existente como completada', () => {\n    const tarea = service.completarTarea(1);\n    expect(tarea?.completada).toBe(true);\n  });\n\n  it('completarTarea devuelve undefined si la tarea no existe', () => {\n    expect(service.completarTarea(999)).toBeUndefined();\n  });\n});\n`,
+          },
+          {
+            name: 'app.controller.ts', path: '/src/app.controller.ts', is_folder: false,
+            content: `import { Controller, Get, Param } from '@nestjs/common';\nimport { AppService } from './app.service';\n\n@Controller('tareas')\nexport class AppController {\n  constructor(private readonly appService: AppService) {}\n\n  @Get()\n  listar() {\n    return this.appService.obtenerTareas();\n  }\n\n  @Get(':id/completar')\n  completar(@Param('id') id: string) {\n    return this.appService.completarTarea(Number(id));\n  }\n}\n`,
+          },
+          // Endpoint test with supertest — no real port needed, uses
+          // app.getHttpServer() directly (in-memory HTTP)
+          {
+            name: 'app.controller.spec.ts', path: '/src/app.controller.spec.ts', is_folder: false,
+            content: `import { Test, TestingModule } from '@nestjs/testing';\nimport { INestApplication } from '@nestjs/common';\nimport request from 'supertest';\nimport { AppModule } from './app.module';\n\ndescribe('AppController (e2e)', () => {\n  let app: INestApplication;\n\n  beforeAll(async () => {\n    const moduleFixture: TestingModule = await Test.createTestingModule({\n      imports: [AppModule],\n    }).compile();\n\n    app = moduleFixture.createNestApplication();\n    await app.init();\n  });\n\n  afterAll(async () => {\n    await app.close();\n  });\n\n  it('GET /tareas devuelve el listado de tareas', () => {\n    return request(app.getHttpServer())\n      .get('/tareas')\n      .expect(200)\n      .expect((res) => {\n        expect(res.body).toHaveLength(2);\n      });\n  });\n\n  it('GET /tareas/:id/completar marca una tarea como completada', () => {\n    return request(app.getHttpServer())\n      .get('/tareas/1/completar')\n      .expect(200)\n      .expect((res) => {\n        expect(res.body.completada).toBe(true);\n      });\n  });\n});\n`,
+          },
+        ],
+      },
     ];
 
     for (const t of templates) {
@@ -1065,6 +1137,125 @@ const { data: user } = useQuery({
         );
       }
     }
+  }
+
+  // ── Examen con variantes temáticas (Programación IV — TypeScript) ────────────
+  private async seedExamTemplates(admin: User) {
+    const templateName = 'Programación IV — Estructuras de Control, Ciclos y Switch';
+    const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
+    if (exists) return;
+
+    // Same difficulty/structure/numbers as the base guide, only re-themed vocabulary:
+    //   Q1: for + if/else if — tarifa por horas (0h gratis, 1-2h $1.50/h, 3-5h $1.00/h, >5h $8.00 fijo)
+    //   Q2: switch — 4 planes/tipos con descuento (0%, 5%, 10%, 15%)
+    //   Q3: for + if/else if — clasifica 6 elementos por precio en 4 segmentos
+    //   Q4: while (centinela 0) — tarifa por categoría (1-4), cuenta reservas de "alto valor" (> $300)
+    const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
+      {
+        theme_name: 'Restaurante', order_index: 0,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Tarifa de ocupación de mesas',
+            statement: 'Se registra el tiempo (en horas) que permanecieron ocupadas 5 mesas del restaurante en una noche. La tarifa de servicio por mesa es: 0 horas: gratis; 1 a 2 horas: $1.50 por hora; 3 a 5 horas: $1.00 por hora; más de 5 horas: tarifa fija de $8.00. Usando un ciclo for y una estructura if/else if, calcula el cargo de servicio de cada mesa y, al final, indica cuántas mesas pagaron la tarifa fija máxima ($8.00).',
+          },
+          {
+            order: 2, points: 2.5, title: 'Menús con descuento',
+            statement: 'El restaurante ofrece 4 tipos de menú (plan 1 a 4: Ejecutivo, Familiar, Buffet, Degustación). Escribe una función que reciba el número de plan y la cantidad de comensales, calcule el precio base × comensales como subtotal, aplique un descuento según el plan usando switch (Plan 1: 0%, Plan 2: 5%, Plan 3: 10%, Plan 4: 15%), y devuelva un objeto con precioBase, subtotal, descuento y total.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Clasificación de platos por precio',
+            statement: 'El restaurante tiene 6 platos en su menú con distintos precios. Usando un ciclo for y una estructura if/else if, clasifica cada plato por precio en 4 categorías (Económico: menos de $10; Estándar: $10 a $20; Premium: $20 a $35; Gourmet: más de $35), acumula el valor total del menú y cuenta cuántos platos son de categoría Gourmet.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Facturación de reservas de mesa',
+            statement: 'Se registran reservas de mesa una por una: para cada reserva se ingresa la categoría de mesa (1: mesa estándar $80; 2: mesa VIP $150; 3: salón privado pequeño $280; 4: salón privado grande $450), hasta que se ingresa 0 (centinela) que indica el fin del turno. Usando un ciclo while, acumula la recaudación total del turno y cuenta cuántas reservas fueron de "alto valor" (más de $300).',
+          },
+        ],
+      },
+      {
+        theme_name: 'Cine', order_index: 1,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Tarifa de anticipación de boletos',
+            statement: 'Se registra, para 5 boletos vendidos, cuántas horas antes de la función fueron comprados. La tarifa es: comprado el mismo día (0 horas antes): gratis (promoción); 1 a 2 horas antes: $1.50 por hora de anticipación; 3 a 5 horas antes: $1.00 por hora de anticipación; más de 5 horas antes: tarifa fija de $8.00. Usando un ciclo for y una estructura if/else if, calcula el cargo de cada boleto y cuenta cuántos pagaron la tarifa fija máxima ($8.00).',
+          },
+          {
+            order: 2, points: 2.5, title: 'Salas con descuento',
+            statement: 'El cine ofrece 4 tipos de sala (tipo 1 a 4: Estándar, VIP, 3D, IMAX). Escribe una función que reciba el tipo de sala y la cantidad de boletos, calcule el precio base × boletos como subtotal, aplique un descuento según el tipo de sala usando switch (Tipo 1: 0%, Tipo 2: 5%, Tipo 3: 10%, Tipo 4: 15%), y devuelva un objeto con precioBase, subtotal, descuento y total.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Clasificación de películas por recaudación',
+            statement: 'La cartelera tiene 6 películas con distinta recaudación en su primer fin de semana. Usando un ciclo for y una estructura if/else if, clasifica cada película por recaudación en 4 segmentos (Bajo: menos de $1,000,000; Medio: $1,000,000 a $10,000,000; Alto: $10,000,000 a $50,000,000; Blockbuster: más de $50,000,000), acumula la recaudación total y cuenta cuántas películas son Blockbuster.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Venta de entradas hasta agotar función',
+            statement: 'Se venden entradas una por una: para cada venta se ingresa la categoría de sala (1: Estándar $60; 2: VIP $120; 3: 3D $200; 4: IMAX/Premium $350), hasta que se ingresa 0 (centinela) que indica que la función se agotó o cerró la venta. Usando un ciclo while, acumula la recaudación total de la función y cuenta cuántas ventas fueron de "alto valor" (más de $300).',
+          },
+        ],
+      },
+      {
+        theme_name: 'Veterinaria', order_index: 2,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Tarifa de internación',
+            statement: 'Se registra el tiempo (en horas) que 5 mascotas estuvieron internadas en observación. La tarifa es: 0 horas: gratis (solo revisión); 1 a 2 horas: $1.50 por hora; 3 a 5 horas: $1.00 por hora; más de 5 horas: tarifa fija de $8.00. Usando un ciclo for y una estructura if/else if, calcula el costo de internación de cada mascota y cuenta cuántas pagaron la tarifa fija máxima ($8.00).',
+          },
+          {
+            order: 2, points: 2.5, title: 'Planes de servicio con descuento',
+            statement: 'La veterinaria ofrece 4 planes de servicio (plan 1 a 4: Baño y Peluquería, Vacunación, Control General, Cirugía). Escribe una función que reciba el número de plan y la cantidad de mascotas atendidas, calcule el precio base × mascotas como subtotal, aplique un descuento según el plan usando switch (Plan 1: 0%, Plan 2: 5%, Plan 3: 10%, Plan 4: 15%), y devuelva un objeto con precioBase, subtotal, descuento y total.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Clasificación de tratamientos por costo',
+            statement: 'La clínica atendió 6 mascotas con tratamientos de distinto costo. Usando un ciclo for y una estructura if/else if, clasifica cada tratamiento por costo en 4 categorías (Básico: menos de $30; Intermedio: $30 a $80; Avanzado: $80 a $200; Especializado: más de $200), acumula el costo total de los tratamientos y cuenta cuántos son Especializados.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Turnos hasta agotar la agenda',
+            statement: 'Se registran turnos uno por uno: para cada turno se ingresa la categoría de servicio (1: consulta general $40; 2: vacunación $90; 3: cirugía menor $220; 4: cirugía mayor $380), hasta que se ingresa 0 (centinela) que indica que se cerró la agenda del día. Usando un ciclo while, acumula la recaudación total del día y cuenta cuántos turnos fueron de "alto valor" (más de $300).',
+          },
+        ],
+      },
+      {
+        theme_name: 'Consultorio Odontológico', order_index: 3,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Tarifa de tratamiento',
+            statement: 'Se registra el tiempo (en horas) que tomó atender a 5 pacientes. La tarifa es: 0 horas: gratis (solo revisión); 1 a 2 horas: $1.50 por hora; 3 a 5 horas: $1.00 por hora; más de 5 horas: tarifa fija de $8.00. Usando un ciclo for y una estructura if/else if, calcula el costo de atención de cada paciente y cuenta cuántos pagaron la tarifa fija máxima ($8.00).',
+          },
+          {
+            order: 2, points: 2.5, title: 'Planes de tratamiento con descuento',
+            statement: 'El consultorio ofrece 4 planes de tratamiento (plan 1 a 4: Limpieza, Blanqueamiento, Ortodoncia, Implante). Escribe una función que reciba el número de plan y la cantidad de sesiones, calcule el precio base × sesiones como subtotal, aplique un descuento según el plan usando switch (Plan 1: 0%, Plan 2: 5%, Plan 3: 10%, Plan 4: 15%), y devuelva un objeto con precioBase, subtotal, descuento y total.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Clasificación de tratamientos por costo',
+            statement: 'El consultorio realizó 6 tratamientos con distinto costo. Usando un ciclo for y una estructura if/else if, clasifica cada tratamiento por costo en 4 categorías (Básico: menos de $40; Intermedio: $40 a $100; Avanzado: $100 a $300; Premium: más de $300), acumula el costo total de los tratamientos y cuenta cuántos son Premium.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Turnos hasta agotar la agenda del día',
+            statement: 'Se registran turnos uno por uno: para cada turno se ingresa la categoría de tratamiento (1: limpieza $50; 2: extracción $100; 3: endodoncia $260; 4: ortodoncia/implante $420), hasta que se ingresa 0 (centinela) que indica que se cerró la agenda del día. Usando un ciclo while, acumula la recaudación total del día y cuenta cuántos turnos fueron de "alto valor" (más de $300).',
+          },
+        ],
+      },
+    ];
+
+    const template = await this.examTemplatesRepo.save(
+      this.examTemplatesRepo.create({
+        name: templateName,
+        description: 'Examen de TypeScript con 4 ejercicios (for+if, switch, for+if, while) y 4 variantes temáticas para evitar copias entre alumnos.',
+        language: 'typescript',
+        created_by: admin.id,
+      }),
+    );
+
+    await this.examVersionsRepo.save(
+      versions.map((v) =>
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: v.theme_name,
+          order_index: v.order_index,
+          questions: v.questions,
+        }),
+      ),
+    );
   }
 
   // ════════════════════════════════════════════════════════════════════════════

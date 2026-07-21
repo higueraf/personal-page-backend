@@ -10,7 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { promises as fs, existsSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
@@ -30,12 +30,88 @@ interface RuntimeConfig {
 const RUNTIMES: Record<string, RuntimeConfig> = {
   javascript: { directCommand: 'node',    extension: '.js' },
   typescript: { directCommand: 'tsx',     extension: '.ts' },
+  nestjs:     { directCommand: 'tsx',     extension: '.ts' },
   python:     { directCommand: 'python3', extension: '.py' },
   kotlin:     { directCommand: 'kotlin',  extension: '.kt', compileCommand: 'kotlinc' },
   java:       { directCommand: 'java',    extension: '.java', compileCommand: 'javac' },
   dart:       { directCommand: 'dart',    extension: '.dart' },
   r:          { directCommand: 'Rscript', extension: '.R' },
 };
+
+/** Packages installed globally on the host that a Vitest run needs.
+ *  They are symlinked into the session's node_modules (see linkTestModules)
+ *  so Vite/Vitest's own resolver finds them without relying on NODE_PATH. */
+const TEST_GLOBAL_PACKAGES = [
+  'vitest',
+  'vite',
+  '@vitejs/plugin-react',
+  'react',
+  'react-dom',
+  '@testing-library/react',
+  '@testing-library/jest-dom',
+  'jsdom',
+];
+
+const VITE_TEST_CONFIG = `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./vitest.setup.ts'],
+    globals: true,
+  },
+});
+`;
+
+const VITEST_SETUP = `import '@testing-library/jest-dom';\n`;
+
+/** Packages required by a NestJS app that are ALREADY dependencies of this very
+ *  backend (personal-page-backend). Instead of installing them again, we
+ *  symlink them straight from this project's own node_modules so a session's
+ *  `tsx`/Jest run resolves `@nestjs/*` (and its transitive deps) correctly. */
+const NEST_LOCAL_PACKAGES = [
+  '@nestjs/common',
+  '@nestjs/core',
+  '@nestjs/testing',
+  '@nestjs/platform-express',
+  'reflect-metadata',
+  'rxjs',
+];
+
+/** Packages installed globally on the host that a Jest run for NestJS needs. */
+const NEST_GLOBAL_TEST_PACKAGES = ['jest', 'ts-jest', 'supertest'];
+
+/** tsconfig.json shared by NestJS "Ejecutar" (tsx) and "Ejecutar tests" (ts-jest) runs.
+ *  - experimentalDecorators/emitDecoratorMetadata: required by Nest's decorators.
+ *  - isolatedModules: must live here (not as a deprecated ts-jest option).
+ *  - ignoreDeprecations "6.0": the globally-installed ts-jest may bundle a very
+ *    recent TypeScript that hard-errors on the legacy `moduleResolution` default. */
+const DECORATOR_TSCONFIG = `{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "commonjs",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "isolatedModules": true,
+    "ignoreDeprecations": "6.0",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": false
+  }
+}
+`;
+
+const JEST_CONFIG = `module.exports = {
+  testEnvironment: 'node',
+  transform: { '^.+\\\\.ts$': 'ts-jest' },
+  testRegex: '.*spec\\\\.ts$',
+  setupFiles: ['./jest.setup.ts'],
+};
+`;
+
+const JEST_SETUP = `import 'reflect-metadata';\n`;
 
 @WebSocketGateway({
   cors: {
@@ -92,7 +168,7 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   @SubscribeMessage('start_execution')
   async handleStartExecution(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { language: string; files: { name: string; content: string }[]; targetFile?: string },
+    @MessageBody() payload: { language: string; files: { name: string; path?: string; content: string }[]; targetFile?: string },
   ) {
     // Kill any existing session for this client before starting a new one
     this.killSession(client.id);
@@ -120,19 +196,28 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
         return;
       }
 
+      // Preserve each file's folder `path` (when present) so multi-file
+      // projects with relative imports (e.g. NestJS's src/*.ts) resolve
+      // correctly. Falls back to the flat `name` for single-file languages,
+      // which keeps existing behavior unchanged.
+      const fileRelPath = (file: { name: string; path?: string }): string => {
+        const raw = file.path && file.path.trim() !== '' ? file.path : file.name;
+        return raw.includes('.') ? raw : raw + runtime.extension;
+      };
+
       for (const file of validFiles) {
-        const fileName = file.name.includes('.') ? file.name : file.name + runtime.extension;
-        await fs.writeFile(join(sessionDir, fileName), file.content);
+        const fullPath = join(sessionDir, fileRelPath(file));
+        await fs.mkdir(dirname(fullPath), { recursive: true });
+        await fs.writeFile(fullPath, file.content);
       }
 
-      const mainFile =
-        payload.targetFile
-          ?? validFiles.find((f) => f.name.endsWith(runtime.extension))?.name
-          ?? validFiles[0].name;
+      const targetEntry =
+        (payload.targetFile ? validFiles.find((f) => f.name === payload.targetFile) : undefined)
+          ?? validFiles.find((f) => f.name.endsWith(runtime.extension))
+          ?? validFiles[0];
 
-      const allFileNames = validFiles.map((f) =>
-        f.name.includes('.') ? f.name : f.name + runtime.extension,
-      );
+      const mainFile = fileRelPath(targetEntry);
+      const allFileNames = validFiles.map(fileRelPath);
 
       const shellCmd = lang === 'kotlin'
         ? await this.buildKotlinCommand(sessionDir, mainFile, allFileNames, validFiles)
@@ -151,35 +236,79 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
         // non-TTY environments. Our shim reads from stdin (fd 0) instead,
         // which works with the WebSocket-piped input.
         await this.injectReadlineSyncShim(sessionDir);
+      } else if (lang === 'nestjs') {
+        // tsx needs a nearby tsconfig.json with experimentalDecorators/
+        // emitDecoratorMetadata to compile Nest's @Injectable/@Controller
+        // decorators, and @nestjs/* must resolve from this very backend's
+        // own node_modules (no extra global install required).
+        await fs.writeFile(join(sessionDir, 'tsconfig.json'), DECORATOR_TSCONFIG);
+        const nodeModulesDir = join(sessionDir, 'node_modules');
+        await fs.mkdir(nodeModulesDir, { recursive: true });
+        for (const pkg of NEST_LOCAL_PACKAGES) {
+          const dir = this.resolveLocalPackageDir(pkg);
+          if (dir) {
+            await this.symlinkPackage(dir, join(nodeModulesDir, pkg));
+          }
+        }
       }
 
-      const child = spawn('sh', ['-c', shellCmd], {
-        cwd: sessionDir,
-        env: execEnv,
-      });
-
-      this.sessions.set(client.id, { process: child, sessionDir });
-
-      child.stdout.on('data', (data: Buffer) => {
-        client.emit('terminal_output', data.toString());
-      });
-
-      child.stderr.on('data', (data: Buffer) => {
-        client.emit('terminal_output', data.toString());
-      });
-
-      child.on('close', (code: number | null) => {
-        client.emit('execution_done', { code: code ?? 0 });
-        this.cleanupSession(client.id, sessionDir);
-      });
-
-      child.on('error', (err: Error) => {
-        client.emit('terminal_output', `\x1b[31mError del proceso: ${err.message}\x1b[0m\r\n`);
-        client.emit('execution_done', { code: 1 });
-        this.cleanupSession(client.id, sessionDir);
-      });
+      this.spawnAndStream(client, sessionDir, shellCmd, execEnv);
     } catch (err: any) {
       client.emit('terminal_output', `\x1b[31mError iniciando ejecución: ${err.message}\x1b[0m\r\n`);
+      client.emit('execution_done', { code: 1 });
+      await this.cleanupDir(sessionDir);
+    }
+  }
+
+  // ── start_test_execution (Vitest para React, Jest para NestJS) ─────────────
+
+  @SubscribeMessage('start_test_execution')
+  async handleStartTestExecution(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { files: { name: string; path: string; content: string }[]; language?: string },
+  ) {
+    this.killSession(client.id);
+
+    const language = (payload?.language ?? 'react').toLowerCase();
+    const sessionId = uuidv4();
+    const sessionDir = join(this.TEMP_DIR, sessionId);
+
+    try {
+      await fs.mkdir(sessionDir, { recursive: true });
+
+      const validFiles = (payload.files ?? []).filter((f) => f.content.trim() !== '');
+      if (validFiles.length === 0) {
+        client.emit('terminal_output', `\x1b[31mNo hay archivos con contenido para ejecutar.\x1b[0m\r\n`);
+        client.emit('execution_done', { code: 1 });
+        await this.cleanupDir(sessionDir);
+        return;
+      }
+
+      for (const file of validFiles) {
+        const relativePath = file.path && file.path.trim() !== '' ? file.path : file.name;
+        const fullPath = join(sessionDir, relativePath);
+        await fs.mkdir(dirname(fullPath), { recursive: true });
+        await fs.writeFile(fullPath, file.content);
+      }
+
+      let shellCmd: string;
+      if (language === 'nestjs') {
+        await fs.writeFile(join(sessionDir, 'tsconfig.json'), DECORATOR_TSCONFIG);
+        await fs.writeFile(join(sessionDir, 'jest.config.js'), JEST_CONFIG);
+        await fs.writeFile(join(sessionDir, 'jest.setup.ts'), JEST_SETUP);
+        shellCmd = './node_modules/.bin/jest --config jest.config.js';
+      } else {
+        await fs.writeFile(join(sessionDir, 'vite.config.ts'), VITE_TEST_CONFIG);
+        await fs.writeFile(join(sessionDir, 'vitest.setup.ts'), VITEST_SETUP);
+        shellCmd = './node_modules/.bin/vitest run --reporter=verbose';
+      }
+      await this.linkTestModules(sessionDir, language);
+
+      const execEnv: NodeJS.ProcessEnv = { ...process.env, TERM: 'xterm-256color', FORCE_COLOR: '1' };
+
+      this.spawnAndStream(client, sessionDir, shellCmd, execEnv);
+    } catch (err: any) {
+      client.emit('terminal_output', `\x1b[31mError iniciando los tests: ${err.message}\x1b[0m\r\n`);
       client.emit('execution_done', { code: 1 });
       await this.cleanupDir(sessionDir);
     }
@@ -299,6 +428,127 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     const shimDir = join(sessionDir, 'node_modules', 'readline-sync');
     await fs.mkdir(shimDir, { recursive: true });
     await fs.copyFile(this.READLINE_SYNC_SHIM, join(shimDir, 'index.js'));
+  }
+
+  /** Symlink `target` at `linkPath`, creating any needed parent dirs first.
+   *  Silently ignores failures (already exists / missing target) — callers
+   *  treat this as best-effort, same as the pre-refactor inline try/catch. */
+  private async symlinkPackage(target: string, linkPath: string, type: 'dir' | 'file' = 'dir'): Promise<void> {
+    try {
+      await fs.mkdir(dirname(linkPath), { recursive: true });
+      await fs.symlink(target, linkPath, type);
+    } catch {
+      /* already exists or target missing — ignore */
+    }
+  }
+
+  /** Resolve a package's real directory from THIS backend's own
+   *  node_modules (works in dev via ts-node AND in the compiled dist/ build,
+   *  since require.resolve walks up from the current file to find the real
+   *  node_modules tree). Returns null if the package can't be found. */
+  private resolveLocalPackageDir(pkg: string): string | null {
+    try {
+      const pkgJsonPath = require.resolve(join(pkg, 'package.json'));
+      return dirname(pkgJsonPath);
+    } catch {
+      return null;
+    }
+  }
+
+  /** ts-jest internally does `require('jest-util')`, which only resolves if
+   *  jest-util exists as a SIBLING inside the global node_modules directory
+   *  (Node resolves modules by realpath, not by where we symlink them per
+   *  session). Jest nests jest-util inside jest/node_modules/jest-util, so
+   *  this self-heals by lazily creating that sibling symlink once — no
+   *  manual VPS step beyond `npm install -g jest ts-jest supertest`. */
+  private async ensureJestUtilGlobalLink(globalModules: string): Promise<void> {
+    const linkPath = join(globalModules, 'jest-util');
+    if (existsSync(linkPath)) return;
+    const target = join(globalModules, 'jest', 'node_modules', 'jest-util');
+    if (!existsSync(target)) return;
+    await this.symlinkPackage(target, linkPath);
+  }
+
+  /**
+   * Symlink the packages a test run needs into the session's node_modules so
+   * the runner's own resolver finds them via standard node_modules lookup
+   * (NODE_PATH is not reliably honored by Vite/Vitest/Jest).
+   *
+   *  - React (Vitest): globally-installed Vitest/Vite/React/Testing-Library.
+   *  - NestJS (Jest):   @nestjs/* etc. straight from THIS backend's own
+   *                     node_modules (already a real dependency of this
+   *                     app), plus globally-installed jest/ts-jest/supertest.
+   */
+  private async linkTestModules(sessionDir: string, language: string): Promise<void> {
+    const nodeModulesDir = join(sessionDir, 'node_modules');
+    await fs.mkdir(nodeModulesDir, { recursive: true });
+    const binDir = join(nodeModulesDir, '.bin');
+    await fs.mkdir(binDir, { recursive: true });
+
+    if (language === 'nestjs') {
+      for (const pkg of NEST_LOCAL_PACKAGES) {
+        const dir = this.resolveLocalPackageDir(pkg);
+        if (dir) {
+          await this.symlinkPackage(dir, join(nodeModulesDir, pkg));
+        }
+      }
+
+      const globalModules = await this.executionService.getGlobalNodeModules();
+      if (globalModules) {
+        for (const pkg of NEST_GLOBAL_TEST_PACKAGES) {
+          await this.symlinkPackage(join(globalModules, pkg), join(nodeModulesDir, pkg));
+        }
+        await this.ensureJestUtilGlobalLink(globalModules);
+        await this.symlinkPackage(join(globalModules, 'jest', 'bin', 'jest.js'), join(binDir, 'jest'), 'file');
+      }
+      return;
+    }
+
+    // React / Vitest (default)
+    const globalModules = await this.executionService.getGlobalNodeModules();
+    if (!globalModules) return;
+
+    for (const pkg of TEST_GLOBAL_PACKAGES) {
+      await this.symlinkPackage(join(globalModules, pkg), join(nodeModulesDir, pkg));
+    }
+
+    await this.symlinkPackage(join(globalModules, 'vitest', 'vitest.mjs'), join(binDir, 'vitest'), 'file');
+  }
+
+  /** Spawn the given shell command in sessionDir, streaming stdout/stderr to
+   *  the client and emitting `execution_done` on exit. Shared by both plain
+   *  code execution and Vitest test runs. */
+  private spawnAndStream(
+    client: Socket,
+    sessionDir: string,
+    shellCmd: string,
+    execEnv: NodeJS.ProcessEnv,
+  ) {
+    const child = spawn('sh', ['-c', shellCmd], {
+      cwd: sessionDir,
+      env: execEnv,
+    });
+
+    this.sessions.set(client.id, { process: child, sessionDir });
+
+    child.stdout.on('data', (data: Buffer) => {
+      client.emit('terminal_output', data.toString());
+    });
+
+    child.stderr.on('data', (data: Buffer) => {
+      client.emit('terminal_output', data.toString());
+    });
+
+    child.on('close', (code: number | null) => {
+      client.emit('execution_done', { code: code ?? 0 });
+      this.cleanupSession(client.id, sessionDir);
+    });
+
+    child.on('error', (err: Error) => {
+      client.emit('terminal_output', `\x1b[31mError del proceso: ${err.message}\x1b[0m\r\n`);
+      client.emit('execution_done', { code: 1 });
+      this.cleanupSession(client.id, sessionDir);
+    });
   }
 
   private killSession(clientId: string) {

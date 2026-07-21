@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { PlaygroundFile } from './playground-file.entity';
+import { ExamVersion } from './exam-version.entity';
 
 export enum ProjectStatus {
   PENDING = 'pending',
@@ -69,6 +70,14 @@ export class PlaygroundProject {
   /** Groups all PlaygroundProjects created from the same assignment batch */
   @Column({ nullable: true })
   exam_group_id: string;
+
+  /** Which themed variant (ExamVersion) was assigned to this student, if any */
+  @ManyToOne(() => ExamVersion, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'exam_version_id' })
+  examVersion: ExamVersion;
+
+  @Column({ nullable: true })
+  exam_version_id: string;
 
   @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })

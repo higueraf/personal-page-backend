@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Req,
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlaygroundService } from './playground.service';
 import { ExecutionService } from './execution.service';
+import { ExamTemplateService } from './exam-template.service';
 import { Request, Response } from 'express';
 
 @Controller('playground')
@@ -10,6 +11,7 @@ export class PlaygroundController {
   constructor(
     private playgroundService: PlaygroundService,
     private executionService: ExecutionService,
+    private examTemplateService: ExamTemplateService,
   ) {}
 
   @Get()
@@ -176,11 +178,22 @@ export class PlaygroundController {
     const { randomUUID } = await import('crypto');
     const exam_group_id = randomUUID();
 
+    // If an exam template (with themed variants) was selected, round-robin its
+    // versions across the students so consecutive students get different themes.
+    let versions: { id: string }[] = [];
+    if (data.examTemplateId) {
+      const template = await this.examTemplateService.get(data.examTemplateId);
+      versions = template.versions ?? [];
+      if (versions.length === 0) {
+        throw new ForbiddenException('El examen seleccionado no tiene variantes configuradas.');
+      }
+    }
+
     const results = await Promise.all(
-      studentIds.map((studentId) =>
+      studentIds.map((studentId, i) =>
         this.playgroundService.assignExam(teacher.id, studentId, {
           name:             data.name,
-          language:         data.language ?? 'python',
+          language:         data.language ?? (versions.length ? 'typescript' : 'python'),
           materia:          data.materia,
           start_time:       data.start_time ? new Date(data.start_time) : undefined,
           end_time:         data.end_time   ? new Date(data.end_time)   : undefined,
@@ -188,6 +201,8 @@ export class PlaygroundController {
           require_seb:      data.require_seb ?? false,
           files:            data.files,
           templateId:       data.templateId,
+          examVersionId:    versions.length ? versions[i % versions.length].id : undefined,
+          fileMode:         data.fileMode,
           exam_group_id,
         }),
       ),
@@ -404,5 +419,36 @@ export class PlaygroundController {
       throw new ForbiddenException('Solo administradores o profesores pueden eliminar exámenes.');
     }
     return this.playgroundService.deleteAdminExamGroup(groupId);
+  }
+
+  /**
+   * Admin/Teacher: manually grade a student's exam (0-10, 2.5 pts per exercise)
+   */
+  @Patch('admin/exam/:id/grade')
+  async gradeExam(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body('grade') grade: number,
+    @Body('feedback') feedback?: string,
+  ) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden calificar exámenes.');
+    }
+    return this.playgroundService.gradeExam(id, Number(grade), feedback);
+  }
+
+  /**
+   * Admin/Teacher: build a copy-paste prompt (rubric + student's code) for manual AI grading
+   */
+  @Get('admin/exam/:id/grading-prompt')
+  async getGradingPrompt(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden ver el prompt de corrección.');
+    }
+    return this.playgroundService.buildGradingPrompt(id);
   }
 }

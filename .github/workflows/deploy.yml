@@ -56,6 +56,9 @@ jobs:
 
             NODE_OPTIONS="--max-old-space-size=4096" /root/n/bin/npm run build
 
+            # ── Seed idempotente (crea/verifica datos base sin duplicar) ────
+            /root/n/bin/npm run seed || echo "⚠️  Seed falló, continuando con el deploy"
+
             pm2 stop personal-page-api || true
             pm2 delete personal-page-api || true
             pm2 start dist/main.js --name personal-page-api
