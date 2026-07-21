@@ -134,9 +134,12 @@ export class PlaygroundService {
    * Estructura de la pantalla principal (home_screen.dart): ícono grande +
    * mensaje de bienvenida, 3 botones abajo (uno por pregunta, cada uno abre
    * su propia pantalla stub) y un Drawer (menú) con acceso al ejemplo de
-   * referencia "ToDo" — un CRUD completo y funcional (API distinta,
-   * `/todo-api/todos`) que el alumno puede estudiar/replicar para resolver
-   * su propia variante.
+   * referencia "ToDo" — una mini-app APARTE, completa y funcional (misma
+   * estructura: home + 3 botones), contra otra API (`/todo-api/todos`),
+   * que el alumno puede estudiar/replicar para resolver su propia variante.
+   * Las 2 pantallas de cálculo del ejemplo ToDo son intencionalmente
+   * DISTINTAS a las de Preguntas 2/3 del examen (para que sirvan de guía de
+   * patrón, no de respuesta literal).
    */
   private buildFlutterExamFiles(version: ExamVersion) {
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
@@ -166,11 +169,21 @@ export class PlaygroundService {
       '- `lib/screens/item_list_screen.dart`: **Pregunta 1** — stub del CRUD contra tu API.',
       '- `lib/screens/question2_screen.dart`: **Pregunta 2** — stub de la pantalla de cálculo.',
       '- `lib/screens/question3_screen.dart`: **Pregunta 3** — stub de la pantalla de cálculo.',
-      '- `lib/screens/todo_list_screen.dart` y `todo_form_screen.dart`: **ejemplo de referencia** (ya',
-      '  resuelto y funcional) — un CRUD completo de tareas (`id` + `nombre`) contra otra API pública',
-      `  (\`${todoEndpoint}\`). Se accede desde el menú (ícono ☰ / Drawer) de la pantalla principal.`,
-      '  Estudiá este ejemplo para replicar el mismo patrón (modelo → servicio → pantalla) en tus',
-      '  pantallas de la Pregunta 1.',
+      '',
+      '### Ejemplo de referencia (ToDo) — accedé desde el menú ☰ de la pantalla principal',
+      '',
+      '  Es una mini-app COMPLETA y funcional, con la misma estructura que tu examen (pantalla',
+      '  principal + 3 botones), pero contra otra API pública ' + `(\`${todoEndpoint}\`)` + ' y con un',
+      '  modelo de solo 2 campos (`id` + `nombre`). Estudiá este ejemplo para replicar el mismo',
+      '  patrón (modelo → servicio → pantalla) en las pantallas de tu propia variante:',
+      '',
+      '  - `lib/screens/todo_home_screen.dart`: pantalla principal del ejemplo (ícono + bienvenida + 3 botones).',
+      '  - `lib/screens/todo_list_screen.dart` + `todo_form_screen.dart`: CRUD completo (listar/crear/editar/eliminar).',
+      '  - `lib/screens/todo_stat1_screen.dart`: ejemplo de pantalla de cálculo (promedio de caracteres por tarea).',
+      '  - `lib/screens/todo_stat2_screen.dart`: ejemplo de pantalla de cálculo (buscador de tareas por texto).',
+      '',
+      '  Nota: los cálculos del ejemplo ToDo son a propósito DISTINTOS a los de las Preguntas 2 y 3 de',
+      '  tu examen — sirven para mostrar el patrón, no la respuesta.',
       '',
       '## Preguntas',
       '',
@@ -332,7 +345,7 @@ class TodoApiService {
 import 'item_list_screen.dart';
 import 'question2_screen.dart';
 import 'question3_screen.dart';
-import 'todo_list_screen.dart';
+import 'todo_home_screen.dart';
 
 /// Pantalla principal: ícono + bienvenida, 3 botones (uno por pregunta) y un
 /// Drawer con el ejemplo de referencia (ToDo).
@@ -353,12 +366,12 @@ class HomeScreen extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.checklist),
               title: const Text('Ejemplo de referencia (ToDo)'),
-              subtitle: const Text('CRUD completo ya resuelto'),
+              subtitle: const Text('App completa ya resuelta'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const TodoListScreen()),
+                  MaterialPageRoute(builder: (_) => const TodoHomeScreen()),
                 );
               },
             ),
@@ -770,6 +783,226 @@ class _TodoFormScreenState extends State<TodoFormScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+`,
+      },
+      {
+        name: 'todo_home_screen.dart', path: '/lib/screens/todo_home_screen.dart', is_folder: false,
+        content:
+`import 'package:flutter/material.dart';
+import 'todo_list_screen.dart';
+import 'todo_stat1_screen.dart';
+import 'todo_stat2_screen.dart';
+
+/// Pantalla principal del ejemplo de referencia — misma estructura que la
+/// pantalla principal de tu examen (ícono + bienvenida + 3 botones), para que
+/// veas el mismo patrón aplicado de punta a punta.
+class TodoHomeScreen extends StatelessWidget {
+  const TodoHomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Ejemplo de referencia: Tareas')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.checklist, size: 96, color: Colors.green),
+            const SizedBox(height: 16),
+            Text(
+              'Ejemplo completo: lista de tareas',
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TodoListScreen()),
+                  ),
+                  child: const Text('CRUD de tareas'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TodoStat1Screen()),
+                  ),
+                  child: const Text('Ejemplo de cálculo 1'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TodoStat2Screen()),
+                  ),
+                  child: const Text('Ejemplo de cálculo 2'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+`,
+      },
+      {
+        name: 'todo_stat1_screen.dart', path: '/lib/screens/todo_stat1_screen.dart', is_folder: false,
+        content:
+`import 'package:flutter/material.dart';
+import '../services/todo_api_service.dart';
+import '../models/todo.dart';
+
+/// Ejemplo de referencia — pantalla de cálculo YA RESUELTA (distinta a las
+/// Preguntas 2/3 de tu examen): promedio de caracteres en el nombre de las
+/// tareas. Estudiá el patrón fetch → calcular → mostrar para tus propias
+/// pantallas de Pregunta 2 y Pregunta 3.
+class TodoStat1Screen extends StatefulWidget {
+  const TodoStat1Screen({super.key});
+
+  @override
+  State<TodoStat1Screen> createState() => _TodoStat1ScreenState();
+}
+
+class _TodoStat1ScreenState extends State<TodoStat1Screen> {
+  final TodoApiService _api = TodoApiService();
+  List<Todo> _todos = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final todos = await _api.fetchTodos();
+      setState(() => _todos = todos);
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final promedio = _todos.isEmpty
+        ? 0.0
+        : _todos.map((t) => t.nombre.length).reduce((a, b) => a + b) / _todos.length;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Ejemplo de cálculo 1')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Promedio de caracteres por nombre de tarea:'),
+                  const SizedBox(height: 8),
+                  Text(
+                    promedio.toStringAsFixed(1),
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+`,
+      },
+      {
+        name: 'todo_stat2_screen.dart', path: '/lib/screens/todo_stat2_screen.dart', is_folder: false,
+        content:
+`import 'package:flutter/material.dart';
+import '../services/todo_api_service.dart';
+import '../models/todo.dart';
+
+/// Ejemplo de referencia — pantalla de cálculo YA RESUELTA (distinta a las
+/// Preguntas 2/3 de tu examen): buscador de tareas por texto.
+class TodoStat2Screen extends StatefulWidget {
+  const TodoStat2Screen({super.key});
+
+  @override
+  State<TodoStat2Screen> createState() => _TodoStat2ScreenState();
+}
+
+class _TodoStat2ScreenState extends State<TodoStat2Screen> {
+  final TodoApiService _api = TodoApiService();
+  List<Todo> _todos = [];
+  bool _loading = true;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final todos = await _api.fetchTodos();
+      setState(() => _todos = todos);
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _todos
+        .where((t) => t.nombre.toLowerCase().contains(_query.toLowerCase()))
+        .toList();
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Ejemplo de cálculo 2')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    decoration: const InputDecoration(labelText: 'Buscar tarea por texto'),
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Resultados: \${filtered.length}'),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (context, i) => ListTile(title: Text(filtered[i].nombre)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }
