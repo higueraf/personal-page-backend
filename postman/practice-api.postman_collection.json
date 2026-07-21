@@ -1,0 +1,228 @@
+{
+  "info": {
+    "name": "API de práctica — Exámenes Flutter",
+    "description": "CRUD público (sin autenticación) usado por los alumnos en el examen de Flutter. Cada variante (ropa, libros, farmacia, tareas) tiene su propio endpoint y sus propios campos. Antes de usar, cambiá la variable `baseUrl` por la URL real del backend.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://tudominio.com/api", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Ropa",
+      "item": [
+        {
+          "name": "Listar prendas",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/practice-api/ropa/items", "host": ["{{baseUrl}}"], "path": ["practice-api", "ropa", "items"] }
+          }
+        },
+        {
+          "name": "Obtener prenda por id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/practice-api/ropa/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "ropa", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Crear prenda",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prenda\": \"Camiseta oversize\",\n  \"talla\": \"L\",\n  \"color\": \"Negro\",\n  \"categoria\": \"Camisetas\",\n  \"precio\": 18.5,\n  \"stock\": 12,\n  \"disponible\": true\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/practice-api/ropa/items", "host": ["{{baseUrl}}"], "path": ["practice-api", "ropa", "items"] }
+          }
+        },
+        {
+          "name": "Actualizar prenda",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"stock\": 5\n}" },
+            "url": { "raw": "{{baseUrl}}/practice-api/ropa/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "ropa", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Eliminar prenda",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/practice-api/ropa/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "ropa", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Reiniciar datos demo",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/practice-api/ropa/items/reset", "host": ["{{baseUrl}}"], "path": ["practice-api", "ropa", "items", "reset"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Libros",
+      "item": [
+        {
+          "name": "Listar libros",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/practice-api/libros/items", "host": ["{{baseUrl}}"], "path": ["practice-api", "libros", "items"] }
+          }
+        },
+        {
+          "name": "Obtener libro por id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/practice-api/libros/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "libros", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Crear libro",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Rayuela\",\n  \"autor\": \"Julio Cortázar\",\n  \"genero\": \"Novela\",\n  \"precio\": 16.0,\n  \"ejemplares\": 4,\n  \"anioPublicacion\": 1963,\n  \"disponible\": true\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/practice-api/libros/items", "host": ["{{baseUrl}}"], "path": ["practice-api", "libros", "items"] }
+          }
+        },
+        {
+          "name": "Actualizar libro",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"ejemplares\": 0\n}" },
+            "url": { "raw": "{{baseUrl}}/practice-api/libros/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "libros", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Eliminar libro",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/practice-api/libros/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "libros", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Reiniciar datos demo",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/practice-api/libros/items/reset", "host": ["{{baseUrl}}"], "path": ["practice-api", "libros", "items", "reset"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Farmacia",
+      "item": [
+        {
+          "name": "Listar medicamentos",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/practice-api/farmacia/items", "host": ["{{baseUrl}}"], "path": ["practice-api", "farmacia", "items"] }
+          }
+        },
+        {
+          "name": "Obtener medicamento por id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/practice-api/farmacia/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "farmacia", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Crear medicamento",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"medicamento\": \"Loratadina 10mg\",\n  \"presentacion\": \"Tabletas\",\n  \"laboratorio\": \"Genfar\",\n  \"precio\": 4.8,\n  \"existencias\": 25,\n  \"requiereReceta\": false,\n  \"fechaVencimiento\": \"2027-06-01\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/practice-api/farmacia/items", "host": ["{{baseUrl}}"], "path": ["practice-api", "farmacia", "items"] }
+          }
+        },
+        {
+          "name": "Actualizar medicamento",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"existencias\": 3\n}" },
+            "url": { "raw": "{{baseUrl}}/practice-api/farmacia/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "farmacia", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Eliminar medicamento",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/practice-api/farmacia/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "farmacia", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Reiniciar datos demo",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/practice-api/farmacia/items/reset", "host": ["{{baseUrl}}"], "path": ["practice-api", "farmacia", "items", "reset"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tareas",
+      "item": [
+        {
+          "name": "Listar tareas",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/practice-api/tareas/items", "host": ["{{baseUrl}}"], "path": ["practice-api", "tareas", "items"] }
+          }
+        },
+        {
+          "name": "Obtener tarea por id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/practice-api/tareas/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "tareas", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Crear tarea",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tarea\": \"Preparar presentación final\",\n  \"materia\": \"Programación IV\",\n  \"prioridad\": \"Alta\",\n  \"progreso\": 10,\n  \"fechaLimite\": \"2026-08-10\",\n  \"responsable\": \"Equipo 3\",\n  \"completada\": false\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/practice-api/tareas/items", "host": ["{{baseUrl}}"], "path": ["practice-api", "tareas", "items"] }
+          }
+        },
+        {
+          "name": "Actualizar tarea",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"progreso\": 100,\n  \"completada\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/practice-api/tareas/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "tareas", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Eliminar tarea",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/practice-api/tareas/items/:id", "host": ["{{baseUrl}}"], "path": ["practice-api", "tareas", "items", ":id"], "variable": [{ "key": "id", "value": "" }] }
+          }
+        },
+        {
+          "name": "Reiniciar datos demo",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/practice-api/tareas/items/reset", "host": ["{{baseUrl}}"], "path": ["practice-api", "tareas", "items", "reset"] }
+          }
+        }
+      ]
+    }
+  ]
+}
