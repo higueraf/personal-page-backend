@@ -181,9 +181,11 @@ export class PlaygroundController {
     // If an exam template (with themed variants) was selected, round-robin its
     // versions across the students so consecutive students get different themes.
     let versions: { id: string }[] = [];
+    let templateLanguage: string | undefined;
     if (data.examTemplateId) {
       const template = await this.examTemplateService.get(data.examTemplateId);
       versions = template.versions ?? [];
+      templateLanguage = template.language;
       if (versions.length === 0) {
         throw new ForbiddenException('El examen seleccionado no tiene variantes configuradas.');
       }
@@ -193,7 +195,7 @@ export class PlaygroundController {
       studentIds.map((studentId, i) =>
         this.playgroundService.assignExam(teacher.id, studentId, {
           name:             data.name,
-          language:         data.language ?? (versions.length ? 'typescript' : 'python'),
+          language:         templateLanguage ?? data.language ?? 'python',
           materia:          data.materia,
           start_time:       data.start_time ? new Date(data.start_time) : undefined,
           end_time:         data.end_time   ? new Date(data.end_time)   : undefined,
