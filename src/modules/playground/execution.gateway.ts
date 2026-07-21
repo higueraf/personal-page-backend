@@ -423,13 +423,13 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
       const cls = mainFile.replace('.java', '');
       return `javac "${mainFile}" && java "${cls}"`;
     }
-    // tsx's ESM loader treats a bare filename (no leading "./" or "/") as an
-    // import specifier rather than a relative path, resolving it against the
-    // filesystem root instead of the session's cwd ("Cannot find module
-    // '/main.ts'"). Force it to be unambiguously relative.
-    const entryArg = mainFile.startsWith('./') || mainFile.startsWith('/')
-      ? mainFile
-      : `./${mainFile}`;
+    // File paths use a virtual project-root convention where top-level files
+    // are stored as "/name.ts" — that leading "/" is NOT a filesystem-root
+    // path, it's relative to the session dir. Passed as-is (or as a bare
+    // filename) to tsx, its ESM loader resolves it as an absolute/import
+    // specifier instead of relative to cwd ("Cannot find module '/main.ts'").
+    // Strip any leading slashes and force it to be unambiguously relative.
+    const entryArg = `./${mainFile.replace(/^\/+/, '')}`;
     return `${runtime.directCommand} "${entryArg}"`;
   }
 
