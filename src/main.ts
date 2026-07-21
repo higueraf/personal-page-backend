@@ -16,6 +16,20 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.setGlobalPrefix('api');
+
+  // La "API de práctica" (módulo aislado, sin auth) debe poder ser consumida
+  // desde cualquier origen — incluido el preview de Flutter embebido vía
+  // DartPad (dartpad.dev), que hace fetch/http reales contra este backend.
+  // Se resuelve con CORS totalmente abierto SOLO para este prefijo, antes de
+  // que corra el enableCors global (con whitelist) para el resto de la API.
+  app.use('/api/practice-api', (req: any, res: any, next: any) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
+
   app.enableCors({
     origin: process.env.APP_ORIGINS?.split(',') || [
       'http://localhost:5173'

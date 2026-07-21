@@ -9,6 +9,15 @@ import { ExamVersion, ExamQuestion } from '../../entities/exam-version.entity';
 import { User } from '../../entities/user.entity';
 import { MailService } from '../mail/mail.service';
 
+/** Slug simple para el "type" (namespace) de la API de práctica, derivado del theme_name de la variante. */
+function slugify(text: string): string {
+  return text
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function wrapStatement(text: string, width = 90): string {
   const words = text.split(/\s+/);
   const lines: string[] = [];
@@ -54,7 +63,9 @@ export class PlaygroundService {
   ) {}
 
   /** Builds blank exam files with only the question statement as a top comment, per the requested file mode. */
-  private buildExamVersionFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion') {
+  private buildExamVersionFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion', language?: string) {
+    if (language === 'flutter') return this.buildFlutterExamFiles(version);
+
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
 
     const block = (q: ExamQuestion) =>
@@ -73,6 +84,234 @@ export class PlaygroundService {
       content: block(q),
       is_folder: false,
     }));
+  }
+
+  /**
+   * Andamiaje fijo de Flutter (idéntico para las 4 variantes) + un único
+   * archivo de enunciados (ENUNCIADO.md, no-.dart) para no repetirlos por
+   * archivo — el bundler de preview del frontend solo toma archivos .dart,
+   * así que este .md queda automáticamente fuera del preview compilado.
+   */
+  private buildFlutterExamFiles(version: ExamVersion) {
+    const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
+    const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0);
+    const typeSlug = slugify(version.theme_name);
+
+    const enunciado = [
+      `# Examen Flutter — ${version.theme_name}`,
+      '',
+      `Puntaje total: ${totalPoints} pts`,
+      '',
+      `> API de práctica: usá \`type=${typeSlug}\` en tus llamadas (ya viene configurado en \`lib/services/api_service.dart\`).`,
+      '',
+      ...questions.map((q) => `## Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+    ].join('\n');
+
+    return [
+      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      { name: 'lib', path: '/lib', content: '', is_folder: true },
+      {
+        name: 'models', path: '/lib/models', content: '', is_folder: true,
+      },
+      {
+        name: 'services', path: '/lib/services', content: '', is_folder: true,
+      },
+      {
+        name: 'item.dart', path: '/lib/models/item.dart', is_folder: false,
+        content:
+`class Item {
+  final String? id;
+  final String type;
+  final String name;
+  final String? description;
+  final String? category;
+  final double price;
+  final int quantity;
+  final bool active;
+
+  Item({
+    this.id,
+    required this.type,
+    required this.name,
+    this.description,
+    this.category,
+    this.price = 0,
+    this.quantity = 1,
+    this.active = true,
+  });
+
+  factory Item.fromJson(Map<String, dynamic> json) {
+    return Item(
+      id: json['id'] as String?,
+      type: json['type'] as String,
+      name: json['name'] as String,
+      description: json['description'] as String?,
+      category: json['category'] as String?,
+      price: double.tryParse(json['price'].toString()) ?? 0,
+      quantity: json['quantity'] as int? ?? 1,
+      active: json['active'] as bool? ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'name': name,
+      'description': description,
+      'category': category,
+      'price': price,
+      'quantity': quantity,
+      'active': active,
+    };
+  }
+}
+`,
+      },
+      {
+        name: 'api_service.dart', path: '/lib/services/api_service.dart', is_folder: false,
+        content:
+`import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../models/item.dart';
+
+/// Cliente mínimo de la API de práctica — cambiá [type] por el indicado en ENUNCIADO.md.
+class ApiService {
+  static const String baseUrl = 'https://TU-BACKEND/api/practice-api/items';
+  static const String type = '${typeSlug}';
+
+  Future<List<Item>> fetchItems() async {
+    final res = await http.get(Uri.parse('\$baseUrl?type=\$type'));
+    final List<dynamic> data = jsonDecode(res.body);
+    return data.map((e) => Item.fromJson(e)).toList();
+  }
+
+  Future<Item> createItem(Item item) async {
+    final res = await http.post(
+      Uri.parse(baseUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({...item.toJson(), 'type': type}),
+    );
+    return Item.fromJson(jsonDecode(res.body));
+  }
+
+  Future<Item> updateItem(String id, Item item) async {
+    final res = await http.patch(
+      Uri.parse('\$baseUrl/\$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(item.toJson()),
+    );
+    return Item.fromJson(jsonDecode(res.body));
+  }
+
+  Future<void> deleteItem(String id) async {
+    await http.delete(Uri.parse('\$baseUrl/\$id'));
+  }
+}
+`,
+      },
+      {
+        name: 'main.dart', path: '/lib/main.dart', is_folder: false,
+        content:
+`import 'package:flutter/material.dart';
+import 'services/api_service.dart';
+import 'models/item.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '${version.theme_name}',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+      ),
+      home: const HomePage(),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final ApiService _api = ApiService();
+  List<Item> _items = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final items = await _api.fetchItems();
+      setState(() => _items = items);
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('${version.theme_name}')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: _items.length,
+              itemBuilder: (context, i) {
+                final item = _items[i];
+                return ListTile(
+                  title: Text(item.name),
+                  subtitle: Text('\${item.category ?? ''} — \\\$\${item.price}'),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // TODO: implementar la pantalla/lógica de creación (parte del examen)
+        },
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+`,
+      },
+      {
+        name: 'pubspec.yaml', path: '/pubspec.yaml', is_folder: false,
+        content:
+`name: flutter_examen
+description: Examen de Flutter — CRUD contra API.
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+
+flutter:
+  uses-material-design: true
+`,
+      },
+    ];
   }
 
   async findAllByUser(userId: string) {
@@ -362,8 +601,13 @@ export class PlaygroundService {
     let resolvedFiles = files;
     if (!Array.isArray(resolvedFiles) || resolvedFiles.length === 0) {
       if (examVersionId) {
-        const version = await this.examVersionRepo.findOne({ where: { id: examVersionId } });
-        if (version) resolvedFiles = this.buildExamVersionFiles(version, fileMode ?? 'perQuestion');
+        const version = await this.examVersionRepo.findOne({
+          where: { id: examVersionId },
+          relations: ['examTemplate'],
+        });
+        if (version) {
+          resolvedFiles = this.buildExamVersionFiles(version, fileMode ?? 'perQuestion', version.examTemplate?.language);
+        }
       }
     }
     if (!Array.isArray(resolvedFiles) || resolvedFiles.length === 0) {

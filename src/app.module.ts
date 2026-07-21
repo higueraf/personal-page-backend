@@ -12,6 +12,7 @@ import { ProfileModule } from './modules/profile/profile.module';
 import { ResourcesModule } from './modules/resources/resources.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { PlaygroundModule } from './modules/playground/playground.module';
+import { PracticeApiModule } from './modules/practice-api/practice-api.module';
 import { AppSeeder } from './database/app.seeder';
 
 import { ContentBlock } from './entities/content-block.entity';
@@ -34,6 +35,7 @@ import { PlaygroundFile } from './entities/playground-file.entity';
 import { PlaygroundTemplate } from './entities/playground-template.entity';
 import { ExamTemplate } from './entities/exam-template.entity';
 import { ExamVersion } from './entities/exam-version.entity';
+import { PracticeItem } from './entities/practice-item.entity';
 import { Institution } from './entities/institution.entity';
 import { StudyCourse } from './entities/study-course.entity';
 
@@ -47,6 +49,7 @@ const ALL_ENTITIES = [
   Resource,
   ContactInfo, ContactMessage,
   PlaygroundProject, PlaygroundFile, PlaygroundTemplate, ExamTemplate, ExamVersion,
+  PracticeItem,
 ];
 
 @Module({
@@ -74,6 +77,7 @@ const ALL_ENTITIES = [
     ResourcesModule,
     ContactModule,
     PlaygroundModule,
+    PracticeApiModule,
     MailModule,
   ],
   providers: [AppSeeder],

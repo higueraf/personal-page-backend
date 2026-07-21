@@ -67,6 +67,8 @@ export class AppSeeder {
     await this.seedResources();
     await this.seedPlaygroundTemplates(adminUser);
     await this.seedExamTemplates(adminUser);
+    await this.seedExamTemplateTypeScriptV2(adminUser);
+    await this.seedExamTemplateFlutter(adminUser);
 
     return { ok: true };
   }
@@ -1248,6 +1250,223 @@ const { data: user } = useQuery({
         name: templateName,
         description: 'Examen de TypeScript con 4 ejercicios (for+if, switch, for+if, while) y 4 variantes temáticas para evitar copias entre alumnos.',
         language: 'typescript',
+        created_by: admin.id,
+      }),
+    );
+
+    await this.examVersionsRepo.save(
+      versions.map((v) =>
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: v.theme_name,
+          order_index: v.order_index,
+          questions: v.questions,
+        }),
+      ),
+    );
+  }
+
+  private async seedExamTemplateTypeScriptV2(admin: User) {
+    const templateName = 'Programación IV — Estructuras de Control, Ciclos y Switch (Variante 2)';
+    const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
+    if (exists) return;
+
+    // Misma dificultad/estructura/números que la plantilla original, con vocabulario nuevo:
+    //   Q1: for + if/else if — tarifa por horas (0h gratis, 1-2h $1.50/h, 3-5h $1.00/h, >5h $8.00 fijo)
+    //   Q2: switch — 4 planes/tipos con descuento (0%, 5%, 10%, 15%)
+    //   Q3: for + if/else if — clasifica 6 elementos por precio en 4 segmentos
+    //   Q4: while (centinela 0) — tarifa por categoría (1-4), cuenta reservas de "alto valor" (> $300)
+    const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
+      {
+        theme_name: 'Ferretería', order_index: 0,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Tarifa de despacho a domicilio',
+            statement: 'Se registra el tiempo estimado (en horas) de despacho de 5 pedidos de la ferretería. La tarifa de despacho es: 0 horas: gratis (retiro en tienda); 1 a 2 horas: $1.50 por hora; 3 a 5 horas: $1.00 por hora; más de 5 horas: tarifa fija de $8.00. Usando un ciclo for y una estructura if/else if, calcula el costo de despacho de cada pedido y cuenta cuántos pagaron la tarifa fija máxima ($8.00).',
+          },
+          {
+            order: 2, points: 2.5, title: 'Tipos de cliente con descuento',
+            statement: 'La ferretería clasifica a sus clientes en 4 tipos (tipo 1 a 4: Particular, Contratista, Mayorista, Constructora). Escribe una función que reciba el tipo de cliente y el monto de la compra, calcule el subtotal (se recibe directamente como monto de compra), aplique un descuento según el tipo usando switch (Tipo 1: 0%, Tipo 2: 5%, Tipo 3: 10%, Tipo 4: 15%), y devuelva un objeto con subtotal, descuento y total.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Clasificación de productos por precio',
+            statement: 'La ferretería tiene 6 productos con distintos precios. Usando un ciclo for y una estructura if/else if, clasifica cada producto por precio en 4 categorías (Económico: menos de $10; Estándar: $10 a $20; Profesional: $20 a $35; Premium: más de $35), acumula el valor total del inventario y cuenta cuántos productos son de categoría Premium.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Ventas en caja hasta el cierre',
+            statement: 'Se registran ventas en caja una por una: para cada venta se ingresa la categoría de producto (1: herramienta manual $80; 2: herramienta eléctrica $150; 3: material de construcción $280; 4: maquinaria pesada $450), hasta que se ingresa 0 (centinela) que indica el cierre de caja. Usando un ciclo while, acumula la recaudación total del día y cuenta cuántas ventas fueron de "alto valor" (más de $300).',
+          },
+        ],
+      },
+      {
+        theme_name: 'Gimnasio', order_index: 1,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Tarifa de uso de sala de pesas',
+            statement: 'Se registra el tiempo (en horas) que 5 socios permanecieron en la sala de pesas. La tarifa adicional (fuera de la membresía básica) es: 0 horas: gratis; 1 a 2 horas: $1.50 por hora; 3 a 5 horas: $1.00 por hora; más de 5 horas: tarifa fija de $8.00. Usando un ciclo for y una estructura if/else if, calcula el cargo adicional de cada socio y cuenta cuántos pagaron la tarifa fija máxima ($8.00).',
+          },
+          {
+            order: 2, points: 2.5, title: 'Planes de membresía con descuento',
+            statement: 'El gimnasio ofrece 4 planes de membresía (plan 1 a 4: Mensual, Trimestral, Semestral, Anual). Escribe una función que reciba el número de plan y la cantidad de meses, calcule el precio base × meses como subtotal, aplique un descuento según el plan usando switch (Plan 1: 0%, Plan 2: 5%, Plan 3: 10%, Plan 4: 15%), y devuelva un objeto con precioBase, subtotal, descuento y total.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Clasificación de clases por costo',
+            statement: 'El gimnasio ofrece 6 clases grupales con distinto costo. Usando un ciclo for y una estructura if/else if, clasifica cada clase por costo en 4 categorías (Básica: menos de $10; Estándar: $10 a $20; Especializada: $20 a $35; Premium: más de $35), acumula el costo total de las clases y cuenta cuántas son Premium.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Inscripciones hasta agotar cupos',
+            statement: 'Se registran inscripciones a clases una por una: para cada inscripción se ingresa la categoría de clase (1: yoga $50; 2: spinning $100; 3: crossfit $260; 4: entrenamiento personalizado $420), hasta que se ingresa 0 (centinela) que indica que se agotaron los cupos del día. Usando un ciclo while, acumula la recaudación total y cuenta cuántas inscripciones fueron de "alto valor" (más de $300).',
+          },
+        ],
+      },
+      {
+        theme_name: 'Lavandería', order_index: 2,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Tarifa de servicio urgente',
+            statement: 'Se registra el tiempo (en horas) que tomó procesar 5 pedidos de lavandería con servicio urgente. La tarifa urgente es: 0 horas: gratis (servicio normal); 1 a 2 horas: $1.50 por hora; 3 a 5 horas: $1.00 por hora; más de 5 horas: tarifa fija de $8.00. Usando un ciclo for y una estructura if/else if, calcula el cargo urgente de cada pedido y cuenta cuántos pagaron la tarifa fija máxima ($8.00).',
+          },
+          {
+            order: 2, points: 2.5, title: 'Tipos de prenda con descuento',
+            statement: 'La lavandería clasifica las prendas en 4 tipos (tipo 1 a 4: Ropa Casual, Ropa Formal, Edredones, Cortinas). Escribe una función que reciba el tipo de prenda y la cantidad de piezas, calcule el precio base × piezas como subtotal, aplique un descuento según el tipo usando switch (Tipo 1: 0%, Tipo 2: 5%, Tipo 3: 10%, Tipo 4: 15%), y devuelva un objeto con precioBase, subtotal, descuento y total.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Clasificación de pedidos por costo',
+            statement: 'La lavandería procesó 6 pedidos con distinto costo. Usando un ciclo for y una estructura if/else if, clasifica cada pedido por costo en 4 categorías (Básico: menos de $10; Estándar: $10 a $20; Grande: $20 a $35; Premium: más de $35), acumula el costo total de los pedidos y cuenta cuántos son Premium.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Entregas hasta cerrar el turno',
+            statement: 'Se registran entregas de pedidos una por una: para cada entrega se ingresa la categoría del servicio (1: lavado simple $50; 2: lavado y planchado $100; 3: tintorería $260; 4: edredones/cortinas $420), hasta que se ingresa 0 (centinela) que indica el cierre del turno. Usando un ciclo while, acumula la recaudación total del turno y cuenta cuántas entregas fueron de "alto valor" (más de $300).',
+          },
+        ],
+      },
+      {
+        theme_name: 'Parqueadero', order_index: 3,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Tarifa por tiempo de estacionamiento',
+            statement: 'Se registra el tiempo (en horas) que permanecieron estacionados 5 vehículos. La tarifa es: 0 horas: gratis (primeros minutos de cortesía); 1 a 2 horas: $1.50 por hora; 3 a 5 horas: $1.00 por hora; más de 5 horas: tarifa fija de $8.00. Usando un ciclo for y una estructura if/else if, calcula el cargo de cada vehículo y cuenta cuántos pagaron la tarifa fija máxima ($8.00).',
+          },
+          {
+            order: 2, points: 2.5, title: 'Tipos de vehículo con descuento',
+            statement: 'El parqueadero clasifica los vehículos en 4 tipos (tipo 1 a 4: Auto, Moto, Camioneta, Camión). Escribe una función que reciba el tipo de vehículo y la cantidad de días de plan mensual, calcule el precio base × días como subtotal, aplique un descuento según el tipo usando switch (Tipo 1: 0%, Tipo 2: 5%, Tipo 3: 10%, Tipo 4: 15%), y devuelva un objeto con precioBase, subtotal, descuento y total.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Clasificación de espacios por tarifa mensual',
+            statement: 'El parqueadero ofrece 6 tipos de espacio con distinta tarifa mensual. Usando un ciclo for y una estructura if/else if, clasifica cada espacio por tarifa en 4 categorías (Económico: menos de $10; Estándar: $10 a $20; Cubierto: $20 a $35; VIP: más de $35), acumula el valor total de los espacios y cuenta cuántos son VIP.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Cobros hasta el cierre del día',
+            statement: 'Se registran cobros de salida uno por uno: para cada cobro se ingresa la categoría del vehículo (1: moto $50; 2: auto $100; 3: camioneta $260; 4: camión $420), hasta que se ingresa 0 (centinela) que indica el cierre del día. Usando un ciclo while, acumula la recaudación total del día y cuenta cuántos cobros fueron de "alto valor" (más de $300).',
+          },
+        ],
+      },
+    ];
+
+    const template = await this.examTemplatesRepo.save(
+      this.examTemplatesRepo.create({
+        name: templateName,
+        description: 'Segunda plantilla de TypeScript con 4 ejercicios (for+if, switch, for+if, while) y 4 variantes temáticas nuevas, misma dificultad que la plantilla original.',
+        language: 'typescript',
+        created_by: admin.id,
+      }),
+    );
+
+    await this.examVersionsRepo.save(
+      versions.map((v) =>
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: v.theme_name,
+          order_index: v.order_index,
+          questions: v.questions,
+        }),
+      ),
+    );
+  }
+
+  private async seedExamTemplateFlutter(admin: User) {
+    const templateName = 'Programación IV — Flutter, CRUD contra API';
+    const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
+    if (exists) return;
+
+    // Cada variante: Q1 CRUD contra la API de práctica (7 pts) + Q2/Q3 lógica interviniente (1.5 pts c/u).
+    // El `theme_name` es también el "type" (namespace) usado en la API de práctica — ver PracticeApiService.
+    const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
+      {
+        theme_name: 'Ropa', order_index: 0,
+        questions: [
+          {
+            order: 1, points: 7, title: 'CRUD de tienda de ropa contra la API',
+            statement: 'Construye una app Flutter que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart, con type="ropa") para gestionar el catálogo de una tienda de ropa. Debe permitir: (1) listar las prendas mostrando nombre, categoría, precio y stock; (2) crear una prenda nueva desde un formulario; (3) editar una prenda existente; (4) eliminar una prenda. Usa las funciones ya provistas en ApiService (fetchItems, createItem, updateItem, deleteItem) y actualiza la lista en pantalla después de cada operación.',
+          },
+          {
+            order: 2, points: 1.5, title: 'Valor total del inventario',
+            statement: 'En la pantalla de listado, calcula y muestra el valor total del inventario (suma de precio × stock de todas las prendas cargadas) en un texto visible, por ejemplo en la parte superior de la lista.',
+          },
+          {
+            order: 3, points: 1.5, title: 'Filtro por categoría',
+            statement: 'Agrega un buscador o selector que permita filtrar la lista de prendas por categoría (ej. Camisetas, Pantalones, Calzado), mostrando solo las que coincidan con la categoría seleccionada.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Libros', order_index: 1,
+        questions: [
+          {
+            order: 1, points: 7, title: 'CRUD de biblioteca contra la API',
+            statement: 'Construye una app Flutter que consuma la API de práctica (type="libros") para gestionar el catálogo de una biblioteca. Debe permitir: (1) listar los libros mostrando nombre, categoría, precio y cantidad disponible; (2) crear un libro nuevo desde un formulario; (3) editar un libro existente; (4) eliminar un libro. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
+          },
+          {
+            order: 2, points: 1.5, title: 'Libros agotados',
+            statement: 'En la pantalla de listado, cuenta cuántos libros tienen cantidad disponible igual a 0 ("agotados") y muestra ese total en un texto visible.',
+          },
+          {
+            order: 3, points: 1.5, title: 'Ordenar la lista',
+            statement: 'Agrega un botón que permita ordenar la lista de libros alfabéticamente por nombre (o por precio), alternando el orden cada vez que se presiona.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Farmacia', order_index: 2,
+        questions: [
+          {
+            order: 1, points: 7, title: 'CRUD de farmacia contra la API',
+            statement: 'Construye una app Flutter que consuma la API de práctica (type="farmacia") para gestionar el inventario de una farmacia. Debe permitir: (1) listar los medicamentos mostrando nombre, categoría, precio y stock; (2) crear un medicamento nuevo desde un formulario; (3) editar un medicamento existente; (4) eliminar un medicamento. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
+          },
+          {
+            order: 2, points: 1.5, title: 'Alerta de stock bajo',
+            statement: 'En la pantalla de listado, resalta (por ejemplo con color rojo o un ícono) los medicamentos cuyo stock sea menor a 5 unidades, para indicar visualmente que deben reabastecerse.',
+          },
+          {
+            order: 3, points: 1.5, title: 'Precio con descuento por volumen',
+            statement: 'Para cada medicamento, calcula y muestra junto al precio original un "precio con descuento" aplicando un 10% de descuento cuando el stock sea mayor a 20 unidades (promoción por exceso de inventario).',
+          },
+        ],
+      },
+      {
+        theme_name: 'Tareas', order_index: 3,
+        questions: [
+          {
+            order: 1, points: 7, title: 'CRUD de lista de tareas contra la API',
+            statement: 'Construye una app Flutter que consuma la API de práctica (type="tareas") para gestionar una lista de tareas/pendientes. Debe permitir: (1) listar las tareas mostrando nombre y descripción; (2) crear una tarea nueva desde un formulario; (3) editar una tarea existente; (4) eliminar una tarea. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación (usa el campo `active` del ítem como "pendiente" (true) / "completada" (false)).',
+          },
+          {
+            order: 2, points: 1.5, title: 'Contador de pendientes y completadas',
+            statement: 'En la pantalla de listado, cuenta cuántas tareas están pendientes (`active == true`) y cuántas están completadas (`active == false`), y muestra ambos totales en pantalla.',
+          },
+          {
+            order: 3, points: 1.5, title: 'Validación del formulario',
+            statement: 'En el formulario de creación/edición de tareas, valida que el nombre no esté vacío antes de guardar; si está vacío, muestra un mensaje de error en pantalla y no permite continuar.',
+          },
+        ],
+      },
+    ];
+
+    const template = await this.examTemplatesRepo.save(
+      this.examTemplatesRepo.create({
+        name: templateName,
+        description: 'Examen de Flutter con 4 variantes temáticas: CRUD contra la API de práctica (7 pts) + 2 preguntas de lógica interviniente (1.5 pts c/u).',
+        language: 'flutter',
         created_by: admin.id,
       }),
     );
