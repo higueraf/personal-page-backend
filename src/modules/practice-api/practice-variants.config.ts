@@ -1,8 +1,9 @@
 /**
  * Configuración de las variantes de la "API de práctica".
  *
- * Cada variante tiene su propio segmento de URL (`/practice-api/<key>/items`)
- * y su propio conjunto de campos (mínimo 7, con nombres distintos entre sí),
+ * Cada variante tiene su propio segmento de URL (`/practice-api/<key>/<resource>`,
+ * ej. `/practice-api/ropa/prendas`) y su propio conjunto de campos (mínimo 7,
+ * con nombres distintos entre sí),
  * para que copiar el proyecto de un compañero con otra variante no funcione
  * sin cambios reales de código.
  *
@@ -20,12 +21,15 @@ export interface VariantField {
 }
 
 export interface VariantConfig {
+  /** Último segmento de la URL del recurso, ej. `/practice-api/ropa/prendas` — distinto por variante. */
+  resource: string;
   fields: VariantField[];
   seeds: Record<string, any>[];
 }
 
 export const PRACTICE_VARIANTS: Record<string, VariantConfig> = {
   ropa: {
+    resource: 'prendas',
     fields: [
       { key: 'prenda', type: 'string', label: 'Prenda' },
       { key: 'talla', type: 'string', label: 'Talla' },
@@ -44,6 +48,7 @@ export const PRACTICE_VARIANTS: Record<string, VariantConfig> = {
     ],
   },
   libros: {
+    resource: 'libros',
     fields: [
       { key: 'titulo', type: 'string', label: 'Título' },
       { key: 'autor', type: 'string', label: 'Autor' },
@@ -62,6 +67,7 @@ export const PRACTICE_VARIANTS: Record<string, VariantConfig> = {
     ],
   },
   farmacia: {
+    resource: 'medicamentos',
     fields: [
       { key: 'medicamento', type: 'string', label: 'Medicamento' },
       { key: 'presentacion', type: 'string', label: 'Presentación' },
@@ -80,6 +86,7 @@ export const PRACTICE_VARIANTS: Record<string, VariantConfig> = {
     ],
   },
   tareas: {
+    resource: 'tareas',
     fields: [
       { key: 'tarea', type: 'string', label: 'Tarea' },
       { key: 'materia', type: 'string', label: 'Materia' },
@@ -100,6 +107,7 @@ export const PRACTICE_VARIANTS: Record<string, VariantConfig> = {
 };
 
 export const GENERIC_VARIANT: VariantConfig = {
+  resource: 'items',
   fields: [
     { key: 'nombre', type: 'string', label: 'Nombre' },
     { key: 'descripcion', type: 'string', label: 'Descripción' },

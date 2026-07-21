@@ -22,7 +22,7 @@ async function bootstrap() {
   // DartPad (dartpad.dev), que hace fetch/http reales contra este backend.
   // Se resuelve con CORS totalmente abierto SOLO para este prefijo, antes de
   // que corra el enableCors global (con whitelist) para el resto de la API.
-  app.use('/api/practice-api', (req: any, res: any, next: any) => {
+  app.use(['/api/practice-api', '/api/todo-api'], (req: any, res: any, next: any) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type');

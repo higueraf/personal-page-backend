@@ -55,6 +55,23 @@ function wrapStatement(text: string, width = 90): string {
   return lines.map(l => ` * ${l}`).join('\n');
 }
 
+/** Wraps text into `///` Dart doc-comment lines (for widget/screen headers). */
+function wrapLineComment(text: string, width = 86): string {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length > width) {
+      lines.push(current.trim());
+      current = word;
+    } else {
+      current = `${current} ${word}`.trim();
+    }
+  }
+  if (current) lines.push(current.trim());
+  return lines.map(l => `/// ${l}`).join('\n');
+}
+
 /** Fallback starter files when an exam is assigned without explicit files */
 const DEFAULT_FILES: Record<string, { name: string; content: string; path: string }[]> = {
   python:     [{ name: 'main.py',   path: '/main.py',   content: 'print("Hello World!")\n' }],
@@ -108,48 +125,76 @@ export class PlaygroundService {
   }
 
   /**
-   * Andamiaje fijo de Flutter (idéntico para las 4 variantes) + un único
-   * archivo de enunciados (ENUNCIADO.md, no-.dart) para no repetirlos por
-   * archivo — el bundler de preview del frontend solo toma archivos .dart,
-   * así que este .md queda automáticamente fuera del preview compilado.
+   * Andamiaje de Flutter con arquitectura por capas (models/services/screens),
+   * más un único archivo de enunciados (ENUNCIADO.md, no-.dart) para no
+   * repetirlos por archivo — el bundler de preview del frontend solo toma
+   * archivos .dart, así que este .md queda automáticamente fuera del preview
+   * compilado.
+   *
+   * Estructura de la pantalla principal (home_screen.dart): ícono grande +
+   * mensaje de bienvenida, 3 botones abajo (uno por pregunta, cada uno abre
+   * su propia pantalla stub) y un Drawer (menú) con acceso al ejemplo de
+   * referencia "ToDo" — un CRUD completo y funcional (API distinta,
+   * `/todo-api/todos`) que el alumno puede estudiar/replicar para resolver
+   * su propia variante.
    */
   private buildFlutterExamFiles(version: ExamVersion) {
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
+    const [q1, q2, q3] = questions;
     const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0);
     const typeSlug = slugify(version.theme_name);
-    const fields = getVariantConfig(typeSlug).fields;
-    const endpoint = `https://TU-BACKEND/api/practice-api/${typeSlug}/items`;
+    const variant = getVariantConfig(typeSlug);
+    const fields = variant.fields;
+    const apiBase = 'https://api.franciscohiguera.site/api';
+    const endpoint = `${apiBase}/practice-api/${typeSlug}/${variant.resource}`;
+    const todoEndpoint = `${apiBase}/todo-api/todos`;
 
     const enunciado = [
       `# Examen Flutter — ${version.theme_name}`,
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
-      `> API de práctica: \`GET/POST ${endpoint}\` y \`GET/PATCH/DELETE ${endpoint}/:id\` (ya viene configurado en \`lib/services/api_service.dart\`).`,
+      '## Tu API (variante asignada)',
+      '',
+      `> \`GET/POST ${endpoint}\` y \`GET/PATCH/DELETE ${endpoint}/:id\` (ya viene configurado en \`lib/services/api_service.dart\`).`,
       '',
       `> Campos del recurso: ${fields.map((f) => `\`${f.key}\` (${dartType(f.type)})`).join(', ')}.`,
       '',
-      ...questions.map((q) => `## Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+      '## Estructura del proyecto',
+      '',
+      '- `lib/screens/home_screen.dart`: pantalla principal (ícono + bienvenida + 3 botones, uno por pregunta).',
+      '- `lib/screens/item_list_screen.dart`: **Pregunta 1** — stub del CRUD contra tu API.',
+      '- `lib/screens/question2_screen.dart`: **Pregunta 2** — stub de la pantalla de cálculo.',
+      '- `lib/screens/question3_screen.dart`: **Pregunta 3** — stub de la pantalla de cálculo.',
+      '- `lib/screens/todo_list_screen.dart` y `todo_form_screen.dart`: **ejemplo de referencia** (ya',
+      '  resuelto y funcional) — un CRUD completo de tareas (`id` + `nombre`) contra otra API pública',
+      `  (\`${todoEndpoint}\`). Se accede desde el menú (ícono ☰ / Drawer) de la pantalla principal.`,
+      '  Estudiá este ejemplo para replicar el mismo patrón (modelo → servicio → pantalla) en tus',
+      '  pantallas de la Pregunta 1.',
+      '',
+      '## Preguntas',
+      '',
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
     ].join('\n');
 
     const constructorParams = fields.map((f) => `    required this.${f.key},`).join('\n');
     const classProps = fields.map((f) => `  final ${dartType(f.type)} ${f.key};`).join('\n');
     const fromJsonProps = fields.map((f) => `      ${f.key}: ${dartFromJson(f)},`).join('\n');
     const toJsonProps = fields.map((f) => `      '${f.key}': ${f.key},`).join('\n');
+    const firstField = fields[0];
+    const secondField = fields[1] ?? fields[0];
 
     return [
       { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
       { name: 'lib', path: '/lib', content: '', is_folder: true },
-      {
-        name: 'models', path: '/lib/models', content: '', is_folder: true,
-      },
-      {
-        name: 'services', path: '/lib/services', content: '', is_folder: true,
-      },
+      { name: 'models', path: '/lib/models', content: '', is_folder: true },
+      { name: 'services', path: '/lib/services', content: '', is_folder: true },
+      { name: 'screens', path: '/lib/screens', content: '', is_folder: true },
       {
         name: 'item.dart', path: '/lib/models/item.dart', is_folder: false,
         content:
-`class Item {
+`/// Modelo de datos de tu variante (${version.theme_name}).
+class Item {
   final String? id;
 ${classProps}
 
@@ -174,13 +219,37 @@ ${toJsonProps}
 `,
       },
       {
+        name: 'todo.dart', path: '/lib/models/todo.dart', is_folder: false,
+        content:
+`/// Modelo del ejemplo de referencia — solo 2 campos, a propósito, para que
+/// sirva de plantilla simple de arquitectura por capas.
+class Todo {
+  final String? id;
+  final String nombre;
+
+  Todo({this.id, required this.nombre});
+
+  factory Todo.fromJson(Map<String, dynamic> json) {
+    return Todo(
+      id: json['id'] as String?,
+      nombre: json['nombre'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'nombre': nombre};
+  }
+}
+`,
+      },
+      {
         name: 'api_service.dart', path: '/lib/services/api_service.dart', is_folder: false,
         content:
 `import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/item.dart';
 
-/// Cliente mínimo de la API de práctica de esta variante (ver ENUNCIADO.md).
+/// Cliente de la API de práctica de tu variante (ver ENUNCIADO.md).
 class ApiService {
   static const String baseUrl = '${endpoint}';
 
@@ -215,41 +284,164 @@ class ApiService {
 `,
       },
       {
-        name: 'main.dart', path: '/lib/main.dart', is_folder: false,
+        name: 'todo_api_service.dart', path: '/lib/services/todo_api_service.dart', is_folder: false,
+        content:
+`import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../models/todo.dart';
+
+/// Cliente del ejemplo de referencia — API pública distinta a la de tu
+/// variante, usada solo para estudiar el patrón (no es parte de tu entrega).
+class TodoApiService {
+  static const String baseUrl = '${todoEndpoint}';
+
+  Future<List<Todo>> fetchTodos() async {
+    final res = await http.get(Uri.parse(baseUrl));
+    final List<dynamic> data = jsonDecode(res.body);
+    return data.map((e) => Todo.fromJson(e)).toList();
+  }
+
+  Future<Todo> createTodo(Todo todo) async {
+    final res = await http.post(
+      Uri.parse(baseUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(todo.toJson()),
+    );
+    return Todo.fromJson(jsonDecode(res.body));
+  }
+
+  Future<Todo> updateTodo(String id, Todo todo) async {
+    final res = await http.patch(
+      Uri.parse('\$baseUrl/\$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(todo.toJson()),
+    );
+    return Todo.fromJson(jsonDecode(res.body));
+  }
+
+  Future<void> deleteTodo(String id) async {
+    await http.delete(Uri.parse('\$baseUrl/\$id'));
+  }
+}
+`,
+      },
+      {
+        name: 'home_screen.dart', path: '/lib/screens/home_screen.dart', is_folder: false,
         content:
 `import 'package:flutter/material.dart';
-import 'services/api_service.dart';
-import 'models/item.dart';
+import 'item_list_screen.dart';
+import 'question2_screen.dart';
+import 'question3_screen.dart';
+import 'todo_list_screen.dart';
 
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// Pantalla principal: ícono + bienvenida, 3 botones (uno por pregunta) y un
+/// Drawer con el ejemplo de referencia (ToDo).
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '${version.theme_name}',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
+    return Scaffold(
+      appBar: AppBar(title: const Text('${version.theme_name}')),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              child: Text('Menú', style: TextStyle(fontSize: 20)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.checklist),
+              title: const Text('Ejemplo de referencia (ToDo)'),
+              subtitle: const Text('CRUD completo ya resuelto'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TodoListScreen()),
+                );
+              },
+            ),
+          ],
+        ),
       ),
-      home: const HomePage(),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.school, size: 96, color: Colors.blue),
+            const SizedBox(height: 16),
+            Text(
+              'Bienvenido/a al examen de ${version.theme_name}',
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ItemListScreen()),
+                  ),
+                  child: Text('Pregunta 1 · ${q1?.title ?? ''} (${q1?.points ?? 0} pts)'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const Question2Screen()),
+                  ),
+                  child: Text('Pregunta 2 · ${q2?.title ?? ''} (${q2?.points ?? 0} pts)'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const Question3Screen()),
+                  ),
+                  child: Text('Pregunta 3 · ${q3?.title ?? ''} (${q3?.points ?? 0} pts)'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
+`,
+      },
+      {
+        name: 'item_list_screen.dart', path: '/lib/screens/item_list_screen.dart', is_folder: false,
+        content:
+`import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../models/item.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+${wrapLineComment(`Pregunta 1 (${q1?.points ?? 0} pts): ${q1?.statement ?? ''}`)}
+class ItemListScreen extends StatefulWidget {
+  const ItemListScreen({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<ItemListScreen> createState() => _ItemListScreenState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _ItemListScreenState extends State<ItemListScreen> {
   final ApiService _api = ApiService();
   List<Item> _items = [];
   bool _loading = true;
@@ -273,28 +465,339 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('${version.theme_name}')),
+      appBar: AppBar(title: const Text('${q1?.title ?? 'Pregunta 1'}')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
               itemCount: _items.length,
               itemBuilder: (context, i) {
                 final item = _items[i];
-                final fields = item.toJson().entries.toList();
-                final title = fields.isNotEmpty ? fields.first.value.toString() : '(sin datos)';
-                final subtitle = fields.skip(1).map((e) => '\${e.key}: \${e.value}').join(' · ');
                 return ListTile(
-                  title: Text(title),
-                  subtitle: Text(subtitle),
+                  title: Text(item.${firstField.key}.toString()),
+                  subtitle: Text('${secondField.key}: \${item.${secondField.key}}'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () {
+                      // TODO: eliminar (item.id) llamando a _api.deleteItem y recargar la lista
+                    },
+                  ),
+                  onTap: () {
+                    // TODO: abrir un formulario para editar este item (parte del examen)
+                  },
                 );
               },
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: implementar la pantalla/lógica de creación (parte del examen)
+          // TODO: abrir un formulario para crear un item nuevo (parte del examen)
+          // usando _api.createItem(...) y recargando la lista con _load()
         },
         child: const Icon(Icons.add),
       ),
+    );
+  }
+}
+`,
+      },
+      {
+        name: 'question2_screen.dart', path: '/lib/screens/question2_screen.dart', is_folder: false,
+        content:
+`import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../models/item.dart';
+
+${wrapLineComment(`Pregunta 2 (${q2?.points ?? 0} pts): ${q2?.statement ?? ''}`)}
+class Question2Screen extends StatefulWidget {
+  const Question2Screen({super.key});
+
+  @override
+  State<Question2Screen> createState() => _Question2ScreenState();
+}
+
+class _Question2ScreenState extends State<Question2Screen> {
+  final ApiService _api = ApiService();
+  List<Item> _items = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final items = await _api.fetchItems();
+      setState(() => _items = items);
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('${q2?.title ?? 'Pregunta 2'}')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${q2?.statement ?? ''}',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 24),
+                  // TODO: calcular el resultado a partir de \`_items\` y mostrarlo abajo
+                  // (parte del examen).
+                  const Text('Resultado: (pendiente de implementar)'),
+                ],
+              ),
+            ),
+    );
+  }
+}
+`,
+      },
+      {
+        name: 'question3_screen.dart', path: '/lib/screens/question3_screen.dart', is_folder: false,
+        content:
+`import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../models/item.dart';
+
+${wrapLineComment(`Pregunta 3 (${q3?.points ?? 0} pts): ${q3?.statement ?? ''}`)}
+class Question3Screen extends StatefulWidget {
+  const Question3Screen({super.key});
+
+  @override
+  State<Question3Screen> createState() => _Question3ScreenState();
+}
+
+class _Question3ScreenState extends State<Question3Screen> {
+  final ApiService _api = ApiService();
+  List<Item> _items = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final items = await _api.fetchItems();
+      setState(() => _items = items);
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('${q3?.title ?? 'Pregunta 3'}')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${q3?.statement ?? ''}',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 24),
+                  // TODO: calcular el resultado a partir de \`_items\` y mostrarlo abajo
+                  // (parte del examen).
+                  const Text('Resultado: (pendiente de implementar)'),
+                ],
+              ),
+            ),
+    );
+  }
+}
+`,
+      },
+      {
+        name: 'todo_list_screen.dart', path: '/lib/screens/todo_list_screen.dart', is_folder: false,
+        content:
+`import 'package:flutter/material.dart';
+import '../services/todo_api_service.dart';
+import '../models/todo.dart';
+import 'todo_form_screen.dart';
+
+/// Ejemplo de referencia — CRUD completo y funcional (no es parte de la
+/// entrega, es solo para estudiar el patrón: modelo → servicio → pantalla).
+class TodoListScreen extends StatefulWidget {
+  const TodoListScreen({super.key});
+
+  @override
+  State<TodoListScreen> createState() => _TodoListScreenState();
+}
+
+class _TodoListScreenState extends State<TodoListScreen> {
+  final TodoApiService _api = TodoApiService();
+  List<Todo> _todos = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final todos = await _api.fetchTodos();
+      setState(() => _todos = todos);
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _delete(String id) async {
+    await _api.deleteTodo(id);
+    _load();
+  }
+
+  Future<void> _openForm([Todo? todo]) async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => TodoFormScreen(todo: todo)),
+    );
+    if (saved == true) _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Ejemplo: Tareas')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: _todos.length,
+              itemBuilder: (context, i) {
+                final todo = _todos[i];
+                return ListTile(
+                  title: Text(todo.nombre),
+                  onTap: () => _openForm(todo),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () => _delete(todo.id!),
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _openForm(),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+`,
+      },
+      {
+        name: 'todo_form_screen.dart', path: '/lib/screens/todo_form_screen.dart', is_folder: false,
+        content:
+`import 'package:flutter/material.dart';
+import '../services/todo_api_service.dart';
+import '../models/todo.dart';
+
+/// Ejemplo de referencia — formulario de creación/edición, ya funcional.
+class TodoFormScreen extends StatefulWidget {
+  final Todo? todo;
+
+  const TodoFormScreen({super.key, this.todo});
+
+  @override
+  State<TodoFormScreen> createState() => _TodoFormScreenState();
+}
+
+class _TodoFormScreenState extends State<TodoFormScreen> {
+  final TodoApiService _api = TodoApiService();
+  late final TextEditingController _nombreCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _nombreCtrl = TextEditingController(text: widget.todo?.nombre ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nombreCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final nombre = _nombreCtrl.text.trim();
+    if (nombre.isEmpty) return;
+
+    if (widget.todo == null) {
+      await _api.createTodo(Todo(nombre: nombre));
+    } else {
+      await _api.updateTodo(widget.todo!.id!, Todo(nombre: nombre));
+    }
+    if (mounted) Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.todo == null ? 'Nueva tarea' : 'Editar tarea')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: _nombreCtrl,
+              decoration: const InputDecoration(labelText: 'Nombre'),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(onPressed: _save, child: const Text('Guardar')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+`,
+      },
+      {
+        name: 'main.dart', path: '/lib/main.dart', is_folder: false,
+        content:
+`import 'package:flutter/material.dart';
+import 'screens/home_screen.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '${version.theme_name}',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+      ),
+      home: const HomeScreen(),
     );
   }
 }

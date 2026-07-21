@@ -1386,28 +1386,32 @@ const { data: user } = useQuery({
 
   private async seedExamTemplateFlutter(admin: User) {
     const templateName = 'Programación IV — Flutter, CRUD contra API';
-    const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
-    if (exists) return;
+    const description =
+      'Examen de Flutter con 4 variantes temáticas: pantalla principal con menú + 3 botones — ' +
+      'CRUD contra la API de práctica (7 pts) y 2 pantallas de cálculo (1.5 pts c/u) — más un ejemplo ' +
+      'de referencia (ToDo) accesible desde el menú.';
 
-    // Cada variante: Q1 CRUD contra la API de práctica (7 pts) + Q2/Q3 lógica interviniente (1.5 pts c/u).
-    // El `theme_name` define el segmento de URL (`/practice-api/<slug>/items`) y los 7 campos propios
-    // de esa variante — ver `practice-variants.config.ts`. Endpoint y campos son distintos por variante
-    // a propósito, para que no se pueda reusar el mismo proyecto entre variantes sin cambios reales.
+    // Cada variante: Q1 CRUD contra la API de práctica (7 pts, pantalla propia) + Q2/Q3 (1.5 pts c/u),
+    // cada una resuelta en su propia pantalla (accedida desde uno de los 3 botones de la pantalla
+    // principal). El `theme_name` define el segmento de URL (`/practice-api/<slug>/<resource>`) y los
+    // 7 campos propios de esa variante — ver `practice-variants.config.ts`. Endpoint y campos son
+    // distintos por variante a propósito, para que no se pueda reusar el mismo proyecto entre
+    // variantes sin cambios reales.
     const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
       {
         theme_name: 'Ropa', order_index: 0,
         questions: [
           {
             order: 1, points: 7, title: 'CRUD de tienda de ropa contra la API',
-            statement: 'Construye una app Flutter que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el catálogo de una tienda de ropa. El recurso maneja los campos: prenda, talla, color, categoria, precio, stock y disponible. Debe permitir: (1) listar las prendas mostrando al menos prenda, categoria, precio y stock; (2) crear una prenda nueva desde un formulario con todos los campos; (3) editar una prenda existente; (4) eliminar una prenda. Usa las funciones ya provistas en ApiService (fetchItems, createItem, updateItem, deleteItem) y actualiza la lista en pantalla después de cada operación.',
+            statement: 'Construye la pantalla de CRUD (accedida desde el primer botón de la pantalla principal) que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el catálogo de una tienda de ropa. El recurso maneja los campos: prenda, talla, color, categoria, precio, stock y disponible. Debe permitir: (1) listar las prendas mostrando al menos prenda, categoria, precio y stock; (2) crear una prenda nueva desde un formulario con todos los campos; (3) editar una prenda existente; (4) eliminar una prenda. Usa las funciones ya provistas en ApiService (fetchItems, createItem, updateItem, deleteItem) y actualiza la lista en pantalla después de cada operación.',
           },
           {
             order: 2, points: 1.5, title: 'Valor total del inventario',
-            statement: 'En la pantalla de listado, calcula y muestra el valor total del inventario (suma de precio × stock de todas las prendas con disponible == true) en un texto visible, por ejemplo en la parte superior de la lista.',
+            statement: 'En la pantalla propia de la Pregunta 2 (accedida desde el segundo botón de la pantalla principal), calcula y muestra el valor total del inventario: la suma de precio × stock de todas las prendas con disponible == true.',
           },
           {
-            order: 3, points: 1.5, title: 'Filtro por categoría',
-            statement: 'Agrega un buscador o selector que permita filtrar la lista de prendas por categoria (ej. Camisetas, Pantalones, Calzado), mostrando solo las que coincidan con la categoría seleccionada.',
+            order: 3, points: 1.5, title: 'Precio promedio de prendas disponibles',
+            statement: 'En la pantalla propia de la Pregunta 3 (accedida desde el tercer botón de la pantalla principal), calcula y muestra el precio promedio de las prendas con disponible == true.',
           },
         ],
       },
@@ -1416,15 +1420,15 @@ const { data: user } = useQuery({
         questions: [
           {
             order: 1, points: 7, title: 'CRUD de biblioteca contra la API',
-            statement: 'Construye una app Flutter que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el catálogo de una biblioteca. El recurso maneja los campos: titulo, autor, genero, precio, ejemplares, anioPublicacion y disponible. Debe permitir: (1) listar los libros mostrando al menos titulo, autor, precio y ejemplares; (2) crear un libro nuevo desde un formulario con todos los campos; (3) editar un libro existente; (4) eliminar un libro. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
+            statement: 'Construye la pantalla de CRUD (accedida desde el primer botón de la pantalla principal) que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el catálogo de una biblioteca. El recurso maneja los campos: titulo, autor, genero, precio, ejemplares, anioPublicacion y disponible. Debe permitir: (1) listar los libros mostrando al menos titulo, autor, precio y ejemplares; (2) crear un libro nuevo desde un formulario con todos los campos; (3) editar un libro existente; (4) eliminar un libro. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
           },
           {
             order: 2, points: 1.5, title: 'Libros agotados',
-            statement: 'En la pantalla de listado, cuenta cuántos libros tienen ejemplares igual a 0 ("agotados") y muestra ese total en un texto visible.',
+            statement: 'En la pantalla propia de la Pregunta 2 (accedida desde el segundo botón de la pantalla principal), cuenta cuántos libros tienen ejemplares igual a 0 ("agotados") y muestra ese total.',
           },
           {
-            order: 3, points: 1.5, title: 'Ordenar la lista',
-            statement: 'Agrega un botón que permita ordenar la lista de libros alfabéticamente por titulo (o por precio), alternando el orden cada vez que se presiona.',
+            order: 3, points: 1.5, title: 'Precio promedio del catálogo',
+            statement: 'En la pantalla propia de la Pregunta 3 (accedida desde el tercer botón de la pantalla principal), calcula y muestra el precio promedio de todos los libros del catálogo.',
           },
         ],
       },
@@ -1433,15 +1437,15 @@ const { data: user } = useQuery({
         questions: [
           {
             order: 1, points: 7, title: 'CRUD de farmacia contra la API',
-            statement: 'Construye una app Flutter que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el inventario de una farmacia. El recurso maneja los campos: medicamento, presentacion, laboratorio, precio, existencias, requiereReceta y fechaVencimiento. Debe permitir: (1) listar los medicamentos mostrando al menos medicamento, presentacion, precio y existencias; (2) crear un medicamento nuevo desde un formulario con todos los campos; (3) editar un medicamento existente; (4) eliminar un medicamento. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
+            statement: 'Construye la pantalla de CRUD (accedida desde el primer botón de la pantalla principal) que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el inventario de una farmacia. El recurso maneja los campos: medicamento, presentacion, laboratorio, precio, existencias, requiereReceta y fechaVencimiento. Debe permitir: (1) listar los medicamentos mostrando al menos medicamento, presentacion, precio y existencias; (2) crear un medicamento nuevo desde un formulario con todos los campos; (3) editar un medicamento existente; (4) eliminar un medicamento. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
           },
           {
-            order: 2, points: 1.5, title: 'Alerta de stock bajo',
-            statement: 'En la pantalla de listado, resalta (por ejemplo con color rojo o un ícono) los medicamentos cuyas existencias sean menores a 5 unidades, para indicar visualmente que deben reabastecerse.',
+            order: 2, points: 1.5, title: 'Medicamentos con stock bajo',
+            statement: 'En la pantalla propia de la Pregunta 2 (accedida desde el segundo botón de la pantalla principal), cuenta cuántos medicamentos tienen existencias menores a 5 unidades y muestra ese total.',
           },
           {
-            order: 3, points: 1.5, title: 'Precio con descuento por volumen',
-            statement: 'Para cada medicamento, calcula y muestra junto al precio original un "precio con descuento" aplicando un 10% de descuento cuando las existencias sean mayores a 20 unidades (promoción por exceso de inventario).',
+            order: 3, points: 1.5, title: 'Total con descuento por volumen',
+            statement: 'En la pantalla propia de la Pregunta 3 (accedida desde el tercer botón de la pantalla principal), calcula y muestra la suma de los precios aplicando un 10% de descuento a los medicamentos cuyas existencias sean mayores a 20 unidades (el resto sin descuento).',
           },
         ],
       },
@@ -1450,39 +1454,73 @@ const { data: user } = useQuery({
         questions: [
           {
             order: 1, points: 7, title: 'CRUD de lista de tareas contra la API',
-            statement: 'Construye una app Flutter que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar una lista de tareas. El recurso maneja los campos: tarea, materia, prioridad, progreso, fechaLimite, responsable y completada. Debe permitir: (1) listar las tareas mostrando al menos tarea, materia, prioridad y progreso; (2) crear una tarea nueva desde un formulario con todos los campos; (3) editar una tarea existente; (4) eliminar una tarea. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
+            statement: 'Construye la pantalla de CRUD (accedida desde el primer botón de la pantalla principal) que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar una lista de tareas. El recurso maneja los campos: tarea, materia, prioridad, progreso, fechaLimite, responsable y completada. Debe permitir: (1) listar las tareas mostrando al menos tarea, materia, prioridad y progreso; (2) crear una tarea nueva desde un formulario con todos los campos; (3) editar una tarea existente; (4) eliminar una tarea. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
           },
           {
             order: 2, points: 1.5, title: 'Contador de pendientes y completadas',
-            statement: 'En la pantalla de listado, cuenta cuántas tareas están completadas (`completada == true`) y cuántas están pendientes (`completada == false`), y muestra ambos totales en pantalla.',
+            statement: 'En la pantalla propia de la Pregunta 2 (accedida desde el segundo botón de la pantalla principal), cuenta cuántas tareas están completadas (`completada == true`) y cuántas están pendientes (`completada == false`), y muestra ambos totales.',
           },
           {
-            order: 3, points: 1.5, title: 'Validación del formulario',
-            statement: 'En el formulario de creación/edición de tareas, valida que el campo tarea no esté vacío antes de guardar; si está vacío, muestra un mensaje de error en pantalla y no permite continuar.',
+            order: 3, points: 1.5, title: 'Progreso promedio',
+            statement: 'En la pantalla propia de la Pregunta 3 (accedida desde el tercer botón de la pantalla principal), calcula y muestra el progreso promedio (campo progreso) de todas las tareas.',
           },
         ],
       },
     ];
 
-    const template = await this.examTemplatesRepo.save(
-      this.examTemplatesRepo.create({
-        name: templateName,
-        description: 'Examen de Flutter con 4 variantes temáticas: CRUD contra la API de práctica (7 pts) + 2 preguntas de lógica interviniente (1.5 pts c/u).',
-        language: 'flutter',
-        created_by: admin.id,
-      }),
-    );
+    // Upsert: si el template ya existe (deploys previos), actualiza su descripción/idioma y las
+    // preguntas de cada variante en el lugar (conservando los IDs), en vez de saltarse el seed —
+    // así los cambios de contenido llegan a producción sin necesidad de editar manualmente desde el
+    // Admin.
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
 
-    await this.examVersionsRepo.save(
-      versions.map((v) =>
-        this.examVersionsRepo.create({
-          exam_template_id: template.id,
-          theme_name: v.theme_name,
-          order_index: v.order_index,
-          questions: v.questions,
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'flutter',
+          created_by: admin.id,
         }),
-      ),
-    );
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'flutter';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = v.questions;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+          }),
+        );
+      }
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════════════
