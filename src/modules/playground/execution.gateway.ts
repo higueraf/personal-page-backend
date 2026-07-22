@@ -231,6 +231,16 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
           ?? validFiles.find((f) => f.name.endsWith(runtime.extension))
           ?? validFiles[0];
 
+      // A NestJS .spec.ts run through the plain "Ejecutar" (tsx) path has no
+      // Jest globals (describe/it/expect) and always crashes. Defense in depth
+      // in case a client ever sends one here (frontend already reroutes this
+      // itself): fall back to the same Jest run as "Ejecutar tests".
+      if (lang === 'nestjs' && /\.(spec|test)\.ts$/.test(targetEntry.name)) {
+        await this.cleanupDir(sessionDir);
+        await this.handleStartTestExecution(client, { files: payload.files, language: lang });
+        return;
+      }
+
       const mainFile = fileRelPath(targetEntry);
       const allFileNames = validFiles.map(fileRelPath);
 
@@ -280,7 +290,7 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   @SubscribeMessage('start_test_execution')
   async handleStartTestExecution(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { files: { name: string; path: string; content: string }[]; language?: string },
+    @MessageBody() payload: { files: { name: string; path?: string; content: string }[]; language?: string },
   ) {
     this.killSession(client.id);
 

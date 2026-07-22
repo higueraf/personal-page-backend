@@ -1608,27 +1608,29 @@ const { data: user } = useQuery({
     const description =
       'Examen de NestJS con 5 variantes temáticas. Cada proyecto trae un módulo CRUD de referencia ' +
       'YA RESUELTO (servicio + controlador + 2 archivos de test) y dos módulos más (Categorías y ' +
-      'Movimientos) sin implementar: el alumno debe completar su servicio y controlador siguiendo el ' +
-      'mismo patrón, y escribir los 4 archivos de test que faltan (uno de servicio y uno de endpoints ' +
-      'para cada módulo).';
+      'Movimientos) también YA IMPLEMENTADOS (servicio + controlador), cada uno con una regla de ' +
+      'negocio y un endpoint adicionales que NO están en el módulo de referencia. El alumno no ' +
+      'programa CRUD: su único trabajo es escribir los 4 archivos de test que faltan, cubriendo ' +
+      'también esos casos adicionales (copiar los tests de referencia cambiando nombres de ' +
+      'variables no alcanza para cubrirlos).';
 
     // Cada variante solo cambia el recurso/los campos del módulo de referencia (ver
     // `practice-variants.config.ts`, mismas claves que usa el examen de Flutter). Los módulos
-    // "Categorías" y "Movimientos" que el alumno debe completar son siempre los mismos —
-    // ver `buildNestExamFiles` en `playground.service.ts`. Las preguntas describen lo que se
-    // califica (también alimentan el rubric de `buildGradingPrompt`).
+    // "Categorías" y "Movimientos" (ya implementados, con su regla/endpoint extra cada uno)
+    // son siempre los mismos — ver `buildNestExamFiles` en `playground.service.ts`. Las
+    // preguntas describen lo que se califica (también alimentan el rubric de `buildGradingPrompt`).
     const questions: ExamQuestion[] = [
       {
-        order: 1, points: 4, title: 'Módulo Categorías — CRUD completo',
-        statement: 'Completa `CategoriasService` y `CategoriasController` (recurso `categorias`: `id`, `nombre`, `descripcion`) con el mismo patrón de CRUD en memoria que ves resuelto en el módulo de referencia: `findAll`, `findOne` (lanzando `NotFoundException` si no existe), `create`, `update` y `remove`, expuestos como `GET /categorias`, `GET /categorias/:id`, `POST /categorias`, `PATCH /categorias/:id` y `DELETE /categorias/:id`.',
+        order: 1, points: 4, title: 'Tests de Categorías',
+        statement: 'Escribe `categorias.service.spec.ts` (mínimo 6 tests: los 5 básicos —listar iniciales, crear, encontrar por id, `NotFoundException` con id inexistente, actualizar/eliminar— más uno que verifique que crear una categoría con un `nombre` ya existente, sin importar mayúsculas/minúsculas, lanza `ConflictException`) y `categorias.controller.spec.ts` (mínimo 4 tests con `supertest`: los 3 básicos —`GET` lista 200, `POST` crea 201 con `id`, `GET /:id` inexistente 404— más uno de `GET /categorias/buscar?nombre=...` que verifique que solo devuelve las categorías cuyo nombre contiene el texto buscado).',
       },
       {
-        order: 2, points: 4, title: 'Módulo Movimientos — CRUD completo',
-        statement: 'Completa `MovimientosService` y `MovimientosController` (recurso `movimientos`: `id`, `tipo` (`\'entrada\'` o `\'salida\'`), `cantidad`, `referencia`, `fecha`) con el mismo patrón de CRUD en memoria, expuesto con los mismos 5 endpoints REST que en Categorías.',
+        order: 2, points: 4, title: 'Tests de Movimientos',
+        statement: 'Escribe `movimientos.service.spec.ts` (mínimo 6 tests: los 5 básicos —igual que en Categorías— más uno que verifique que crear un movimiento con `cantidad` menor o igual a 0 lanza `BadRequestException`) y `movimientos.controller.spec.ts` (mínimo 4 tests con `supertest`: los 3 básicos más uno de `GET /movimientos/resumen` que verifique que `totalEntradas`, `totalSalidas` y `balance` se calculan correctamente a partir de movimientos creados en el propio test).',
       },
       {
-        order: 3, points: 2, title: 'Tests de Categorías y Movimientos',
-        statement: 'Escribe los 4 archivos de test que faltan, siguiendo exactamente el mismo estilo que los del módulo de referencia: `categorias.service.spec.ts` y `movimientos.service.spec.ts` (mínimo 5 tests cada uno — listar iniciales, crear, encontrar por id, `NotFoundException` con id inexistente, actualizar/eliminar), y `categorias.controller.spec.ts` y `movimientos.controller.spec.ts` (mínimo 3 tests con `supertest` cada uno — `GET` lista con 200, `POST` con 201 e `id` definido, `GET /:id` inexistente con 404).',
+        order: 3, points: 2, title: 'Cobertura de los casos adicionales (anti-copia)',
+        statement: 'Categorías y Movimientos tienen cada uno una regla de negocio (`ConflictException` por nombre duplicado / `BadRequestException` por cantidad inválida) y un endpoint (`/categorias/buscar`, `/movimientos/resumen`) que NO existen en el módulo de referencia: los tests que solo copian los del recurso de referencia cambiando variables no los cubren y pierden estos puntos. Se evalúa que los 4 archivos de test incluyan casos explícitos para esa parte adicional de cada módulo.',
       },
     ];
 

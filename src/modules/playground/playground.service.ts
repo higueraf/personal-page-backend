@@ -790,26 +790,33 @@ flutter:
       `  - \`src/${resource}/${resource}.controller.ts\`: controlador RESUELTO (endpoints REST).`,
       `  - \`src/${resource}/${resource}.service.spec.ts\`: tests unitarios RESUELTOS (Jest + @nestjs/testing).`,
       `  - \`src/${resource}/${resource}.controller.spec.ts\`: tests de endpoints RESUELTOS (supertest, HTTP en memoria).`,
-      '  - `src/categorias/`: servicio y controlador SIN IMPLEMENTAR (solo la firma de cada método).',
-      '  - `src/movimientos/`: servicio y controlador SIN IMPLEMENTAR (solo la firma de cada método).',
+      '  - `src/categorias/`: servicio y controlador **YA IMPLEMENTADOS** (CRUD completo + una regla de',
+      '    negocio y un endpoint adicionales). Sin archivos de test.',
+      '  - `src/movimientos/`: servicio y controlador **YA IMPLEMENTADOS** (CRUD completo + una regla de',
+      '    negocio y un endpoint adicionales). Sin archivos de test.',
       '',
       '## Tu trabajo',
       '',
-      `  1. **Completar \`CategoriasService\` y \`CategoriasController\`** (recurso \`categorias\`: \`id\`, \`nombre\`,`,
-      '     `descripcion`) con el mismo patrón de CRUD en memoria que ves resuelto en `' + resource + '.service.ts`' + '/`' + resource + '.controller.ts`' + ':',
-      '     `findAll`, `findOne` (lanzando `NotFoundException` si no existe), `create`, `update` y `remove`,',
-      '     expuestos como `GET /categorias`, `GET /categorias/:id`, `POST /categorias`, `PATCH /categorias/:id`',
-      '     y `DELETE /categorias/:id`.',
-      '  2. **Completar `MovimientosService` y `MovimientosController`** (recurso `movimientos`: `id`, `tipo`',
-      '     (`\'entrada\'` o `\'salida\'`), `cantidad`, `referencia`, `fecha`) con el mismo patrón de CRUD.',
-      '  3. **Escribir los 4 archivos de test que faltan** (no vienen dados, a diferencia de los de `' + resource + '`' + '):',
-      '     - `src/categorias/categorias.service.spec.ts`: mínimo 5 tests — listar iniciales, crear (y verificar que',
-      '       aumenta el conteo), encontrar por id, lanzar `NotFoundException` con un id inexistente, y actualizar/eliminar.',
-      '     - `src/categorias/categorias.controller.spec.ts`: mínimo 3 tests con `supertest` — `GET /categorias`',
-      '       (200 y arreglo), `POST /categorias` (201 y `id` definido), `GET /categorias/:id` con id inexistente (404).',
-      '     - `src/movimientos/movimientos.service.spec.ts` y `src/movimientos/movimientos.controller.spec.ts`:',
-      '       la misma cobertura mínima que arriba, pero para `movimientos`.',
-      '     Todos deben seguir exactamente el mismo estilo/estructura que ' + '`' + resource + '.service.spec.ts`' + ' y ' + '`' + resource + '.controller.spec.ts`' + '.',
+      '  Categorías y Movimientos ya vienen completos: **no tenés que programar el CRUD**, solo escribir',
+      '  los 4 archivos de test que faltan, siguiendo el mismo estilo que `' + resource + '.service.spec.ts`' +
+        ' y `' + resource + '.controller.spec.ts`' + '. Ojo: cada módulo tiene una regla y un endpoint que',
+      '  NO existen en el módulo de referencia — copiar los tests de `' + resource + '`' + ' cambiando nombres',
+      '  de variables no te va a alcanzar, tenés que agregar casos de prueba distintos para esas partes.',
+      '',
+      `  1. **\`src/categorias/categorias.service.spec.ts\`** (mínimo 6 tests): los 5 básicos de siempre`,
+      '     (listar iniciales, crear, encontrar por id, `NotFoundException` con id inexistente, actualizar/eliminar)',
+      '     **más** un test que verifique que crear una categoría con un `nombre` ya existente (sin importar',
+      '     mayúsculas/minúsculas) lanza `ConflictException`.',
+      '  2. **`src/categorias/categorias.controller.spec.ts`** (mínimo 4 tests con `supertest`): los 3 básicos',
+      '     de siempre (`GET` lista 200, `POST` crea 201 con `id`, `GET /:id` inexistente 404) **más** un test',
+      '     de `GET /categorias/buscar?nombre=...` que verifique que devuelve solo las categorías cuyo nombre',
+      '     contiene el texto buscado.',
+      '  3. **`src/movimientos/movimientos.service.spec.ts`** (mínimo 6 tests): los 5 básicos de siempre',
+      '     **más** un test que verifique que crear un movimiento con `cantidad` menor o igual a 0 lanza',
+      '     `BadRequestException`.',
+      '  4. **`src/movimientos/movimientos.controller.spec.ts`** (mínimo 4 tests con `supertest`): los 3',
+      '     básicos de siempre **más** un test de `GET /movimientos/resumen` que verifique que `totalEntradas`,',
+      '     `totalSalidas` y `balance` se calculan correctamente a partir de movimientos creados en el test.',
       '',
       '  Corré los tests con el botón "Ejecutar tests" (Jest) para verificar tu propio avance.',
       '',
@@ -969,81 +976,206 @@ flutter:
       "})\n" +
       "export class " + ClassName + "Module {}\n";
 
-    /** Builds an unimplemented (student-authored) service+controller+module pair for a fixed, non-thematic resource. */
-    const buildStub = (name: string, stubFields: Array<{ key: string; tsType: string }>) => {
-      const Name = cap(name);
-      const iface =
-        'export interface ' + Name + 'Item {\n' +
-        '  id: string;\n' +
-        stubFields.map((f) => '  ' + f.key + ': ' + f.tsType + ';').join('\n') +
-        '\n}\n';
-
-      const service =
-        "import { Injectable } from '@nestjs/common';\n\n" +
-        iface + '\n' +
-        "/**\n" +
-        " * TODO (Alumno): implementar el CRUD completo de " + cap(name) + ", con el mismo patrón\n" +
-        " * (arreglo en memoria + findAll/findOne/create/update/remove, lanzando\n" +
-        " * NotFoundException cuando corresponda) que viste resuelto en\n" +
-        " * `" + resource + ".service.ts`.\n" +
-        " */\n" +
+    /** Categorías: CRUD completo YA IMPLEMENTADO + una regla/endpoint que el módulo de
+     *  referencia no tiene (unicidad de `nombre` + búsqueda), para que el alumno no pueda
+     *  aprobar solo copiando los tests de `resource` y renombrando variables. Sin `.spec.ts`:
+     *  el alumno debe escribirlos, incluyendo casos para esta parte extra. */
+    const categorias = {
+      Name: 'Categorias',
+      service:
+        "import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';\n\n" +
+        "export interface CategoriasItem {\n" +
+        "  id: string;\n" +
+        "  nombre: string;\n" +
+        "  descripcion: string;\n" +
+        "}\n\n" +
         "@Injectable()\n" +
-        "export class " + Name + "Service {\n" +
-        "  private items: " + Name + "Item[] = [];\n\n" +
-        "  findAll(): " + Name + "Item[] {\n" +
-        "    throw new Error('TODO: implementar findAll');\n" +
+        "export class CategoriasService {\n" +
+        "  private items: CategoriasItem[] = [];\n" +
+        "  private nextId = 1;\n\n" +
+        "  findAll(): CategoriasItem[] {\n" +
+        "    return this.items;\n" +
         "  }\n\n" +
-        "  findOne(id: string): " + Name + "Item {\n" +
-        "    throw new Error('TODO: implementar findOne');\n" +
+        "  findOne(id: string): CategoriasItem {\n" +
+        "    const item = this.items.find((i) => i.id === id);\n" +
+        "    if (!item) throw new NotFoundException(`Categoria ${id} no encontrada`);\n" +
+        "    return item;\n" +
         "  }\n\n" +
-        "  create(data: Omit<" + Name + "Item, 'id'>): " + Name + "Item {\n" +
-        "    throw new Error('TODO: implementar create');\n" +
+        "  /** Regla extra (no está en el módulo de referencia): busca por coincidencia parcial de nombre. */\n" +
+        "  search(nombre: string): CategoriasItem[] {\n" +
+        "    const needle = nombre.toLowerCase();\n" +
+        "    return this.items.filter((i) => i.nombre.toLowerCase().includes(needle));\n" +
         "  }\n\n" +
-        "  update(id: string, data: Partial<Omit<" + Name + "Item, 'id'>>): " + Name + "Item {\n" +
-        "    throw new Error('TODO: implementar update');\n" +
+        "  create(data: Omit<CategoriasItem, 'id'>): CategoriasItem {\n" +
+        "    this.assertNombreUnico(data.nombre);\n" +
+        "    const item: CategoriasItem = { id: String(this.nextId++), ...data };\n" +
+        "    this.items.push(item);\n" +
+        "    return item;\n" +
+        "  }\n\n" +
+        "  update(id: string, data: Partial<Omit<CategoriasItem, 'id'>>): CategoriasItem {\n" +
+        "    const item = this.findOne(id);\n" +
+        "    if (data.nombre) this.assertNombreUnico(data.nombre, id);\n" +
+        "    Object.assign(item, data);\n" +
+        "    return item;\n" +
         "  }\n\n" +
         "  remove(id: string): void {\n" +
-        "    throw new Error('TODO: implementar remove');\n" +
+        "    const index = this.items.findIndex((i) => i.id === id);\n" +
+        "    if (index === -1) throw new NotFoundException(`Categoria ${id} no encontrada`);\n" +
+        "    this.items.splice(index, 1);\n" +
+        "  }\n\n" +
+        "  /** Regla extra (no está en el módulo de referencia): no se permiten dos categorías con el mismo nombre. */\n" +
+        "  private assertNombreUnico(nombre: string, ignoreId?: string): void {\n" +
+        "    const duplicada = this.items.some(\n" +
+        "      (i) => i.id !== ignoreId && i.nombre.toLowerCase() === nombre.toLowerCase(),\n" +
+        "    );\n" +
+        "    if (duplicada) throw new ConflictException(`Ya existe una categoría llamada \"${nombre}\"`);\n" +
         "  }\n" +
-        "}\n";
-
-      const controller =
-        "import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common';\n" +
-        "import { " + Name + "Service, " + Name + "Item } from './" + name + ".service';\n\n" +
-        "/**\n" +
-        " * TODO (Alumno): exponer los endpoints REST de " + cap(name) + " (GET, GET:id, POST,\n" +
-        " * PATCH:id, DELETE:id), delegando en `" + Name + "Service`, con el mismo patrón que\n" +
-        " * `" + resource + ".controller.ts`.\n" +
-        " */\n" +
-        "@Controller('" + name + "')\n" +
-        "export class " + Name + "Controller {\n" +
-        "  constructor(private readonly service: " + Name + "Service) {}\n\n" +
-        "  // TODO: implementar los endpoints (ver " + resource + ".controller.ts como referencia)\n" +
-        "}\n";
-
-      const module =
+        "}\n",
+      controller:
+        "import { Controller, Get, Post, Patch, Delete, Param, Query, Body } from '@nestjs/common';\n" +
+        "import { CategoriasService, CategoriasItem } from './categorias.service';\n\n" +
+        "@Controller('categorias')\n" +
+        "export class CategoriasController {\n" +
+        "  constructor(private readonly service: CategoriasService) {}\n\n" +
+        "  // Ruta extra (no está en el módulo de referencia). Va ANTES de ':id' para no chocar con esa ruta.\n" +
+        "  @Get('buscar')\n" +
+        "  search(@Query('nombre') nombre: string): CategoriasItem[] {\n" +
+        "    return this.service.search(nombre ?? '');\n" +
+        "  }\n\n" +
+        "  @Get()\n" +
+        "  findAll(): CategoriasItem[] {\n" +
+        "    return this.service.findAll();\n" +
+        "  }\n\n" +
+        "  @Get(':id')\n" +
+        "  findOne(@Param('id') id: string): CategoriasItem {\n" +
+        "    return this.service.findOne(id);\n" +
+        "  }\n\n" +
+        "  @Post()\n" +
+        "  create(@Body() data: Omit<CategoriasItem, 'id'>): CategoriasItem {\n" +
+        "    return this.service.create(data);\n" +
+        "  }\n\n" +
+        "  @Patch(':id')\n" +
+        "  update(@Param('id') id: string, @Body() data: Partial<Omit<CategoriasItem, 'id'>>): CategoriasItem {\n" +
+        "    return this.service.update(id, data);\n" +
+        "  }\n\n" +
+        "  @Delete(':id')\n" +
+        "  remove(@Param('id') id: string): void {\n" +
+        "    this.service.remove(id);\n" +
+        "  }\n" +
+        "}\n",
+      module:
         "import { Module } from '@nestjs/common';\n" +
-        "import { " + Name + "Controller } from './" + name + ".controller';\n" +
-        "import { " + Name + "Service } from './" + name + ".service';\n\n" +
+        "import { CategoriasController } from './categorias.controller';\n" +
+        "import { CategoriasService } from './categorias.service';\n\n" +
         "@Module({\n" +
-        "  controllers: [" + Name + "Controller],\n" +
-        "  providers: [" + Name + "Service],\n" +
+        "  controllers: [CategoriasController],\n" +
+        "  providers: [CategoriasService],\n" +
+        "  exports: [CategoriasService],\n" +
         "})\n" +
-        "export class " + Name + "Module {}\n";
-
-      return { service, controller, module, Name };
+        "export class CategoriasModule {}\n",
     };
 
-    const categorias = buildStub('categorias', [
-      { key: 'nombre', tsType: 'string' },
-      { key: 'descripcion', tsType: 'string' },
-    ]);
-    const movimientos = buildStub('movimientos', [
-      { key: 'tipo', tsType: "'entrada' | 'salida'" },
-      { key: 'cantidad', tsType: 'number' },
-      { key: 'referencia', tsType: 'string' },
-      { key: 'fecha', tsType: 'string' },
-    ]);
+    /** Movimientos: CRUD completo YA IMPLEMENTADO + una regla/endpoint distintos a los de
+     *  Categorías (validación de cantidad + resumen agregado), también ausentes del módulo
+     *  de referencia. Sin `.spec.ts`. */
+    const movimientos = {
+      Name: 'Movimientos',
+      service:
+        "import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';\n\n" +
+        "export interface MovimientosItem {\n" +
+        "  id: string;\n" +
+        "  tipo: 'entrada' | 'salida';\n" +
+        "  cantidad: number;\n" +
+        "  referencia: string;\n" +
+        "  fecha: string;\n" +
+        "}\n\n" +
+        "@Injectable()\n" +
+        "export class MovimientosService {\n" +
+        "  private items: MovimientosItem[] = [];\n" +
+        "  private nextId = 1;\n\n" +
+        "  findAll(): MovimientosItem[] {\n" +
+        "    return this.items;\n" +
+        "  }\n\n" +
+        "  findOne(id: string): MovimientosItem {\n" +
+        "    const item = this.items.find((i) => i.id === id);\n" +
+        "    if (!item) throw new NotFoundException(`Movimiento ${id} no encontrado`);\n" +
+        "    return item;\n" +
+        "  }\n\n" +
+        "  /** Regla extra (no está en el módulo de referencia): totales de entradas/salidas y balance. */\n" +
+        "  resumen(): { totalEntradas: number; totalSalidas: number; balance: number } {\n" +
+        "    const totalEntradas = this.items\n" +
+        "      .filter((i) => i.tipo === 'entrada')\n" +
+        "      .reduce((sum, i) => sum + i.cantidad, 0);\n" +
+        "    const totalSalidas = this.items\n" +
+        "      .filter((i) => i.tipo === 'salida')\n" +
+        "      .reduce((sum, i) => sum + i.cantidad, 0);\n" +
+        "    return { totalEntradas, totalSalidas, balance: totalEntradas - totalSalidas };\n" +
+        "  }\n\n" +
+        "  create(data: Omit<MovimientosItem, 'id'>): MovimientosItem {\n" +
+        "    this.assertCantidadValida(data.cantidad);\n" +
+        "    const item: MovimientosItem = { id: String(this.nextId++), ...data };\n" +
+        "    this.items.push(item);\n" +
+        "    return item;\n" +
+        "  }\n\n" +
+        "  update(id: string, data: Partial<Omit<MovimientosItem, 'id'>>): MovimientosItem {\n" +
+        "    const item = this.findOne(id);\n" +
+        "    if (data.cantidad !== undefined) this.assertCantidadValida(data.cantidad);\n" +
+        "    Object.assign(item, data);\n" +
+        "    return item;\n" +
+        "  }\n\n" +
+        "  remove(id: string): void {\n" +
+        "    const index = this.items.findIndex((i) => i.id === id);\n" +
+        "    if (index === -1) throw new NotFoundException(`Movimiento ${id} no encontrado`);\n" +
+        "    this.items.splice(index, 1);\n" +
+        "  }\n\n" +
+        "  /** Regla extra (no está en el módulo de referencia): la cantidad debe ser mayor a 0. */\n" +
+        "  private assertCantidadValida(cantidad: number): void {\n" +
+        "    if (cantidad <= 0) throw new BadRequestException('La cantidad debe ser mayor a 0');\n" +
+        "  }\n" +
+        "}\n",
+      controller:
+        "import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common';\n" +
+        "import { MovimientosService, MovimientosItem } from './movimientos.service';\n\n" +
+        "@Controller('movimientos')\n" +
+        "export class MovimientosController {\n" +
+        "  constructor(private readonly service: MovimientosService) {}\n\n" +
+        "  // Ruta extra (no está en el módulo de referencia). Va ANTES de ':id' para no chocar con esa ruta.\n" +
+        "  @Get('resumen')\n" +
+        "  resumen() {\n" +
+        "    return this.service.resumen();\n" +
+        "  }\n\n" +
+        "  @Get()\n" +
+        "  findAll(): MovimientosItem[] {\n" +
+        "    return this.service.findAll();\n" +
+        "  }\n\n" +
+        "  @Get(':id')\n" +
+        "  findOne(@Param('id') id: string): MovimientosItem {\n" +
+        "    return this.service.findOne(id);\n" +
+        "  }\n\n" +
+        "  @Post()\n" +
+        "  create(@Body() data: Omit<MovimientosItem, 'id'>): MovimientosItem {\n" +
+        "    return this.service.create(data);\n" +
+        "  }\n\n" +
+        "  @Patch(':id')\n" +
+        "  update(@Param('id') id: string, @Body() data: Partial<Omit<MovimientosItem, 'id'>>): MovimientosItem {\n" +
+        "    return this.service.update(id, data);\n" +
+        "  }\n\n" +
+        "  @Delete(':id')\n" +
+        "  remove(@Param('id') id: string): void {\n" +
+        "    this.service.remove(id);\n" +
+        "  }\n" +
+        "}\n",
+      module:
+        "import { Module } from '@nestjs/common';\n" +
+        "import { MovimientosController } from './movimientos.controller';\n" +
+        "import { MovimientosService } from './movimientos.service';\n\n" +
+        "@Module({\n" +
+        "  controllers: [MovimientosController],\n" +
+        "  providers: [MovimientosService],\n" +
+        "  exports: [MovimientosService],\n" +
+        "})\n" +
+        "export class MovimientosModule {}\n",
+    };
 
     const appModule =
       "import { Module } from '@nestjs/common';\n" +
