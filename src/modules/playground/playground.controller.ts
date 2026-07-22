@@ -178,6 +178,9 @@ export class PlaygroundController {
     const { randomUUID } = await import('crypto');
     const exam_group_id = randomUUID();
 
+    // "Simulacro": practice batch, no dates/restrictions, not counted as a real exam (is_exam: false)
+    const isPractice = data.isPractice === true;
+
     // If an exam template (with themed variants) was selected, round-robin its
     // versions across the students so consecutive students get different themes.
     let versions: { id: string }[] = [];
@@ -197,15 +200,16 @@ export class PlaygroundController {
           name:             data.name,
           language:         templateLanguage ?? data.language ?? 'python',
           materia:          data.materia,
-          start_time:       data.start_time ? new Date(data.start_time) : undefined,
-          end_time:         data.end_time   ? new Date(data.end_time)   : undefined,
-          allow_copy_paste: data.allow_copy_paste ?? false,
-          require_seb:      data.require_seb ?? false,
+          start_time:       isPractice ? undefined : (data.start_time ? new Date(data.start_time) : undefined),
+          end_time:         isPractice ? undefined : (data.end_time   ? new Date(data.end_time)   : undefined),
+          allow_copy_paste: isPractice ? true  : (data.allow_copy_paste ?? false),
+          require_seb:      isPractice ? false : (data.require_seb ?? false),
           files:            data.files,
           templateId:       data.templateId,
           examVersionId:    versions.length ? versions[i % versions.length].id : undefined,
           fileMode:         data.fileMode,
           exam_group_id,
+          is_exam:          !isPractice,
         }),
       ),
     );

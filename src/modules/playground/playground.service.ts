@@ -14,6 +14,14 @@ function dartType(type: DartFieldType): string {
   return type === 'string' ? 'String' : type === 'int' ? 'int' : type === 'double' ? 'double' : 'bool';
 }
 
+function tsType(type: DartFieldType): string {
+  return type === 'string' ? 'string' : type === 'bool' ? 'boolean' : 'number';
+}
+
+function cap(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 /** Slug simple para el "type" (namespace) de la API de práctica, derivado del theme_name de la variante. */
 function slugify(text: string): string {
   return text
@@ -70,6 +78,7 @@ export class PlaygroundService {
   /** Builds blank exam files with only the question statement as a top comment, per the requested file mode. */
   private buildExamVersionFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion', language?: string) {
     if (language === 'flutter') return this.buildFlutterExamFiles(version);
+    if (language === 'nestjs') return this.buildNestExamFiles(version);
 
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
 
@@ -95,7 +104,9 @@ export class PlaygroundService {
    * Andamiaje de Flutter: el proyecto arranca como una app "ToDo" COMPLETA y
    * funcional (arquitectura por capas: models/services/screens), contra una
    * API de referencia distinta a la de la variante asignada (`/todo-api/todos`,
-   * modelo de solo `id`+`nombre`). No hay ningún stub separado por pregunta —
+   * modelo con `nombre` (String), `hecho` (bool), `duracion` (int) y
+   * `presupuesto` (double), para cubrir los mismos tipos de dato que las
+   * variantes reales). No hay ningún stub separado por pregunta —
    * el alumno debe DUPLICAR/ADAPTAR este mismo patrón (renombrando
    * archivos/clases, agregando los campos de su variante y apuntando al
    * endpoint de su propia API) para resolver el CRUD (Pregunta 1) y las 2
@@ -139,8 +150,9 @@ export class PlaygroundService {
       '',
       '## Punto de partida: app "ToDo" completa y funcional',
       '',
-      '  El proyecto arranca con una app de ejemplo YA RESUELTA (tareas: solo `id` + `nombre`),',
-      '  contra otra API distinta a la tuya, con esta estructura:',
+      '  El proyecto arranca con una app de ejemplo YA RESUELTA (tareas con `nombre` (String),',
+      '  `hecho` (bool), `duracion` (int) y `presupuesto` (double)), contra otra API distinta a',
+      '  la tuya, con esta estructura:',
       '',
       '  - `lib/models/todo.dart`: modelo de datos.',
       '  - `lib/services/todo_api_service.dart`: cliente HTTP (GET/POST/PATCH/DELETE).',
@@ -176,23 +188,41 @@ export class PlaygroundService {
       {
         name: 'todo.dart', path: '/lib/models/todo.dart', is_folder: false,
         content:
-`/// Modelo del ejemplo de referencia — solo 2 campos, a propósito, para que
-/// sirva de plantilla simple de arquitectura por capas.
+`/// Modelo del ejemplo de referencia — 4 campos con distintos tipos
+/// (String/bool/int/double), a propósito, para que sirva de plantilla de
+/// arquitectura por capas con la misma variedad de tipos que tu variante.
 class Todo {
   final String? id;
   final String nombre;
+  final bool hecho;
+  final int duracion;
+  final double presupuesto;
 
-  Todo({this.id, required this.nombre});
+  Todo({
+    this.id,
+    required this.nombre,
+    this.hecho = false,
+    this.duracion = 0,
+    this.presupuesto = 0,
+  });
 
   factory Todo.fromJson(Map<String, dynamic> json) {
     return Todo(
       id: json['id'] as String?,
       nombre: json['nombre'] as String? ?? '',
+      hecho: json['hecho'] as bool? ?? false,
+      duracion: (json['duracion'] as num?)?.toInt() ?? 0,
+      presupuesto: (json['presupuesto'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'nombre': nombre};
+    return {
+      'nombre': nombre,
+      'hecho': hecho,
+      'duracion': duracion,
+      'presupuesto': presupuesto,
+    };
   }
 }
 `,
@@ -304,6 +334,9 @@ class _TodoListScreenState extends State<TodoListScreen> {
                 final todo = _todos[i];
                 return ListTile(
                   title: Text(todo.nombre),
+                  subtitle: Text(
+                    '\${todo.duracion} min · \$\${todo.presupuesto.toStringAsFixed(2)} · \${todo.hecho ? "hecho" : "pendiente"}',
+                  ),
                   onTap: () => _openForm(todo),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete),
@@ -341,16 +374,24 @@ class TodoFormScreen extends StatefulWidget {
 class _TodoFormScreenState extends State<TodoFormScreen> {
   final TodoApiService _api = TodoApiService();
   late final TextEditingController _nombreCtrl;
+  late final TextEditingController _duracionCtrl;
+  late final TextEditingController _presupuestoCtrl;
+  bool _hecho = false;
 
   @override
   void initState() {
     super.initState();
     _nombreCtrl = TextEditingController(text: widget.todo?.nombre ?? '');
+    _duracionCtrl = TextEditingController(text: widget.todo?.duracion.toString() ?? '');
+    _presupuestoCtrl = TextEditingController(text: widget.todo?.presupuesto.toString() ?? '');
+    _hecho = widget.todo?.hecho ?? false;
   }
 
   @override
   void dispose() {
     _nombreCtrl.dispose();
+    _duracionCtrl.dispose();
+    _presupuestoCtrl.dispose();
     super.dispose();
   }
 
@@ -358,10 +399,17 @@ class _TodoFormScreenState extends State<TodoFormScreen> {
     final nombre = _nombreCtrl.text.trim();
     if (nombre.isEmpty) return;
 
+    final todo = Todo(
+      nombre: nombre,
+      hecho: _hecho,
+      duracion: int.tryParse(_duracionCtrl.text.trim()) ?? 0,
+      presupuesto: double.tryParse(_presupuestoCtrl.text.trim()) ?? 0.0,
+    );
+
     if (widget.todo == null) {
-      await _api.createTodo(Todo(nombre: nombre));
+      await _api.createTodo(todo);
     } else {
-      await _api.updateTodo(widget.todo!.id!, Todo(nombre: nombre));
+      await _api.updateTodo(widget.todo!.id!, todo);
     }
     if (mounted) Navigator.pop(context, true);
   }
@@ -377,6 +425,24 @@ class _TodoFormScreenState extends State<TodoFormScreen> {
             TextField(
               controller: _nombreCtrl,
               decoration: const InputDecoration(labelText: 'Nombre'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _duracionCtrl,
+              decoration: const InputDecoration(labelText: 'Duración (minutos)'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _presupuestoCtrl,
+              decoration: const InputDecoration(labelText: 'Presupuesto'),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+            const SizedBox(height: 12),
+            CheckboxListTile(
+              title: const Text('Hecho'),
+              value: _hecho,
+              onChanged: (v) => setState(() => _hecho = v ?? false),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -664,6 +730,367 @@ flutter:
     ];
   }
 
+  /**
+   * Andamiaje de NestJS: el proyecto arranca con un módulo de referencia YA
+   * RESUELTO (CRUD completo en memoria del recurso de la variante asignada,
+   * ej. `productos`/`prendas`/`libros`), incluyendo sus tests (unitarios con
+   * `@nestjs/testing` y de endpoints con `supertest`) como ejemplo del patrón
+   * a seguir. El alumno debe replicar ese mismo patrón para completar el
+   * servicio y el controlador de otros DOS recursos (`categorias` y
+   * `movimientos`), que arrancan solo con la firma de sus métodos (sin
+   * implementación) y sin tests — el alumno debe escribir también esos
+   * archivos de test, siguiendo el mismo patrón que ve en el recurso resuelto.
+   */
+  private buildNestExamFiles(version: ExamVersion) {
+    const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
+    const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0);
+    const typeSlug = slugify(version.theme_name);
+    const variant = getVariantConfig(typeSlug);
+    const fields = variant.fields;
+    const resource = variant.resource;
+    const ClassName = cap(resource);
+    const seeds = variant.seeds.length ? variant.seeds : [{}];
+    const firstField = fields[0] ?? { key: 'nombre', type: 'string' as DartFieldType };
+    const firstFieldNewValue = firstField.type === 'string' ? "'Actualizado'" : firstField.type === 'bool' ? 'true' : '999';
+
+    const itemInterface =
+      'export interface ' + ClassName + 'Item {\n' +
+      '  id: string;\n' +
+      fields.map((f) => '  ' + f.key + ': ' + tsType(f.type) + ';').join('\n') +
+      '\n}\n';
+
+    const seedItems = seeds
+      .map((seed, i) => '  ' + JSON.stringify({ id: String(i + 1), ...seed }))
+      .join(',\n');
+
+    const sampleJson = JSON.stringify({ id: '1', ...seeds[0] }, null, 2);
+
+    const enunciado = [
+      `# Examen NestJS — ${version.theme_name}`,
+      '',
+      `Puntaje total: ${totalPoints} pts`,
+      '',
+      '## Tu recurso de referencia (variante asignada)',
+      '',
+      `> El módulo \`src/${resource}/\` YA VIENE RESUELTO como ejemplo: un CRUD completo`,
+      `> del recurso \`${resource}\` (campos: ${fields.map((f) => `\`${f.key}\` (${tsType(f.type)})`).join(', ')}),`,
+      '> con su servicio, su controlador y sus dos archivos de test (unitario y de endpoints).',
+      '',
+      '> Ejemplo de un registro de este recurso:',
+      '>',
+      '> ```json',
+      ...sampleJson.split('\n').map((l) => `> ${l}`),
+      '> ```',
+      '',
+      '## Estructura del proyecto',
+      '',
+      `  - \`src/main.ts\`: bootstrap de Nest (no expone puerto real durante el examen, solo confirma que compila).`,
+      `  - \`src/app.module.ts\`: módulo raíz, importa los 3 módulos de recursos.`,
+      `  - \`src/${resource}/${resource}.service.ts\`: servicio RESUELTO (arreglo en memoria + CRUD).`,
+      `  - \`src/${resource}/${resource}.controller.ts\`: controlador RESUELTO (endpoints REST).`,
+      `  - \`src/${resource}/${resource}.service.spec.ts\`: tests unitarios RESUELTOS (Jest + @nestjs/testing).`,
+      `  - \`src/${resource}/${resource}.controller.spec.ts\`: tests de endpoints RESUELTOS (supertest, HTTP en memoria).`,
+      '  - `src/categorias/`: servicio y controlador SIN IMPLEMENTAR (solo la firma de cada método).',
+      '  - `src/movimientos/`: servicio y controlador SIN IMPLEMENTAR (solo la firma de cada método).',
+      '',
+      '## Tu trabajo',
+      '',
+      `  1. **Completar \`CategoriasService\` y \`CategoriasController\`** (recurso \`categorias\`: \`id\`, \`nombre\`,`,
+      '     `descripcion`) con el mismo patrón de CRUD en memoria que ves resuelto en `' + resource + '.service.ts`' + '/`' + resource + '.controller.ts`' + ':',
+      '     `findAll`, `findOne` (lanzando `NotFoundException` si no existe), `create`, `update` y `remove`,',
+      '     expuestos como `GET /categorias`, `GET /categorias/:id`, `POST /categorias`, `PATCH /categorias/:id`',
+      '     y `DELETE /categorias/:id`.',
+      '  2. **Completar `MovimientosService` y `MovimientosController`** (recurso `movimientos`: `id`, `tipo`',
+      '     (`\'entrada\'` o `\'salida\'`), `cantidad`, `referencia`, `fecha`) con el mismo patrón de CRUD.',
+      '  3. **Escribir los 4 archivos de test que faltan** (no vienen dados, a diferencia de los de `' + resource + '`' + '):',
+      '     - `src/categorias/categorias.service.spec.ts`: mínimo 5 tests — listar iniciales, crear (y verificar que',
+      '       aumenta el conteo), encontrar por id, lanzar `NotFoundException` con un id inexistente, y actualizar/eliminar.',
+      '     - `src/categorias/categorias.controller.spec.ts`: mínimo 3 tests con `supertest` — `GET /categorias`',
+      '       (200 y arreglo), `POST /categorias` (201 y `id` definido), `GET /categorias/:id` con id inexistente (404).',
+      '     - `src/movimientos/movimientos.service.spec.ts` y `src/movimientos/movimientos.controller.spec.ts`:',
+      '       la misma cobertura mínima que arriba, pero para `movimientos`.',
+      '     Todos deben seguir exactamente el mismo estilo/estructura que ' + '`' + resource + '.service.spec.ts`' + ' y ' + '`' + resource + '.controller.spec.ts`' + '.',
+      '',
+      '  Corré los tests con el botón "Ejecutar tests" (Jest) para verificar tu propio avance.',
+      '',
+      '## Preguntas',
+      '',
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+    ].join('\n');
+
+    const samplePayload = JSON.stringify(seeds[0] ?? {});
+
+    const resourceServiceSpec =
+      "import { Test } from '@nestjs/testing';\n" +
+      "import { NotFoundException } from '@nestjs/common';\n" +
+      "import { " + ClassName + "Service } from './" + resource + ".service';\n\n" +
+      "describe('" + ClassName + "Service', () => {\n" +
+      "  let service: " + ClassName + "Service;\n\n" +
+      "  beforeEach(async () => {\n" +
+      "    const module = await Test.createTestingModule({\n" +
+      "      providers: [" + ClassName + "Service],\n" +
+      "    }).compile();\n" +
+      "    service = module.get(" + ClassName + "Service);\n" +
+      "  });\n\n" +
+      "  it('debe listar los registros iniciales', () => {\n" +
+      "    expect(service.findAll().length).toBeGreaterThan(0);\n" +
+      "  });\n\n" +
+      "  it('debe crear un nuevo registro', () => {\n" +
+      "    const before = service.findAll().length;\n" +
+      "    const created = service.create(" + samplePayload + ");\n" +
+      "    expect(service.findAll().length).toBe(before + 1);\n" +
+      "    expect(created.id).toBeDefined();\n" +
+      "  });\n\n" +
+      "  it('debe encontrar un registro por id', () => {\n" +
+      "    const all = service.findAll();\n" +
+      "    expect(service.findOne(all[0].id)).toEqual(all[0]);\n" +
+      "  });\n\n" +
+      "  it('debe lanzar NotFoundException si el id no existe', () => {\n" +
+      "    expect(() => service.findOne('no-existe')).toThrow(NotFoundException);\n" +
+      "  });\n\n" +
+      "  it('debe actualizar un registro existente', () => {\n" +
+      "    const all = service.findAll();\n" +
+      "    const updated = service.update(all[0].id, { " + firstField.key + ": " + firstFieldNewValue + " });\n" +
+      "    expect((updated as any)." + firstField.key + ").toBe(" + firstFieldNewValue + ");\n" +
+      "  });\n\n" +
+      "  it('debe eliminar un registro', () => {\n" +
+      "    const all = service.findAll();\n" +
+      "    const before = all.length;\n" +
+      "    service.remove(all[0].id);\n" +
+      "    expect(service.findAll().length).toBe(before - 1);\n" +
+      "  });\n" +
+      "});\n";
+
+    const resourceControllerSpec =
+      "import { Test } from '@nestjs/testing';\n" +
+      "import { INestApplication } from '@nestjs/common';\n" +
+      "import request from 'supertest';\n" +
+      "import { " + ClassName + "Module } from './" + resource + ".module';\n\n" +
+      "describe('" + ClassName + "Controller (e2e)', () => {\n" +
+      "  let app: INestApplication;\n\n" +
+      "  beforeAll(async () => {\n" +
+      "    const moduleRef = await Test.createTestingModule({\n" +
+      "      imports: [" + ClassName + "Module],\n" +
+      "    }).compile();\n" +
+      "    app = moduleRef.createNestApplication();\n" +
+      "    await app.init();\n" +
+      "  });\n\n" +
+      "  afterAll(async () => {\n" +
+      "    await app.close();\n" +
+      "  });\n\n" +
+      "  it('GET /" + resource + " debe devolver la lista', async () => {\n" +
+      "    const res = await request(app.getHttpServer()).get('/" + resource + "');\n" +
+      "    expect(res.status).toBe(200);\n" +
+      "    expect(Array.isArray(res.body)).toBe(true);\n" +
+      "  });\n\n" +
+      "  it('POST /" + resource + " debe crear un nuevo registro', async () => {\n" +
+      "    const res = await request(app.getHttpServer())\n" +
+      "      .post('/" + resource + "')\n" +
+      "      .send(" + samplePayload + ");\n" +
+      "    expect([200, 201]).toContain(res.status);\n" +
+      "    expect(res.body.id).toBeDefined();\n" +
+      "  });\n\n" +
+      "  it('GET /" + resource + "/:id debe devolver 404 si no existe', async () => {\n" +
+      "    const res = await request(app.getHttpServer()).get('/" + resource + "/no-existe');\n" +
+      "    expect(res.status).toBe(404);\n" +
+      "  });\n" +
+      "});\n";
+
+    const resourceService =
+      "import { Injectable, NotFoundException } from '@nestjs/common';\n\n" +
+      itemInterface + '\n' +
+      "@Injectable()\n" +
+      "export class " + ClassName + "Service {\n" +
+      "  private items: " + ClassName + "Item[] = [\n" +
+      seedItems + ',\n' +
+      "  ];\n" +
+      "  private nextId = " + (seeds.length + 1) + ";\n\n" +
+      "  findAll(): " + ClassName + "Item[] {\n" +
+      "    return this.items;\n" +
+      "  }\n\n" +
+      "  findOne(id: string): " + ClassName + "Item {\n" +
+      "    const item = this.items.find((i) => i.id === id);\n" +
+      "    if (!item) throw new NotFoundException(`" + ClassName + " ${id} no encontrado`);\n" +
+      "    return item;\n" +
+      "  }\n\n" +
+      "  create(data: Omit<" + ClassName + "Item, 'id'>): " + ClassName + "Item {\n" +
+      "    const item: " + ClassName + "Item = { id: String(this.nextId++), ...data };\n" +
+      "    this.items.push(item);\n" +
+      "    return item;\n" +
+      "  }\n\n" +
+      "  update(id: string, data: Partial<Omit<" + ClassName + "Item, 'id'>>): " + ClassName + "Item {\n" +
+      "    const item = this.findOne(id);\n" +
+      "    Object.assign(item, data);\n" +
+      "    return item;\n" +
+      "  }\n\n" +
+      "  remove(id: string): void {\n" +
+      "    const index = this.items.findIndex((i) => i.id === id);\n" +
+      "    if (index === -1) throw new NotFoundException(`" + ClassName + " ${id} no encontrado`);\n" +
+      "    this.items.splice(index, 1);\n" +
+      "  }\n" +
+      "}\n";
+
+    const resourceController =
+      "import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common';\n" +
+      "import { " + ClassName + "Service, " + ClassName + "Item } from './" + resource + ".service';\n\n" +
+      "@Controller('" + resource + "')\n" +
+      "export class " + ClassName + "Controller {\n" +
+      "  constructor(private readonly service: " + ClassName + "Service) {}\n\n" +
+      "  @Get()\n" +
+      "  findAll(): " + ClassName + "Item[] {\n" +
+      "    return this.service.findAll();\n" +
+      "  }\n\n" +
+      "  @Get(':id')\n" +
+      "  findOne(@Param('id') id: string): " + ClassName + "Item {\n" +
+      "    return this.service.findOne(id);\n" +
+      "  }\n\n" +
+      "  @Post()\n" +
+      "  create(@Body() data: Omit<" + ClassName + "Item, 'id'>): " + ClassName + "Item {\n" +
+      "    return this.service.create(data);\n" +
+      "  }\n\n" +
+      "  @Patch(':id')\n" +
+      "  update(@Param('id') id: string, @Body() data: Partial<Omit<" + ClassName + "Item, 'id'>>): " + ClassName + "Item {\n" +
+      "    return this.service.update(id, data);\n" +
+      "  }\n\n" +
+      "  @Delete(':id')\n" +
+      "  remove(@Param('id') id: string): void {\n" +
+      "    this.service.remove(id);\n" +
+      "  }\n" +
+      "}\n";
+
+    const resourceModule =
+      "import { Module } from '@nestjs/common';\n" +
+      "import { " + ClassName + "Controller } from './" + resource + ".controller';\n" +
+      "import { " + ClassName + "Service } from './" + resource + ".service';\n\n" +
+      "@Module({\n" +
+      "  controllers: [" + ClassName + "Controller],\n" +
+      "  providers: [" + ClassName + "Service],\n" +
+      "  exports: [" + ClassName + "Service],\n" +
+      "})\n" +
+      "export class " + ClassName + "Module {}\n";
+
+    /** Builds an unimplemented (student-authored) service+controller+module pair for a fixed, non-thematic resource. */
+    const buildStub = (name: string, stubFields: Array<{ key: string; tsType: string }>) => {
+      const Name = cap(name);
+      const iface =
+        'export interface ' + Name + 'Item {\n' +
+        '  id: string;\n' +
+        stubFields.map((f) => '  ' + f.key + ': ' + f.tsType + ';').join('\n') +
+        '\n}\n';
+
+      const service =
+        "import { Injectable } from '@nestjs/common';\n\n" +
+        iface + '\n' +
+        "/**\n" +
+        " * TODO (Alumno): implementar el CRUD completo de " + cap(name) + ", con el mismo patrón\n" +
+        " * (arreglo en memoria + findAll/findOne/create/update/remove, lanzando\n" +
+        " * NotFoundException cuando corresponda) que viste resuelto en\n" +
+        " * `" + resource + ".service.ts`.\n" +
+        " */\n" +
+        "@Injectable()\n" +
+        "export class " + Name + "Service {\n" +
+        "  private items: " + Name + "Item[] = [];\n\n" +
+        "  findAll(): " + Name + "Item[] {\n" +
+        "    throw new Error('TODO: implementar findAll');\n" +
+        "  }\n\n" +
+        "  findOne(id: string): " + Name + "Item {\n" +
+        "    throw new Error('TODO: implementar findOne');\n" +
+        "  }\n\n" +
+        "  create(data: Omit<" + Name + "Item, 'id'>): " + Name + "Item {\n" +
+        "    throw new Error('TODO: implementar create');\n" +
+        "  }\n\n" +
+        "  update(id: string, data: Partial<Omit<" + Name + "Item, 'id'>>): " + Name + "Item {\n" +
+        "    throw new Error('TODO: implementar update');\n" +
+        "  }\n\n" +
+        "  remove(id: string): void {\n" +
+        "    throw new Error('TODO: implementar remove');\n" +
+        "  }\n" +
+        "}\n";
+
+      const controller =
+        "import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common';\n" +
+        "import { " + Name + "Service, " + Name + "Item } from './" + name + ".service';\n\n" +
+        "/**\n" +
+        " * TODO (Alumno): exponer los endpoints REST de " + cap(name) + " (GET, GET:id, POST,\n" +
+        " * PATCH:id, DELETE:id), delegando en `" + Name + "Service`, con el mismo patrón que\n" +
+        " * `" + resource + ".controller.ts`.\n" +
+        " */\n" +
+        "@Controller('" + name + "')\n" +
+        "export class " + Name + "Controller {\n" +
+        "  constructor(private readonly service: " + Name + "Service) {}\n\n" +
+        "  // TODO: implementar los endpoints (ver " + resource + ".controller.ts como referencia)\n" +
+        "}\n";
+
+      const module =
+        "import { Module } from '@nestjs/common';\n" +
+        "import { " + Name + "Controller } from './" + name + ".controller';\n" +
+        "import { " + Name + "Service } from './" + name + ".service';\n\n" +
+        "@Module({\n" +
+        "  controllers: [" + Name + "Controller],\n" +
+        "  providers: [" + Name + "Service],\n" +
+        "})\n" +
+        "export class " + Name + "Module {}\n";
+
+      return { service, controller, module, Name };
+    };
+
+    const categorias = buildStub('categorias', [
+      { key: 'nombre', tsType: 'string' },
+      { key: 'descripcion', tsType: 'string' },
+    ]);
+    const movimientos = buildStub('movimientos', [
+      { key: 'tipo', tsType: "'entrada' | 'salida'" },
+      { key: 'cantidad', tsType: 'number' },
+      { key: 'referencia', tsType: 'string' },
+      { key: 'fecha', tsType: 'string' },
+    ]);
+
+    const appModule =
+      "import { Module } from '@nestjs/common';\n" +
+      "import { " + ClassName + "Module } from './" + resource + "/" + resource + ".module';\n" +
+      "import { CategoriasModule } from './categorias/categorias.module';\n" +
+      "import { MovimientosModule } from './movimientos/movimientos.module';\n\n" +
+      "@Module({\n" +
+      "  imports: [" + ClassName + "Module, CategoriasModule, MovimientosModule],\n" +
+      "})\n" +
+      "export class AppModule {}\n";
+
+    const mainTs =
+      "import 'reflect-metadata';\n" +
+      "import { NestFactory } from '@nestjs/core';\n" +
+      "import { AppModule } from './app.module';\n\n" +
+      "async function bootstrap() {\n" +
+      "  const app = await NestFactory.create(AppModule);\n" +
+      "  await app.listen(3000);\n" +
+      "  console.log('Nest application is running (bootstrap OK)');\n" +
+      "}\n" +
+      "bootstrap();\n";
+
+    return [
+      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      { name: 'src', path: '/src', content: '', is_folder: true },
+      { name: 'main.ts', path: '/src/main.ts', content: mainTs, is_folder: false },
+      { name: 'app.module.ts', path: '/src/app.module.ts', content: appModule, is_folder: false },
+
+      { name: resource, path: `/src/${resource}`, content: '', is_folder: true },
+      { name: `${resource}.service.ts`, path: `/src/${resource}/${resource}.service.ts`, content: resourceService, is_folder: false },
+      { name: `${resource}.controller.ts`, path: `/src/${resource}/${resource}.controller.ts`, content: resourceController, is_folder: false },
+      { name: `${resource}.module.ts`, path: `/src/${resource}/${resource}.module.ts`, content: resourceModule, is_folder: false },
+      { name: `${resource}.service.spec.ts`, path: `/src/${resource}/${resource}.service.spec.ts`, content: resourceServiceSpec, is_folder: false },
+      { name: `${resource}.controller.spec.ts`, path: `/src/${resource}/${resource}.controller.spec.ts`, content: resourceControllerSpec, is_folder: false },
+
+      { name: 'categorias', path: '/src/categorias', content: '', is_folder: true },
+      { name: 'categorias.service.ts', path: '/src/categorias/categorias.service.ts', content: categorias.service, is_folder: false },
+      { name: 'categorias.controller.ts', path: '/src/categorias/categorias.controller.ts', content: categorias.controller, is_folder: false },
+      { name: 'categorias.module.ts', path: '/src/categorias/categorias.module.ts', content: categorias.module, is_folder: false },
+
+      { name: 'movimientos', path: '/src/movimientos', content: '', is_folder: true },
+      { name: 'movimientos.service.ts', path: '/src/movimientos/movimientos.service.ts', content: movimientos.service, is_folder: false },
+      { name: 'movimientos.controller.ts', path: '/src/movimientos/movimientos.controller.ts', content: movimientos.controller, is_folder: false },
+      { name: 'movimientos.module.ts', path: '/src/movimientos/movimientos.module.ts', content: movimientos.module, is_folder: false },
+    ];
+  }
+
   async findAllByUser(userId: string) {
     return this.projectRepo.find({
       where: { user_id: userId },
@@ -937,7 +1364,7 @@ flutter:
     const project = this.projectRepo.create({
       ...projectData,
       user_id:          studentId,
-      is_exam:          true,
+      is_exam:          examData.is_exam ?? true,
       allow_copy_paste: examData.allow_copy_paste ?? false,
       require_seb:      (examData as any).require_seb ?? false,
       status:           ProjectStatus.PENDING,
