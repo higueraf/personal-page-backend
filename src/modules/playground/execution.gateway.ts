@@ -34,6 +34,12 @@ interface RuntimeConfig {
 const LOCAL_TSX_BIN = join(process.cwd(), 'node_modules', '.bin', 'tsx');
 const TSX_COMMAND = existsSync(LOCAL_TSX_BIN) ? LOCAL_TSX_BIN : 'tsx';
 
+/** Same rationale as TSX_COMMAND above, for the NestJS "Ejecutar tests" (Jest) run:
+ *  resolve the binary by absolute path from this backend's own node_modules
+ *  instead of depending on a global `jest` install being present/on PATH. */
+const LOCAL_JEST_BIN = join(process.cwd(), 'node_modules', '.bin', 'jest');
+const JEST_COMMAND = existsSync(LOCAL_JEST_BIN) ? LOCAL_JEST_BIN : 'jest';
+
 const RUNTIMES: Record<string, RuntimeConfig> = {
   javascript: { directCommand: 'node',       extension: '.js' },
   typescript: { directCommand: TSX_COMMAND,  extension: '.ts' },
@@ -79,12 +85,13 @@ const VITEST_SETUP = `import '@testing-library/jest-dom';\n`;
  *  symlink them straight from this project's own node_modules so a session's
  *  `tsx`/Jest run resolves `@nestjs/*` (and its transitive deps) correctly.
  *
- *  `typescript` lives here too (not in NEST_GLOBAL_TEST_PACKAGES below): ts-jest
- *  declares it as a peerDependency, and whether a global `npm install -g ts-jest`
- *  ends up nesting its own copy of `typescript` is host/npm-version dependent —
- *  on hosts where it doesn't, every Jest run for NestJS fails with
- *  "Cannot find module 'typescript'". Symlinking it from this backend's own
- *  node_modules (already a devDependency here) makes resolution deterministic. */
+ *  `typescript`, `jest`, `ts-jest` and `supertest` live here too (this used to
+ *  rely on a global `npm install -g jest ts-jest supertest typescript` on the
+ *  host, which is fragile: whether that install nests matching versions, or
+ *  even exists at all on a given VPS, is host-dependent — e.g. a missing
+ *  global `jest` produces "./node_modules/.bin/jest: not found" for every
+ *  "Ejecutar tests" run). They're real devDependencies of this backend, so
+ *  symlinking them from here makes resolution deterministic on any host. */
 const NEST_LOCAL_PACKAGES = [
   '@nestjs/common',
   '@nestjs/core',
@@ -93,16 +100,17 @@ const NEST_LOCAL_PACKAGES = [
   'reflect-metadata',
   'rxjs',
   'typescript',
+  'jest',
+  'ts-jest',
+  'supertest',
 ];
-
-/** Packages installed globally on the host that a Jest run for NestJS needs. */
-const NEST_GLOBAL_TEST_PACKAGES = ['jest', 'ts-jest', 'supertest'];
 
 /** tsconfig.json shared by NestJS "Ejecutar" (tsx) and "Ejecutar tests" (ts-jest) runs.
  *  - experimentalDecorators/emitDecoratorMetadata: required by Nest's decorators.
  *  - isolatedModules: must live here (not as a deprecated ts-jest option).
- *  - ignoreDeprecations "6.0": the globally-installed ts-jest may bundle a very
- *    recent TypeScript that hard-errors on the legacy `moduleResolution` default. */
+ *  `typescript` is always this backend's own pinned devDependency (symlinked via
+ *  NEST_LOCAL_PACKAGES), so there's no more "some other, newer TypeScript might get
+ *  resolved" case to guard against with `ignoreDeprecations`. */
 const DECORATOR_TSCONFIG = `{
   "compilerOptions": {
     "target": "ES2021",
@@ -110,7 +118,6 @@ const DECORATOR_TSCONFIG = `{
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "isolatedModules": true,
-    "ignoreDeprecations": "6.0",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "strict": false
@@ -321,7 +328,7 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
         await fs.writeFile(join(sessionDir, 'tsconfig.json'), DECORATOR_TSCONFIG);
         await fs.writeFile(join(sessionDir, 'jest.config.js'), JEST_CONFIG);
         await fs.writeFile(join(sessionDir, 'jest.setup.ts'), JEST_SETUP);
-        shellCmd = './node_modules/.bin/jest --config jest.config.js';
+        shellCmd = `${JEST_COMMAND} --config jest.config.js`;
       } else {
         await fs.writeFile(join(sessionDir, 'vite.config.ts'), VITE_TEST_CONFIG);
         await fs.writeFile(join(sessionDir, 'vitest.setup.ts'), VITEST_SETUP);
@@ -480,25 +487,24 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
    *  node_modules tree). Returns null if the package can't be found. */
   private resolveLocalPackageDir(pkg: string): string | null {
     try {
-      const pkgJsonPath = require.resolve(join(pkg, 'package.json'));
-      return dirname(pkgJsonPath);
+      return dirname(require.resolve(join(pkg, 'package.json')));
     } catch {
-      return null;
+      // Some packages (e.g. reflect-metadata) declare an "exports" map that
+      // doesn't expose "./package.json" as a subpath, so the lookup above
+      // throws ERR_PACKAGE_PATH_NOT_EXPORTED even though the package itself
+      // resolves fine. Fall back to resolving its main entry file and
+      // walking up to the nearest ancestor directory that has a package.json.
+      try {
+        let dir = dirname(require.resolve(pkg));
+        while (dir !== dirname(dir)) {
+          if (existsSync(join(dir, 'package.json'))) return dir;
+          dir = dirname(dir);
+        }
+        return null;
+      } catch {
+        return null;
+      }
     }
-  }
-
-  /** ts-jest internally does `require('jest-util')`, which only resolves if
-   *  jest-util exists as a SIBLING inside the global node_modules directory
-   *  (Node resolves modules by realpath, not by where we symlink them per
-   *  session). Jest nests jest-util inside jest/node_modules/jest-util, so
-   *  this self-heals by lazily creating that sibling symlink once — no
-   *  manual VPS step beyond `npm install -g jest ts-jest supertest`. */
-  private async ensureJestUtilGlobalLink(globalModules: string): Promise<void> {
-    const linkPath = join(globalModules, 'jest-util');
-    if (existsSync(linkPath)) return;
-    const target = join(globalModules, 'jest', 'node_modules', 'jest-util');
-    if (!existsSync(target)) return;
-    await this.symlinkPackage(target, linkPath);
   }
 
   /**
@@ -507,9 +513,12 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
    * (NODE_PATH is not reliably honored by Vite/Vitest/Jest).
    *
    *  - React (Vitest): globally-installed Vitest/Vite/React/Testing-Library.
-   *  - NestJS (Jest):   @nestjs/* etc. straight from THIS backend's own
-   *                     node_modules (already a real dependency of this
-   *                     app), plus globally-installed jest/ts-jest/supertest.
+   *  - NestJS (Jest):   @nestjs/*, jest, ts-jest, supertest, etc. all straight
+   *                     from THIS backend's own node_modules (real
+   *                     dependencies of this app — see NEST_LOCAL_PACKAGES).
+   *                     Node resolves each symlink's transitive requires
+   *                     (e.g. ts-jest → jest-util) via the real path, so no
+   *                     extra global install or manual linking is needed.
    */
   private async linkTestModules(sessionDir: string, language: string): Promise<void> {
     const nodeModulesDir = join(sessionDir, 'node_modules');
@@ -523,15 +532,6 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
         if (dir) {
           await this.symlinkPackage(dir, join(nodeModulesDir, pkg));
         }
-      }
-
-      const globalModules = await this.executionService.getGlobalNodeModules();
-      if (globalModules) {
-        for (const pkg of NEST_GLOBAL_TEST_PACKAGES) {
-          await this.symlinkPackage(join(globalModules, pkg), join(nodeModulesDir, pkg));
-        }
-        await this.ensureJestUtilGlobalLink(globalModules);
-        await this.symlinkPackage(join(globalModules, 'jest', 'bin', 'jest.js'), join(binDir, 'jest'), 'file');
       }
       return;
     }
