@@ -28,7 +28,15 @@ export class TodoItem {
   @Column({ default: 0 })
   duracion: number;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0 })
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => parseFloat(value),
+    },
+  })
   presupuesto: number;
 
   @CreateDateColumn()
