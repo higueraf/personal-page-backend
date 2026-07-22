@@ -77,7 +77,14 @@ const VITEST_SETUP = `import '@testing-library/jest-dom';\n`;
 /** Packages required by a NestJS app that are ALREADY dependencies of this very
  *  backend (personal-page-backend). Instead of installing them again, we
  *  symlink them straight from this project's own node_modules so a session's
- *  `tsx`/Jest run resolves `@nestjs/*` (and its transitive deps) correctly. */
+ *  `tsx`/Jest run resolves `@nestjs/*` (and its transitive deps) correctly.
+ *
+ *  `typescript` lives here too (not in NEST_GLOBAL_TEST_PACKAGES below): ts-jest
+ *  declares it as a peerDependency, and whether a global `npm install -g ts-jest`
+ *  ends up nesting its own copy of `typescript` is host/npm-version dependent —
+ *  on hosts where it doesn't, every Jest run for NestJS fails with
+ *  "Cannot find module 'typescript'". Symlinking it from this backend's own
+ *  node_modules (already a devDependency here) makes resolution deterministic. */
 const NEST_LOCAL_PACKAGES = [
   '@nestjs/common',
   '@nestjs/core',
@@ -85,6 +92,7 @@ const NEST_LOCAL_PACKAGES = [
   '@nestjs/platform-express',
   'reflect-metadata',
   'rxjs',
+  'typescript',
 ];
 
 /** Packages installed globally on the host that a Jest run for NestJS needs. */

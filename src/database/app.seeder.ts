@@ -70,6 +70,7 @@ export class AppSeeder {
     await this.seedExamTemplateTypeScriptV2(adminUser);
     await this.seedExamTemplateFlutter(adminUser);
     await this.seedExamTemplateFlutterSingle(adminUser);
+    await this.seedExamTemplateNestJS(adminUser);
 
     return { ok: true };
   }
@@ -1598,6 +1599,97 @@ const { data: user } = useQuery({
           questions: version.questions,
         }),
       );
+    }
+  }
+
+  // ── Examen con variantes temáticas (Programación IV — NestJS, CRUD + Jest) ──
+  private async seedExamTemplateNestJS(admin: User) {
+    const templateName = 'Programación IV — NestJS, CRUD y Tests con Jest';
+    const description =
+      'Examen de NestJS con 5 variantes temáticas. Cada proyecto trae un módulo CRUD de referencia ' +
+      'YA RESUELTO (servicio + controlador + 2 archivos de test) y dos módulos más (Categorías y ' +
+      'Movimientos) sin implementar: el alumno debe completar su servicio y controlador siguiendo el ' +
+      'mismo patrón, y escribir los 4 archivos de test que faltan (uno de servicio y uno de endpoints ' +
+      'para cada módulo).';
+
+    // Cada variante solo cambia el recurso/los campos del módulo de referencia (ver
+    // `practice-variants.config.ts`, mismas claves que usa el examen de Flutter). Los módulos
+    // "Categorías" y "Movimientos" que el alumno debe completar son siempre los mismos —
+    // ver `buildNestExamFiles` en `playground.service.ts`. Las preguntas describen lo que se
+    // califica (también alimentan el rubric de `buildGradingPrompt`).
+    const questions: ExamQuestion[] = [
+      {
+        order: 1, points: 4, title: 'Módulo Categorías — CRUD completo',
+        statement: 'Completa `CategoriasService` y `CategoriasController` (recurso `categorias`: `id`, `nombre`, `descripcion`) con el mismo patrón de CRUD en memoria que ves resuelto en el módulo de referencia: `findAll`, `findOne` (lanzando `NotFoundException` si no existe), `create`, `update` y `remove`, expuestos como `GET /categorias`, `GET /categorias/:id`, `POST /categorias`, `PATCH /categorias/:id` y `DELETE /categorias/:id`.',
+      },
+      {
+        order: 2, points: 4, title: 'Módulo Movimientos — CRUD completo',
+        statement: 'Completa `MovimientosService` y `MovimientosController` (recurso `movimientos`: `id`, `tipo` (`\'entrada\'` o `\'salida\'`), `cantidad`, `referencia`, `fecha`) con el mismo patrón de CRUD en memoria, expuesto con los mismos 5 endpoints REST que en Categorías.',
+      },
+      {
+        order: 3, points: 2, title: 'Tests de Categorías y Movimientos',
+        statement: 'Escribe los 4 archivos de test que faltan, siguiendo exactamente el mismo estilo que los del módulo de referencia: `categorias.service.spec.ts` y `movimientos.service.spec.ts` (mínimo 5 tests cada uno — listar iniciales, crear, encontrar por id, `NotFoundException` con id inexistente, actualizar/eliminar), y `categorias.controller.spec.ts` y `movimientos.controller.spec.ts` (mínimo 3 tests con `supertest` cada uno — `GET` lista con 200, `POST` con 201 e `id` definido, `GET /:id` inexistente con 404).',
+      },
+    ];
+
+    const versions: { theme_name: string; order_index: number }[] = [
+      { theme_name: 'Ropa', order_index: 0 },
+      { theme_name: 'Libros', order_index: 1 },
+      { theme_name: 'Farmacia', order_index: 2 },
+      { theme_name: 'Tareas', order_index: 3 },
+      { theme_name: 'Papelería', order_index: 4 },
+    ];
+
+    // Upsert: mismo criterio que seedExamTemplateFlutter (conserva IDs si el template ya existe,
+    // y refresca descripción/preguntas si cambian entre deploys).
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'nestjs',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'nestjs';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = questions;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions,
+          }),
+        );
+      }
     }
   }
 
