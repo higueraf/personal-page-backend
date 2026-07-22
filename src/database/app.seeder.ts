@@ -1527,19 +1527,29 @@ const { data: user } = useQuery({
   private async seedExamTemplateFlutterSingle(admin: User) {
     const templateName = 'Programación IV — Flutter, CRUD contra API (Ejercicio único)';
     const description =
-      'Examen de Flutter con un solo ejercicio (10 pts): CRUD completo contra la API de práctica ' +
-      '(variante Papelería), partiendo del ejemplo de referencia ToDo (ver ENUNCIADO.md).';
+      'Examen de Flutter de una sola variante (Papelería), partiendo del ejemplo de referencia ToDo ' +
+      '(ver ENUNCIADO.md): CRUD completo contra la API de práctica (7 pts) y 2 pantallas de cálculo ' +
+      '(1.5 pts c/u).';
 
-    // Una sola variante, un solo ejercicio (CRUD completo, 10 pts). El `theme_name` define el
-    // segmento de URL (`/practice-api/<slug>/<resource>`) y los 7 campos propios — ver
-    // `practice-variants.config.ts` (clave `papeleria`).
+    // Una sola variante (Papelería). El `theme_name` define el segmento de URL
+    // (`/practice-api/<slug>/<resource>`) y los 7 campos propios — ver `practice-variants.config.ts`
+    // (clave `papeleria`). Mismo patrón de 3 preguntas (CRUD 7 pts + 2 cálculos 1.5 pts c/u = 10 pts)
+    // que las variantes de `seedExamTemplateFlutter`.
     const version: { theme_name: string; order_index: number; questions: ExamQuestion[] } = {
       theme_name: 'Papelería',
       order_index: 0,
       questions: [
         {
-          order: 1, points: 10, title: 'CRUD de papelería contra la API',
+          order: 1, points: 7, title: 'CRUD de papelería contra la API',
           statement: 'Construye el CRUD (duplicando/adaptando el ejemplo de referencia ToDo, ver ENUNCIADO.md) para gestionar el inventario de una papelería, consumiendo la API de práctica de tu variante. El recurso maneja los campos: producto, marca, categoria, precio, stock, codigo y disponible. Debe permitir: (1) listar los productos mostrando al menos producto, categoria, precio y stock; (2) crear un producto nuevo desde un formulario con todos los campos; (3) editar un producto existente; (4) eliminar un producto. Actualiza la lista en pantalla después de cada operación.',
+        },
+        {
+          order: 2, points: 1.5, title: 'Valor total del inventario',
+          statement: 'En tu propia pantalla de cálculo (duplicando/adaptando `todo_stat1_screen.dart`, ver ENUNCIADO.md), calcula y muestra el valor total del inventario: la suma de precio × stock de todos los productos con disponible == true.',
+        },
+        {
+          order: 3, points: 1.5, title: 'Precio promedio de productos disponibles',
+          statement: 'En tu propia pantalla de cálculo (duplicando/adaptando `todo_stat2_screen.dart`, ver ENUNCIADO.md), calcula y muestra el precio promedio de los productos con disponible == true.',
         },
       ],
     };

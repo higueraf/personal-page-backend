@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not, IsNull } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { PlaygroundProject, ProjectStatus } from '../../entities/playground-project.entity';
 import { PlaygroundFile } from '../../entities/playground-file.entity';
@@ -335,7 +335,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
                 return ListTile(
                   title: Text(todo.nombre),
                   subtitle: Text(
-                    '\${todo.duracion} min · \$\${todo.presupuesto.toStringAsFixed(2)} · \${todo.hecho ? "hecho" : "pendiente"}',
+                    '\${todo.duracion} min · \${todo.presupuesto.toStringAsFixed(2)} · \${todo.hecho ? "hecho" : "pendiente"}',
                   ),
                   onTap: () => _openForm(todo),
                   trailing: IconButton(
@@ -1469,10 +1469,10 @@ flutter:
     });
   }
 
-  /** Returns one summary entry per exam batch (grouped by exam_group_id) */
+  /** Returns one summary entry per exam/practice batch (grouped by exam_group_id) */
   async findAdminExamGroups() {
     const exams = await this.projectRepo.find({
-      where: { is_exam: true },
+      where: [{ is_exam: true }, { exam_group_id: Not(IsNull()) }],
       order: { created_at: 'DESC' },
       relations: ['user'],
     });
@@ -1491,6 +1491,7 @@ flutter:
         name:            first.name,
         materia:         first.materia,
         language:        first.language,
+        is_exam:         first.is_exam,
         start_time:      first.start_time,
         end_time:        first.end_time,
         allow_copy_paste: first.allow_copy_paste,
@@ -1503,10 +1504,10 @@ flutter:
     });
   }
 
-  /** Returns all student projects belonging to an exam group */
+  /** Returns all student projects belonging to an exam/practice group */
   async findAdminExamsByGroup(groupId: string) {
     const projects = await this.projectRepo.find({
-      where: { exam_group_id: groupId, is_exam: true },
+      where: { exam_group_id: groupId },
       order: { created_at: 'ASC' },
       relations: ['user', 'examVersion'],
     });
@@ -1518,10 +1519,10 @@ flutter:
     return projects;
   }
 
-  /** Deletes all student projects in an exam group */
+  /** Deletes all student projects in an exam/practice group */
   async deleteAdminExamGroup(groupId: string) {
     const projects = await this.projectRepo.find({
-      where: { exam_group_id: groupId, is_exam: true },
+      where: { exam_group_id: groupId },
       relations: ['files'],
     });
     if (projects.length === 0) {
@@ -1532,12 +1533,12 @@ flutter:
     return this.projectRepo.remove(projects);
   }
 
-  /** Updates metadata on all student projects in an exam group */
+  /** Updates metadata on all student projects in an exam/practice group */
   async updateAdminExamGroup(
     groupId: string,
     data: { name?: string; start_time?: Date | null; end_time?: Date | null; allow_copy_paste?: boolean; require_seb?: boolean },
   ) {
-    const projects = await this.projectRepo.find({ where: { exam_group_id: groupId, is_exam: true } });
+    const projects = await this.projectRepo.find({ where: { exam_group_id: groupId } });
     if (projects.length === 0) {
       const single = await this.projectRepo.findOne({ where: { id: groupId, is_exam: true } });
       if (single) {
@@ -1550,18 +1551,18 @@ flutter:
     return this.projectRepo.save(projects);
   }
 
-  /** Change status of a single exam project */
+  /** Change status of a single exam/practice project */
   async changeExamStatus(id: string, status: ProjectStatus) {
     const project = await this.projectRepo.findOne({ where: { id } });
     if (!project) throw new NotFoundException('Project not found');
-    if (!project.is_exam) throw new ForbiddenException('Solo se pueden cambiar status de proyectos de examen.');
+    if (!project.is_exam && !project.exam_group_id) throw new ForbiddenException('Solo se pueden cambiar status de proyectos de examen o práctica.');
     project.status = status;
     return this.projectRepo.save(project);
   }
 
-  /** Change status of all projects in an exam group */
+  /** Change status of all projects in an exam/practice group */
   async changeExamGroupStatus(groupId: string, status: ProjectStatus) {
-    const projects = await this.projectRepo.find({ where: { exam_group_id: groupId, is_exam: true } });
+    const projects = await this.projectRepo.find({ where: { exam_group_id: groupId } });
     if (projects.length === 0) {
       const single = await this.projectRepo.findOne({ where: { id: groupId, is_exam: true } });
       if (single) { single.status = status; return [await this.projectRepo.save(single)]; }
