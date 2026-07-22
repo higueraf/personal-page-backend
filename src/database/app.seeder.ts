@@ -71,6 +71,8 @@ export class AppSeeder {
     await this.seedExamTemplateFlutter(adminUser);
     await this.seedExamTemplateFlutterSingle(adminUser);
     await this.seedExamTemplateNestJS(adminUser);
+    await this.seedExamTemplateReact(adminUser);
+    await this.seedExamTemplateReactSingle(adminUser);
 
     return { ok: true };
   }
@@ -1692,6 +1694,172 @@ const { data: user } = useQuery({
           }),
         );
       }
+    }
+  }
+
+  // ── Examen con variantes temáticas (Programación IV — React, componentes + Vitest) ──
+  private async seedExamTemplateReact(admin: User) {
+    const templateName = 'Programación IV — React, componentes y Tests con Vitest';
+    const description =
+      'Examen de React + TypeScript con 4 variantes temáticas. Cada proyecto trae un componente y ' +
+      'una página de referencia YA RESUELTOS (con sus 2 archivos de test como guía) y 2 páginas más ' +
+      '(Registro, Búsqueda) y 2 componentes más (ContadorLimite, ToggleControl), todos YA ' +
+      'IMPLEMENTADOS, cada uno con un comportamiento (validación, filtro, límites, estado derivado) ' +
+      'que NO está en la pieza de referencia. El alumno no programa esas piezas: su único trabajo es ' +
+      'escribir los 4 archivos de test que faltan, cubriendo también esos comportamientos (copiar los ' +
+      'tests de referencia cambiando nombres de variables no alcanza para cubrirlos).';
+
+    // Cada variante solo cambia el recurso/los campos del componente+página de referencia (ver
+    // `practice-variants.config.ts`, mismas claves que usan los exámenes de Flutter/NestJS). Las 2
+    // páginas y 2 componentes adicionales (ya implementados, cada uno con su comportamiento extra)
+    // son siempre los mismos — ver `buildReactExamFiles` en `playground.service.ts`. Las preguntas
+    // describen lo que se califica (también alimentan el rubric de `buildGradingPrompt`).
+    const questions: ExamQuestion[] = [
+      {
+        order: 1, points: 4, title: 'Tests de páginas',
+        statement: 'Escribe `RegistroPage.test.tsx` (mínimo 3 tests: la lista de contactos inicia vacía; al completar nombre y edad válidos y enviar el formulario, el contacto se agrega a `data-testid="lista-contactos"` y el formulario se limpia; al enviar con nombre vacío o edad inválida —no numérica o menor/igual a 0— se muestra un `role="alert"` y NO se agrega nada) y `BusquedaPage.test.tsx` (mínimo 3 tests: se renderizan los 4 productos iniciales; al escribir un texto en el input `#filtro` la lista se filtra, sin distinguir mayúsculas/minúsculas, y `data-testid="contador-resultados"` refleja la cantidad correcta; si el filtro no coincide con ningún producto se muestra "0 resultado(s)").',
+      },
+      {
+        order: 2, points: 4, title: 'Tests de componentes',
+        statement: 'Escribe `ContadorLimite.test.tsx` (mínimo 4 tests: valor inicial correcto; el botón `aria-label="Sumar"` incrementa el valor de `data-testid="valor-contador"`; el valor no baja del mínimo —el botón `aria-label="Restar"` se deshabilita en el mínimo—; el valor no sube del máximo —el botón `aria-label="Sumar"` se deshabilita en el máximo—) y `ToggleControl.test.tsx` (mínimo 3 tests: el input `aria-label="Campo editable"` empieza deshabilitado; al marcar el checkbox `#habilitar` el campo se habilita; al desmarcarlo el campo vuelve a deshabilitarse).',
+      },
+      {
+        order: 3, points: 2, title: 'Cobertura de casos anti-copia',
+        statement: 'RegistroPage, BusquedaPage, ContadorLimite y ToggleControl tienen cada uno un comportamiento (validación de formulario, filtro + contador derivado, límites min/max, estado derivado de un checkbox) que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 4 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
+      },
+    ];
+
+    const versions: { theme_name: string; order_index: number }[] = [
+      { theme_name: 'Ropa', order_index: 0 },
+      { theme_name: 'Libros', order_index: 1 },
+      { theme_name: 'Farmacia', order_index: 2 },
+      { theme_name: 'Tareas', order_index: 3 },
+    ];
+
+    // Upsert: mismo criterio que seedExamTemplateFlutter (conserva IDs si el template ya existe,
+    // y refresca descripción/preguntas si cambian entre deploys).
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = questions;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions,
+          }),
+        );
+      }
+    }
+  }
+
+  private async seedExamTemplateReactSingle(admin: User) {
+    const templateName = 'Programación IV — React, componentes y Tests con Vitest (Ejercicio único)';
+    const description =
+      'Examen de React + TypeScript de una sola variante (Papelería): componente y página de ' +
+      'referencia YA RESUELTOS (con sus 2 archivos de test como guía) y 2 páginas + 2 componentes ' +
+      'más YA IMPLEMENTADOS, cada uno con un comportamiento adicional que el alumno debe cubrir con ' +
+      'sus propios tests.';
+
+    // Una sola variante (Papelería). Mismas `questions` que `seedExamTemplateReact` — ver ese
+    // método para el detalle de lo que se evalúa en cada una.
+    const questions: ExamQuestion[] = [
+      {
+        order: 1, points: 4, title: 'Tests de páginas',
+        statement: 'Escribe `RegistroPage.test.tsx` (mínimo 3 tests: la lista de contactos inicia vacía; al completar nombre y edad válidos y enviar el formulario, el contacto se agrega a `data-testid="lista-contactos"` y el formulario se limpia; al enviar con nombre vacío o edad inválida —no numérica o menor/igual a 0— se muestra un `role="alert"` y NO se agrega nada) y `BusquedaPage.test.tsx` (mínimo 3 tests: se renderizan los 4 productos iniciales; al escribir un texto en el input `#filtro` la lista se filtra, sin distinguir mayúsculas/minúsculas, y `data-testid="contador-resultados"` refleja la cantidad correcta; si el filtro no coincide con ningún producto se muestra "0 resultado(s)").',
+      },
+      {
+        order: 2, points: 4, title: 'Tests de componentes',
+        statement: 'Escribe `ContadorLimite.test.tsx` (mínimo 4 tests: valor inicial correcto; el botón `aria-label="Sumar"` incrementa el valor de `data-testid="valor-contador"`; el valor no baja del mínimo —el botón `aria-label="Restar"` se deshabilita en el mínimo—; el valor no sube del máximo —el botón `aria-label="Sumar"` se deshabilita en el máximo—) y `ToggleControl.test.tsx` (mínimo 3 tests: el input `aria-label="Campo editable"` empieza deshabilitado; al marcar el checkbox `#habilitar` el campo se habilita; al desmarcarlo el campo vuelve a deshabilitarse).',
+      },
+      {
+        order: 3, points: 2, title: 'Cobertura de casos anti-copia',
+        statement: 'RegistroPage, BusquedaPage, ContadorLimite y ToggleControl tienen cada uno un comportamiento (validación de formulario, filtro + contador derivado, límites min/max, estado derivado de un checkbox) que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 4 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
+      },
+    ];
+
+    const version: { theme_name: string; order_index: number } = { theme_name: 'Papelería', order_index: 0 };
+
+    // Upsert: mismo criterio que seedExamTemplateFlutterSingle (conserva IDs si el template ya existe).
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions,
+        }),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react';
+    await this.examTemplatesRepo.save(template);
+
+    const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
+    if (existing) {
+      existing.order_index = version.order_index;
+      existing.questions = questions;
+      await this.examVersionsRepo.save(existing);
+    } else {
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions,
+        }),
+      );
     }
   }
 

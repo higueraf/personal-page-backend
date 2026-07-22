@@ -79,6 +79,7 @@ export class PlaygroundService {
   private buildExamVersionFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion', language?: string) {
     if (language === 'flutter') return this.buildFlutterExamFiles(version);
     if (language === 'nestjs') return this.buildNestExamFiles(version);
+    if (language === 'react') return this.buildReactExamFiles(version);
 
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
 
@@ -1220,6 +1221,354 @@ flutter:
       { name: 'movimientos.service.ts', path: '/src/movimientos/movimientos.service.ts', content: movimientos.service, is_folder: false },
       { name: 'movimientos.controller.ts', path: '/src/movimientos/movimientos.controller.ts', content: movimientos.controller, is_folder: false },
       { name: 'movimientos.module.ts', path: '/src/movimientos/movimientos.module.ts', content: movimientos.module, is_folder: false },
+    ];
+  }
+
+  private buildReactExamFiles(version: ExamVersion) {
+    const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
+    const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0);
+    const typeSlug = slugify(version.theme_name);
+    const variant = getVariantConfig(typeSlug);
+    const fields = variant.fields;
+    const resource = variant.resource;
+    const ClassName = cap(resource);
+    const seeds = variant.seeds.length ? variant.seeds : [{}];
+    const textFields = fields.filter((f) => f.type !== 'bool');
+    const [f0, f1] = textFields.length ? textFields : fields;
+
+    const fieldValueJsx = (f: { key: string; type: DartFieldType }) =>
+      f.type === 'bool' ? `{item.${f.key} ? 'Sí' : 'No'}` : `{item.${f.key}}`;
+
+    const itemInterface = [
+      `export interface ${ClassName}Item {`,
+      `  id: string;`,
+      ...fields.map((f) => `  ${f.key}: ${tsType(f.type)};`),
+      `}`,
+    ].join('\n');
+
+    const seedItems = seeds
+      .map((seed, i) => '  ' + JSON.stringify({ id: String(i + 1), ...seed }))
+      .join(',\n');
+
+    const sampleJson = JSON.stringify({ id: '1', ...seeds[0] }, null, 2);
+    const sampleItem = JSON.stringify({ id: '1', ...seeds[0] });
+
+    const enunciado = [
+      `# Examen React — ${version.theme_name}`,
+      '',
+      `Puntaje total: ${totalPoints} pts`,
+      '',
+      '## Tu recurso de referencia (variante asignada)',
+      '',
+      `> \`src/components/${ClassName}Card.tsx\` y \`src/pages/${ClassName}ListaPage.tsx\` YA VIENEN`,
+      `> RESUELTOS como ejemplo: un componente que muestra un registro de \`${resource}\``,
+      `> (campos: ${fields.map((f) => `\`${f.key}\` (${tsType(f.type)})`).join(', ')}) y una página que`,
+      '> lista varios, con sus dos archivos de test (Vitest + Testing Library) como guía.',
+      '',
+      '> Ejemplo de un registro de este recurso:',
+      '>',
+      '> ```json',
+      ...sampleJson.split('\n').map((l) => `> ${l}`),
+      '> ```',
+      '',
+      '## Estructura del proyecto',
+      '',
+      '  - `src/main.tsx` / `src/App.tsx`: renderizan las 5 piezas del proyecto (no necesitás tocarlos).',
+      `  - \`src/components/${ClassName}Card.tsx\` y \`src/pages/${ClassName}ListaPage.tsx\`: RESUELTOS, con sus`,
+      '    tests como guía de estilo.',
+      '  - `src/pages/RegistroPage.tsx`: **YA IMPLEMENTADA** (formulario con validación). Sin test.',
+      '  - `src/pages/BusquedaPage.tsx`: **YA IMPLEMENTADA** (filtro de lista + contador). Sin test.',
+      '  - `src/components/ContadorLimite.tsx`: **YA IMPLEMENTADO** (contador con límites). Sin test.',
+      '  - `src/components/ToggleControl.tsx`: **YA IMPLEMENTADO** (checkbox que habilita/deshabilita otro campo). Sin test.',
+      '',
+      '## Tu trabajo',
+      '',
+      '  Las 4 piezas de abajo ya vienen completas: **no tenés que programarlas**, solo escribir los tests que',
+      `  faltan, siguiendo el mismo estilo que \`${ClassName}Card.test.tsx\` y \`${ClassName}ListaPage.test.tsx\`.`,
+      '  Ojo: cada pieza tiene un comportamiento que NO está en la pieza de referencia — copiar esos tests',
+      '  cambiando nombres de variables no te va a alcanzar, tenés que agregar casos de prueba distintos.',
+      '',
+      '  1. **`src/pages/RegistroPage.test.tsx`** (mínimo 3 tests): la lista de contactos inicia vacía; al',
+      '     completar nombre y edad válidos y enviar el formulario, el contacto se agrega a',
+      '     `data-testid="lista-contactos"` y el formulario se limpia; al enviar con nombre vacío o edad',
+      '     inválida (no numérica o menor/igual a 0) se muestra un `role="alert"` y NO se agrega nada.',
+      '  2. **`src/pages/BusquedaPage.test.tsx`** (mínimo 3 tests): al renderizar se muestran los 4 productos',
+      '     iniciales; al escribir un texto en el input `#filtro` la lista se filtra (sin distinguir',
+      '     mayúsculas/minúsculas) y `data-testid="contador-resultados"` refleja la cantidad correcta; si el',
+      '     filtro no coincide con ningún producto se muestra "0 resultado(s)".',
+      '  3. **`src/components/ContadorLimite.test.tsx`** (mínimo 4 tests): valor inicial correcto; el botón',
+      '     `aria-label="Sumar"` incrementa el valor mostrado en `data-testid="valor-contador"`; el valor no',
+      '     baja del mínimo (el botón `aria-label="Restar"` se deshabilita en el mínimo); el valor no sube',
+      '     del máximo (el botón `aria-label="Sumar"` se deshabilita en el máximo).',
+      '  4. **`src/components/ToggleControl.test.tsx`** (mínimo 3 tests): el input `aria-label="Campo editable"`',
+      '     empieza deshabilitado; al marcar el checkbox `#habilitar` el campo se habilita; al desmarcarlo',
+      '     el campo vuelve a deshabilitarse.',
+      '',
+      '  Corré los tests con el botón "Ejecutar tests" (Vitest) para verificar tu propio avance.',
+      '',
+      '## Preguntas',
+      '',
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+    ].join('\n');
+
+    const cardTsx = [
+      itemInterface,
+      '',
+      `interface ${ClassName}CardProps {`,
+      `  item: ${ClassName}Item;`,
+      `}`,
+      '',
+      `export function ${ClassName}Card({ item }: ${ClassName}CardProps) {`,
+      `  return (`,
+      `    <dl data-testid="${resource}-card">`,
+      ...fields.flatMap((f) => [
+        `      <dt>${f.label}</dt>`,
+        `      <dd>${fieldValueJsx(f)}</dd>`,
+      ]),
+      `    </dl>`,
+      `  );`,
+      `}`,
+      '',
+    ].join('\n');
+
+    const cardTest = [
+      `import { render, screen } from '@testing-library/react';`,
+      `import { ${ClassName}Card } from './${ClassName}Card';`,
+      '',
+      `const item = ${sampleItem};`,
+      '',
+      `describe('${ClassName}Card', () => {`,
+      `  it('debe mostrar los datos del registro', () => {`,
+      `    render(<${ClassName}Card item={item} />);`,
+      `    expect(screen.getByTestId('${resource}-card')).toBeInTheDocument();`,
+      `    expect(screen.getByText(String(item.${f0.key}))).toBeInTheDocument();`,
+      `    expect(screen.getByText(String(item.${f1.key}))).toBeInTheDocument();`,
+      `  });`,
+      `});`,
+      '',
+    ].join('\n');
+
+    const listaPageTsx = [
+      `import { ${ClassName}Card } from '../components/${ClassName}Card';`,
+      `import type { ${ClassName}Item } from '../components/${ClassName}Card';`,
+      '',
+      `const seeds: ${ClassName}Item[] = [`,
+      seedItems,
+      `];`,
+      '',
+      `export function ${ClassName}ListaPage() {`,
+      `  return (`,
+      `    <div data-testid="lista-${resource}">`,
+      `      {seeds.map((item) => (`,
+      `        <${ClassName}Card key={item.id} item={item} />`,
+      `      ))}`,
+      `    </div>`,
+      `  );`,
+      `}`,
+      '',
+    ].join('\n');
+
+    const listaPageTest = [
+      `import { render, screen } from '@testing-library/react';`,
+      `import { ${ClassName}ListaPage } from './${ClassName}ListaPage';`,
+      '',
+      `describe('${ClassName}ListaPage', () => {`,
+      `  it('debe renderizar un card por cada registro', () => {`,
+      `    render(<${ClassName}ListaPage />);`,
+      `    expect(screen.getAllByTestId('${resource}-card').length).toBe(${seeds.length});`,
+      `  });`,
+      `});`,
+      '',
+    ].join('\n');
+
+    const registroPageTsx = [
+      `import { useState, type FormEvent } from 'react';`,
+      '',
+      `interface Contacto {`,
+      `  id: number;`,
+      `  nombre: string;`,
+      `  edad: number;`,
+      `}`,
+      '',
+      `export function RegistroPage() {`,
+      `  const [nombre, setNombre] = useState('');`,
+      `  const [edad, setEdad] = useState('');`,
+      `  const [error, setError] = useState('');`,
+      `  const [contactos, setContactos] = useState<Contacto[]>([]);`,
+      '',
+      `  function handleSubmit(e: FormEvent) {`,
+      `    e.preventDefault();`,
+      `    const edadNum = Number(edad);`,
+      `    if (nombre.trim() === '' || !Number.isFinite(edadNum) || edadNum <= 0) {`,
+      `      setError('Nombre y edad (mayor a 0) son obligatorios');`,
+      `      return;`,
+      `    }`,
+      `    setError('');`,
+      `    setContactos((prev) => [...prev, { id: prev.length + 1, nombre: nombre.trim(), edad: edadNum }]);`,
+      `    setNombre('');`,
+      `    setEdad('');`,
+      `  }`,
+      '',
+      `  return (`,
+      `    <div>`,
+      `      <h2>Registro de contactos</h2>`,
+      `      <form onSubmit={handleSubmit}>`,
+      `        <label htmlFor="nombre">Nombre</label>`,
+      `        <input id="nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />`,
+      `        <label htmlFor="edad">Edad</label>`,
+      `        <input id="edad" value={edad} onChange={(e) => setEdad(e.target.value)} />`,
+      `        <button type="submit">Agregar</button>`,
+      `      </form>`,
+      `      {error && <p role="alert">{error}</p>}`,
+      `      <ul data-testid="lista-contactos">`,
+      `        {contactos.map((c) => (`,
+      `          <li key={c.id}>{c.nombre} ({c.edad})</li>`,
+      `        ))}`,
+      `      </ul>`,
+      `    </div>`,
+      `  );`,
+      `}`,
+      '',
+    ].join('\n');
+
+    const busquedaPageTsx = [
+      `import { useState } from 'react';`,
+      '',
+      `interface Producto {`,
+      `  id: number;`,
+      `  nombre: string;`,
+      `}`,
+      '',
+      `const PRODUCTOS: Producto[] = [`,
+      `  { id: 1, nombre: 'Teclado mecánico' },`,
+      `  { id: 2, nombre: 'Mouse inalámbrico' },`,
+      `  { id: 3, nombre: 'Monitor 24 pulgadas' },`,
+      `  { id: 4, nombre: 'Silla ergonómica' },`,
+      `];`,
+      '',
+      `export function BusquedaPage() {`,
+      `  const [filtro, setFiltro] = useState('');`,
+      `  const resultados = PRODUCTOS.filter((p) =>`,
+      `    p.nombre.toLowerCase().includes(filtro.toLowerCase()),`,
+      `  );`,
+      '',
+      `  return (`,
+      `    <div>`,
+      `      <h2>Búsqueda de productos</h2>`,
+      `      <label htmlFor="filtro">Filtro</label>`,
+      `      <input id="filtro" value={filtro} onChange={(e) => setFiltro(e.target.value)} />`,
+      `      <p data-testid="contador-resultados">{resultados.length} resultado(s)</p>`,
+      `      <ul>`,
+      `        {resultados.map((p) => (`,
+      `          <li key={p.id}>{p.nombre}</li>`,
+      `        ))}`,
+      `      </ul>`,
+      `    </div>`,
+      `  );`,
+      `}`,
+      '',
+    ].join('\n');
+
+    const contadorLimiteTsx = [
+      `import { useState } from 'react';`,
+      '',
+      `interface ContadorLimiteProps {`,
+      `  min?: number;`,
+      `  max?: number;`,
+      `}`,
+      '',
+      `export function ContadorLimite({ min = 0, max = 10 }: ContadorLimiteProps) {`,
+      `  const [valor, setValor] = useState(min);`,
+      '',
+      `  return (`,
+      `    <div>`,
+      `      <button aria-label="Restar" onClick={() => setValor((v) => Math.max(min, v - 1))} disabled={valor <= min}>`,
+      `        -`,
+      `      </button>`,
+      `      <span data-testid="valor-contador">{valor}</span>`,
+      `      <button aria-label="Sumar" onClick={() => setValor((v) => Math.min(max, v + 1))} disabled={valor >= max}>`,
+      `        +`,
+      `      </button>`,
+      `    </div>`,
+      `  );`,
+      `}`,
+      '',
+    ].join('\n');
+
+    const toggleControlTsx = [
+      `import { useState } from 'react';`,
+      '',
+      `export function ToggleControl() {`,
+      `  const [habilitado, setHabilitado] = useState(false);`,
+      '',
+      `  return (`,
+      `    <div>`,
+      `      <label htmlFor="habilitar">Habilitar campo</label>`,
+      `      <input`,
+      `        id="habilitar"`,
+      `        type="checkbox"`,
+      `        checked={habilitado}`,
+      `        onChange={(e) => setHabilitado(e.target.checked)}`,
+      `      />`,
+      `      <input aria-label="Campo editable" disabled={!habilitado} />`,
+      `    </div>`,
+      `  );`,
+      `}`,
+      '',
+    ].join('\n');
+
+    const appTsx = [
+      `import { ${ClassName}ListaPage } from './pages/${ClassName}ListaPage';`,
+      `import { RegistroPage } from './pages/RegistroPage';`,
+      `import { BusquedaPage } from './pages/BusquedaPage';`,
+      `import { ContadorLimite } from './components/ContadorLimite';`,
+      `import { ToggleControl } from './components/ToggleControl';`,
+      '',
+      `export function App() {`,
+      `  return (`,
+      `    <div>`,
+      `      <h1>Examen React — ${version.theme_name}</h1>`,
+      `      <${ClassName}ListaPage />`,
+      `      <RegistroPage />`,
+      `      <BusquedaPage />`,
+      `      <ContadorLimite />`,
+      `      <ToggleControl />`,
+      `    </div>`,
+      `  );`,
+      `}`,
+      '',
+    ].join('\n');
+
+    const mainTsx = [
+      `import React from 'react';`,
+      `import ReactDOM from 'react-dom/client';`,
+      `import { App } from './App';`,
+      '',
+      `ReactDOM.createRoot(document.getElementById('root')!).render(`,
+      `  <React.StrictMode>`,
+      `    <App />`,
+      `  </React.StrictMode>,`,
+      `);`,
+      '',
+    ].join('\n');
+
+    return [
+      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      { name: 'src', path: '/src', content: '', is_folder: true },
+      { name: 'main.tsx', path: '/src/main.tsx', content: mainTsx, is_folder: false },
+      { name: 'App.tsx', path: '/src/App.tsx', content: appTsx, is_folder: false },
+
+      { name: 'components', path: '/src/components', content: '', is_folder: true },
+      { name: `${ClassName}Card.tsx`, path: `/src/components/${ClassName}Card.tsx`, content: cardTsx, is_folder: false },
+      { name: `${ClassName}Card.test.tsx`, path: `/src/components/${ClassName}Card.test.tsx`, content: cardTest, is_folder: false },
+      { name: 'ContadorLimite.tsx', path: '/src/components/ContadorLimite.tsx', content: contadorLimiteTsx, is_folder: false },
+      { name: 'ToggleControl.tsx', path: '/src/components/ToggleControl.tsx', content: toggleControlTsx, is_folder: false },
+
+      { name: 'pages', path: '/src/pages', content: '', is_folder: true },
+      { name: `${ClassName}ListaPage.tsx`, path: `/src/pages/${ClassName}ListaPage.tsx`, content: listaPageTsx, is_folder: false },
+      { name: `${ClassName}ListaPage.test.tsx`, path: `/src/pages/${ClassName}ListaPage.test.tsx`, content: listaPageTest, is_folder: false },
+      { name: 'RegistroPage.tsx', path: '/src/pages/RegistroPage.tsx', content: registroPageTsx, is_folder: false },
+      { name: 'BusquedaPage.tsx', path: '/src/pages/BusquedaPage.tsx', content: busquedaPageTsx, is_folder: false },
     ];
   }
 

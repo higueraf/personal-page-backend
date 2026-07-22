@@ -40,6 +40,12 @@ const TSX_COMMAND = existsSync(LOCAL_TSX_BIN) ? LOCAL_TSX_BIN : 'tsx';
 const LOCAL_JEST_BIN = join(process.cwd(), 'node_modules', '.bin', 'jest');
 const JEST_COMMAND = existsSync(LOCAL_JEST_BIN) ? LOCAL_JEST_BIN : 'jest';
 
+/** Same rationale as JEST_COMMAND above, for the React "Ejecutar tests" (Vitest) run:
+ *  resolve the binary by absolute path from this backend's own node_modules
+ *  instead of depending on a global `vitest` install being present/on PATH. */
+const LOCAL_VITEST_BIN = join(process.cwd(), 'node_modules', '.bin', 'vitest');
+const VITEST_COMMAND = existsSync(LOCAL_VITEST_BIN) ? LOCAL_VITEST_BIN : 'vitest';
+
 const RUNTIMES: Record<string, RuntimeConfig> = {
   javascript: { directCommand: 'node',       extension: '.js' },
   typescript: { directCommand: TSX_COMMAND,  extension: '.ts' },
@@ -51,10 +57,15 @@ const RUNTIMES: Record<string, RuntimeConfig> = {
   r:          { directCommand: 'Rscript',    extension: '.R' },
 };
 
-/** Packages installed globally on the host that a Vitest run needs.
- *  They are symlinked into the session's node_modules (see linkTestModules)
- *  so Vite/Vitest's own resolver finds them without relying on NODE_PATH. */
-const TEST_GLOBAL_PACKAGES = [
+/** Packages required by a React/Vitest run that are ALREADY dependencies of
+ *  this very backend (personal-page-backend). Same rationale as
+ *  NEST_LOCAL_PACKAGES below: this used to rely on a global npm install
+ *  (`npm install -g vitest vite react ...`) on the host, which is fragile —
+ *  a missing/mismatched global install produces the same kind of
+ *  "not found" failure that once broke Jest runs. They're real
+ *  devDependencies of this backend, so symlinking them from here makes
+ *  resolution deterministic on any host. */
+const REACT_LOCAL_PACKAGES = [
   'vitest',
   'vite',
   '@vitejs/plugin-react',
@@ -332,7 +343,7 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
       } else {
         await fs.writeFile(join(sessionDir, 'vite.config.ts'), VITE_TEST_CONFIG);
         await fs.writeFile(join(sessionDir, 'vitest.setup.ts'), VITEST_SETUP);
-        shellCmd = './node_modules/.bin/vitest run --reporter=verbose';
+        shellCmd = `${VITEST_COMMAND} run --reporter=verbose`;
       }
       await this.linkTestModules(sessionDir, language);
 
@@ -512,7 +523,9 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
    * the runner's own resolver finds them via standard node_modules lookup
    * (NODE_PATH is not reliably honored by Vite/Vitest/Jest).
    *
-   *  - React (Vitest): globally-installed Vitest/Vite/React/Testing-Library.
+   *  - React (Vitest): @vitejs/plugin-react, react, testing-library, etc. all
+   *                     straight from THIS backend's own node_modules (real
+   *                     dependencies of this app — see REACT_LOCAL_PACKAGES).
    *  - NestJS (Jest):   @nestjs/*, jest, ts-jest, supertest, etc. all straight
    *                     from THIS backend's own node_modules (real
    *                     dependencies of this app — see NEST_LOCAL_PACKAGES).
@@ -523,8 +536,6 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   private async linkTestModules(sessionDir: string, language: string): Promise<void> {
     const nodeModulesDir = join(sessionDir, 'node_modules');
     await fs.mkdir(nodeModulesDir, { recursive: true });
-    const binDir = join(nodeModulesDir, '.bin');
-    await fs.mkdir(binDir, { recursive: true });
 
     if (language === 'nestjs') {
       for (const pkg of NEST_LOCAL_PACKAGES) {
@@ -537,14 +548,12 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     // React / Vitest (default)
-    const globalModules = await this.executionService.getGlobalNodeModules();
-    if (!globalModules) return;
-
-    for (const pkg of TEST_GLOBAL_PACKAGES) {
-      await this.symlinkPackage(join(globalModules, pkg), join(nodeModulesDir, pkg));
+    for (const pkg of REACT_LOCAL_PACKAGES) {
+      const dir = this.resolveLocalPackageDir(pkg);
+      if (dir) {
+        await this.symlinkPackage(dir, join(nodeModulesDir, pkg));
+      }
     }
-
-    await this.symlinkPackage(join(globalModules, 'vitest', 'vitest.mjs'), join(binDir, 'vitest'), 'file');
   }
 
   /** Spawn the given shell command in sessionDir, streaming stdout/stderr to
