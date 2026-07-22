@@ -30,11 +30,25 @@ async function bootstrap() {
     next();
   });
 
-  app.enableCors({
-    origin: process.env.APP_ORIGINS?.split(',') || [
-      'http://localhost:5173'
-    ],
-    credentials: true,
+  // Delegate en vez de opciones estáticas: para /api/practice-api y
+  // /api/todo-api el middleware de arriba ya escribió los headers CORS
+  // abiertos (Access-Control-Allow-Origin: '*'); si dejáramos que este
+  // enableCors global corriera también sobre esas rutas, el paquete `cors`
+  // agrega igualmente `Access-Control-Allow-Credentials: true` (por venir
+  // configurado credentials:true) aunque el origin no matchee el whitelist,
+  // resultando en `Allow-Origin: *` + `Allow-Credentials: true` a la vez —
+  // combinación inválida según el spec CORS que los navegadores (p.ej. el
+  // iframe de DartPad) rechazan silenciosamente, aunque curl no lo note.
+  // `origin: false` le dice a `cors` que no toque los headers en esas rutas.
+  app.enableCors((req: any, callback: any) => {
+    const isOpenApi =
+      req.url?.startsWith('/api/practice-api') || req.url?.startsWith('/api/todo-api');
+    callback(null, {
+      origin: isOpenApi
+        ? false
+        : process.env.APP_ORIGINS?.split(',') || ['http://localhost:5173'],
+      credentials: true,
+    });
   });
   app.useWebSocketAdapter(new IoAdapter(app));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
