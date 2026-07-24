@@ -1807,18 +1807,35 @@ flutter:
     });
   }
 
+  /** Resolves the current student's own project within a shared exam_group_id (for SEB direct-link startURL). */
+  async findMyProjectInExamGroup(groupId: string, userId: string) {
+    let project = await this.projectRepo.findOne({
+      where: { exam_group_id: groupId, user_id: userId },
+    });
+    // Legacy: group_id might be a project id (no exam_group_id set)
+    if (!project) {
+      project = await this.projectRepo.findOne({
+        where: { id: groupId, user_id: userId, is_exam: true },
+      });
+    }
+    if (!project) throw new NotFoundException('No tenés un examen asignado en este grupo.');
+    return project;
+  }
+
   async findOne(id: string, userId: string, userRole?: string) {
     const project = await this.projectRepo.findOne({
       where: { id },
-      relations: ['files'],
+      relations: ['files', 'user'],
     });
 
     if (!project) throw new NotFoundException('Project not found');
 
     const isPrivileged = ['admin', 'teacher'].includes(userRole?.toLowerCase() ?? '');
 
-    // Check time constraints for exams (admin/teacher bypass)
-    if (project.is_exam && !isPrivileged) {
+    // Check time constraints for exams (admin/teacher bypass). Only applies while the
+    // exam is still PENDING — once submitted/graded the student must still be able to
+    // reopen it (read-only) regardless of the deadline having passed.
+    if (project.is_exam && !isPrivileged && project.status === ProjectStatus.PENDING) {
       const now = new Date();
       if (project.start_time && now < project.start_time) {
         throw new ForbiddenException('Este examen aún no ha comenzado.');
@@ -1831,6 +1848,16 @@ flutter:
     // Allow if owner or admin/teacher
     if (project.user_id !== userId && !isPrivileged) {
       throw new ForbiddenException('Access denied');
+    }
+
+    // Never leak sensitive user fields (password hash, tokens, etc.) to the client —
+    // only expose the minimal identity fields needed to show "reviewing X's exam".
+    if (project.user) {
+      project.user = {
+        first_name: project.user.first_name,
+        last_name: project.user.last_name,
+        email: project.user.email,
+      } as User;
     }
 
     return project;
@@ -1886,6 +1913,9 @@ flutter:
   ) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();
+    if (project.is_exam && project.status !== ProjectStatus.PENDING) {
+      throw new ForbiddenException('Este examen ya fue entregado y no se puede modificar.');
+    }
 
     for (const f of files) {
       let file: PlaygroundFile | null = null;
@@ -1923,6 +1953,9 @@ flutter:
   async renameFile(projectId: string, fileId: string, newName: string, userId: string) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();
+    if (project.is_exam && project.status !== ProjectStatus.PENDING) {
+      throw new ForbiddenException('Este examen ya fue entregado y no se puede modificar.');
+    }
 
     const file = await this.fileRepo.findOne({ where: { id: fileId, project_id: projectId } });
     if (!file) throw new NotFoundException('File not found');
@@ -1951,6 +1984,9 @@ flutter:
   async updateFile(projectId: string, fileName: string, content: string, userId: string, isFolder: boolean = false, path: string = '') {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();
+    if (project.is_exam && project.status !== ProjectStatus.PENDING) {
+      throw new ForbiddenException('Este examen ya fue entregado y no se puede modificar.');
+    }
 
     let file = await this.fileRepo.findOne({ where: { project_id: projectId, name: fileName, path } });
     if (file) {
@@ -1965,6 +2001,9 @@ flutter:
   async deleteFile(projectId: string, fileId: string, userId: string) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();
+    if (project.is_exam && project.status !== ProjectStatus.PENDING) {
+      throw new ForbiddenException('Este examen ya fue entregado y no se puede modificar.');
+    }
 
     const file = await this.fileRepo.findOne({ where: { id: fileId, project_id: projectId } });
     if (!file) throw new NotFoundException('File not found');

@@ -51,6 +51,18 @@ export class PlaygroundController {
   }
 
   /**
+   * Student-facing: resolves the current user's own project within a shared
+   * exam_group_id. Used by the SEB config's startURL so a single link works
+   * for every student in an exam, each landing on their own project.
+   */
+  @Get('exam-group/:groupId/my-project')
+  async getMyProjectInExamGroup(@Req() req: Request, @Param('groupId') groupId: string) {
+    const user = req.user as any;
+    const project = await this.playgroundService.findMyProjectInExamGroup(groupId, user.id);
+    return { id: project.id };
+  }
+
+  /**
    * Batch-save all files for a project in a single request.
    * Upserts each file by (project_id + name + path). Handles new files and
    * renamed files transparently, avoiding URL-encoding issues with special
@@ -353,8 +365,9 @@ export class PlaygroundController {
     const origins = (process.env.APP_ORIGINS ?? 'http://localhost:5173').split(',');
     const frontendUrl = origins[origins.length - 1].trim(); // prefer production URL (last entry)
 
-    // Build the start URL pointing directly to the student's exam list filtered by group
-    const startUrl = `${frontendUrl}/playground`;
+    // Build the start URL: a group-shared link that redirects each student to
+    // their own project within this exam (see /playground/exam/:groupId in the frontend).
+    const startUrl = `${frontendUrl}/playground/exam/${groupId}`;
 
     const quitUrl = `${frontendUrl}/seb-quit`;
 
