@@ -71,12 +71,15 @@ export class AppSeeder {
     await this.seedExamTemplateFlutter(adminUser);
     await this.seedExamTemplateFlutterSingle(adminUser);
     await this.seedExamTemplateNestJS(adminUser);
+    await this.seedExamTemplateNestJSSingle(adminUser);
     await this.seedExamTemplateReact(adminUser);
     await this.seedExamTemplateReactSingle(adminUser);
     await this.seedExamTemplateReactNative(adminUser);
     await this.seedExamTemplateReactNativeSingle(adminUser);
     await this.seedExamTemplateReactRealApi(adminUser);
     await this.seedExamTemplateReactRealApiSingle(adminUser);
+    await this.seedExamTemplateReactCypress(adminUser);
+    await this.seedExamTemplateReactCypressSingle(adminUser);
 
     return { ok: true };
   }
@@ -2428,6 +2431,83 @@ const { data: user } = useQuery({
     }
   }
 
+  // ── Examen NestJS de una sola variante (Ejercicio único) ──
+  private async seedExamTemplateNestJSSingle(admin: User) {
+    // Mismo generador (`buildNestExamFiles`) y mismas `questions` que seedExamTemplateNestJS,
+    // pero con una sola variante. Usa "Nómina" porque las otras 5 (Ropa/Libros/Farmacia/Tareas/
+    // Papelería) ya están todas asignadas al template de 5 variantes — así ambos quedan con
+    // variantes totalmente distintas entre sí (mismo criterio que React RealApi/Single).
+    const templateName = 'Programación IV — NestJS, CRUD y Tests con Jest (Ejercicio único)';
+    const description =
+      'Examen de NestJS de una sola variante (Nómina): módulo CRUD de referencia YA RESUELTO ' +
+      '(servicio + controlador + 2 archivos de test) y dos módulos más (Categorías y ' +
+      'Movimientos) también YA IMPLEMENTADOS, cada uno con una regla de negocio y un endpoint ' +
+      'adicionales que el alumno debe cubrir con sus propios tests.';
+
+    // Mismas `questions` que seedExamTemplateNestJS — ver ese método para el detalle.
+    const questions: ExamQuestion[] = [
+      {
+        order: 1, points: 4, title: 'Tests de Categorías',
+        statement: 'Escribe `categorias.service.spec.ts` (mínimo 6 tests: los 5 básicos —listar iniciales, crear, encontrar por id, `NotFoundException` con id inexistente, actualizar/eliminar— más el caso adicional: crear una categoría y luego intentar crear otra con el mismo `nombre` en otra combinación de mayúsculas/minúsculas, verificando que la segunda lanza `ConflictException`) y `categorias.controller.spec.ts` (mínimo 4 tests con `supertest`: los 3 básicos —`GET` lista 200, `POST` crea 201 con `id`, `GET /:id` inexistente 404— más el caso adicional: crear 2 o 3 categorías con nombres distintos, hacer `GET /categorias/buscar?nombre=...` y verificar que la respuesta solo incluye las que contienen ese texto, sin distinguir mayúsculas/minúsculas).',
+      },
+      {
+        order: 2, points: 4, title: 'Tests de Movimientos',
+        statement: 'Escribe `movimientos.service.spec.ts` (mínimo 6 tests: los 5 básicos —igual que en Categorías— más el caso adicional: intentar crear un movimiento con `cantidad` menor o igual a 0 y verificar que lanza `BadRequestException`) y `movimientos.controller.spec.ts` (mínimo 4 tests con `supertest`: los 3 básicos más el caso adicional: crear con `supertest` varios movimientos de entrada y de salida, hacer `GET /movimientos/resumen` y verificar que `totalEntradas`, `totalSalidas` y `balance` de la respuesta coinciden con lo esperado según los movimientos creados en el propio test).',
+      },
+      {
+        order: 3, points: 2, title: 'Cobertura de los casos adicionales (anti-copia)',
+        statement: 'Categorías y Movimientos tienen cada uno una regla de negocio (`ConflictException` por nombre duplicado / `BadRequestException` por cantidad inválida) y un endpoint (`/categorias/buscar`, `/movimientos/resumen`) que NO existen en el módulo de referencia. Se evalúa que, además de los tests básicos, cada uno de los 4 archivos incluya el caso de prueba explícito para esa parte adicional (arrange/act/assert propio, no alcanza con copiar los tests del recurso de referencia cambiando nombres de variables).',
+      },
+    ];
+
+    const version: { theme_name: string; order_index: number } = { theme_name: 'Nómina', order_index: 0 };
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'nestjs',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions,
+        }),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'nestjs';
+    await this.examTemplatesRepo.save(template);
+
+    const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
+    if (existing) {
+      existing.order_index = version.order_index;
+      existing.questions = questions;
+      await this.examVersionsRepo.save(existing);
+    } else {
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions,
+        }),
+      );
+    }
+  }
+
   // ── Examen con variantes temáticas (Programación IV — React, componentes + Vitest) ──
   private async seedExamTemplateReact(admin: User) {
     const templateName = 'Programación IV — React, componentes y Tests con Vitest';
@@ -2916,6 +2996,174 @@ const { data: user } = useQuery({
 
     template.description = description;
     template.language = 'react';
+    await this.examTemplatesRepo.save(template);
+
+    const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
+    if (existing) {
+      existing.order_index = version.order_index;
+      existing.questions = questions;
+      await this.examVersionsRepo.save(existing);
+    } else {
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions,
+        }),
+      );
+    }
+  }
+
+  private async seedExamTemplateReactCypress(admin: User) {
+    // Sin prefijo "Programación IV —", mismo criterio que seedExamTemplateReactRealApi.
+    // Usa `buildReactCypressExamFiles`: mismo proyecto base (React + Vite) que el examen
+    // Vitest, pero con `cypress.config.ts`/`package.json`/`index.html` para correrse LOCAL
+    // (este playground no ejecuta Cypress en vivo) — corrección manual, mismas 4 variantes.
+    const templateName = 'React — CRUD y Tests E2E con Cypress (API real)';
+    const description =
+      'Examen de React + TypeScript con 4 variantes temáticas, evaluado con specs E2E de ' +
+      'Cypress (no con Vitest). Cada proyecto trae un componente y una página de referencia ' +
+      'YA RESUELTOS que consultan la API real de tu variante con `fetch` (con un spec de ' +
+      'Cypress como guía) y 2 páginas más (Registro, Búsqueda) y 2 componentes más ' +
+      '(ContadorLimite, ToggleControl), todos YA IMPLEMENTADOS, cada uno con un comportamiento ' +
+      '(validación, filtro, límites, estado derivado) que NO está en la pieza de referencia. El ' +
+      'alumno no programa esas piezas: su único trabajo es escribir los 4 specs E2E que faltan, ' +
+      'cubriendo también esos comportamientos. El playground NO ejecuta Cypress en vivo — la ' +
+      'corrección es manual (el profesor corre `npm run cy:run` localmente sobre el proyecto ' +
+      'del alumno).';
+
+    const questions: ExamQuestion[] = [
+      {
+        order: 1, points: 4, title: 'Specs E2E de páginas',
+        statement: 'Escribe `cypress/e2e/registro.cy.ts` (mínimo 3 tests, navegando a `/#/registro`: la lista de contactos —`data-testid="lista-contactos"`— inicia vacía; al completar nombre y edad válidos y enviar el formulario, el contacto se agrega a la lista y el formulario se limpia; al enviar con nombre vacío o edad inválida —no numérica o menor/igual a 0— se muestra un elemento con `role="alert"` y NO se agrega nada) y `cypress/e2e/busqueda.cy.ts` (mínimo 3 tests, navegando a `/#/busqueda`: se renderizan los 4 productos iniciales; al escribir un texto en el input `#filtro` la lista se filtra, sin distinguir mayúsculas/minúsculas, y `data-testid="contador-resultados"` refleja la cantidad correcta; si el filtro no coincide con ningún producto se muestra "0 resultado(s)").',
+      },
+      {
+        order: 2, points: 4, title: 'Specs E2E de componentes',
+        statement: 'Escribe `cypress/e2e/contador-limite.cy.ts` (mínimo 4 tests, navegando a `/#/componentes`: valor inicial correcto; el botón `aria-label="Sumar"` incrementa el valor de `data-testid="valor-contador"`; el valor no baja del mínimo —el botón `aria-label="Restar"` se deshabilita en el mínimo—; el valor no sube del máximo —el botón `aria-label="Sumar"` se deshabilita en el máximo—) y `cypress/e2e/toggle-control.cy.ts` (mínimo 3 tests, misma ruta: el input `aria-label="Campo editable"` empieza deshabilitado; al marcar el checkbox `#habilitar` el campo se habilita; al desmarcarlo el campo vuelve a deshabilitarse).',
+      },
+      {
+        order: 3, points: 2, title: 'Cobertura de casos anti-copia',
+        statement: 'RegistroPage, BusquedaPage, ContadorLimite y ToggleControl tienen cada uno un comportamiento (validación de formulario, filtro + contador derivado, límites min/max, estado derivado de un checkbox) que NO existe en la página/componente de referencia: los specs que solo copian el de referencia cambiando selectores no los cubren y pierden estos puntos. Se evalúa que los 4 specs incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
+      },
+    ];
+
+    // Mismas variantes que seedExamTemplateReactRealApi (Papelería queda reservada para el
+    // "Ejercicio único" — seedExamTemplateReactCypressSingle).
+    const versions: { theme_name: string; order_index: number }[] = [
+      { theme_name: 'Ropa', order_index: 0 },
+      { theme_name: 'Libros', order_index: 1 },
+      { theme_name: 'Farmacia', order_index: 2 },
+      { theme_name: 'Nómina', order_index: 3 },
+    ];
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react-cypress',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react-cypress';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = questions;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions,
+          }),
+        );
+      }
+    }
+  }
+
+  private async seedExamTemplateReactCypressSingle(admin: User) {
+    // Sin prefijo "Programación IV —", igual criterio que seedExamTemplateReactCypress.
+    // Variante única (Papelería) — la misma que usan los "Ejercicio único" de Flutter/React/RN.
+    const templateName = 'React — CRUD y Tests E2E con Cypress (API real) (Ejercicio único)';
+    const description =
+      'Examen de React + TypeScript de una sola variante (Papelería), evaluado con specs E2E ' +
+      'de Cypress: componente y página de referencia YA RESUELTOS que consultan la API real de ' +
+      'tu variante con `fetch` (con un spec de Cypress como guía) y 2 páginas + 2 componentes ' +
+      'más YA IMPLEMENTADOS, cada uno con un comportamiento adicional que el alumno debe cubrir ' +
+      'con sus propios specs. El playground NO ejecuta Cypress en vivo — corrección manual.';
+
+    // Mismas `questions` que seedExamTemplateReactCypress — ver ese método para el detalle.
+    const questions: ExamQuestion[] = [
+      {
+        order: 1, points: 4, title: 'Specs E2E de páginas',
+        statement: 'Escribe `cypress/e2e/registro.cy.ts` (mínimo 3 tests, navegando a `/#/registro`: la lista de contactos —`data-testid="lista-contactos"`— inicia vacía; al completar nombre y edad válidos y enviar el formulario, el contacto se agrega a la lista y el formulario se limpia; al enviar con nombre vacío o edad inválida —no numérica o menor/igual a 0— se muestra un elemento con `role="alert"` y NO se agrega nada) y `cypress/e2e/busqueda.cy.ts` (mínimo 3 tests, navegando a `/#/busqueda`: se renderizan los 4 productos iniciales; al escribir un texto en el input `#filtro` la lista se filtra, sin distinguir mayúsculas/minúsculas, y `data-testid="contador-resultados"` refleja la cantidad correcta; si el filtro no coincide con ningún producto se muestra "0 resultado(s)").',
+      },
+      {
+        order: 2, points: 4, title: 'Specs E2E de componentes',
+        statement: 'Escribe `cypress/e2e/contador-limite.cy.ts` (mínimo 4 tests, navegando a `/#/componentes`: valor inicial correcto; el botón `aria-label="Sumar"` incrementa el valor de `data-testid="valor-contador"`; el valor no baja del mínimo —el botón `aria-label="Restar"` se deshabilita en el mínimo—; el valor no sube del máximo —el botón `aria-label="Sumar"` se deshabilita en el máximo—) y `cypress/e2e/toggle-control.cy.ts` (mínimo 3 tests, misma ruta: el input `aria-label="Campo editable"` empieza deshabilitado; al marcar el checkbox `#habilitar` el campo se habilita; al desmarcarlo el campo vuelve a deshabilitarse).',
+      },
+      {
+        order: 3, points: 2, title: 'Cobertura de casos anti-copia',
+        statement: 'RegistroPage, BusquedaPage, ContadorLimite y ToggleControl tienen cada uno un comportamiento (validación de formulario, filtro + contador derivado, límites min/max, estado derivado de un checkbox) que NO existe en la página/componente de referencia: los specs que solo copian el de referencia cambiando selectores no los cubren y pierden estos puntos. Se evalúa que los 4 specs incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
+      },
+    ];
+
+    const version: { theme_name: string; order_index: number } = { theme_name: 'Papelería', order_index: 0 };
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react-cypress',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions,
+        }),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react-cypress';
     await this.examTemplatesRepo.save(template);
 
     const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
