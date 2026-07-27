@@ -104,6 +104,25 @@ export const PRACTICE_VARIANTS: Record<string, VariantConfig> = {
       { tarea: 'Revisar correos pendientes', materia: 'Administración', prioridad: 'Baja', progreso: 100, fechaLimite: '2026-07-15', responsable: 'Luis Salas', completada: true },
     ],
   },
+  nomina: {
+    resource: 'empleados',
+    fields: [
+      { key: 'nombre', type: 'string', label: 'Nombre' },
+      { key: 'cargo', type: 'string', label: 'Cargo' },
+      { key: 'departamento', type: 'string', label: 'Departamento' },
+      { key: 'salarioBase', type: 'double', label: 'Salario base' },
+      { key: 'antiguedad', type: 'int', label: 'Antigüedad (años)' },
+      { key: 'codigoEmpleado', type: 'string', label: 'Código de empleado' },
+      { key: 'activo', type: 'bool', label: 'Activo' },
+    ],
+    seeds: [
+      { nombre: 'Laura Méndez', cargo: 'Analista de sistemas', departamento: 'Tecnología', salarioBase: 1800.0, antiguedad: 3, codigoEmpleado: 'EMP-001', activo: true },
+      { nombre: 'Jorge Salinas', cargo: 'Contador', departamento: 'Finanzas', salarioBase: 1600.0, antiguedad: 5, codigoEmpleado: 'EMP-002', activo: true },
+      { nombre: 'Patricia Rivas', cargo: 'Recursos Humanos', departamento: 'RRHH', salarioBase: 1500.0, antiguedad: 1, codigoEmpleado: 'EMP-003', activo: true },
+      { nombre: 'Diego Castro', cargo: 'Vendedor', departamento: 'Ventas', salarioBase: 1200.0, antiguedad: 2, codigoEmpleado: 'EMP-004', activo: false },
+      { nombre: 'Sofía Herrera', cargo: 'Gerente de Ventas', departamento: 'Ventas', salarioBase: 2200.0, antiguedad: 7, codigoEmpleado: 'EMP-005', activo: true },
+    ],
+  },
   papeleria: {
     resource: 'productos',
     fields: [

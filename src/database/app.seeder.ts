@@ -73,6 +73,10 @@ export class AppSeeder {
     await this.seedExamTemplateNestJS(adminUser);
     await this.seedExamTemplateReact(adminUser);
     await this.seedExamTemplateReactSingle(adminUser);
+    await this.seedExamTemplateReactNative(adminUser);
+    await this.seedExamTemplateReactNativeSingle(adminUser);
+    await this.seedExamTemplateReactRealApi(adminUser);
+    await this.seedExamTemplateReactRealApiSingle(adminUser);
 
     return { ok: true };
   }
@@ -959,6 +963,723 @@ const { data: user } = useQuery({
     }
   }
 
+  /** Base React de referencia: CRUD completo de "Tareas" contra la API real
+   *  `/todo-api/todos` (fetch real, sin datos hardcodeados), con router (hash) + menú
+   *  de navegación, y 2 pantallas separadas para ejercicios de lógica (promedio y
+   *  búsqueda) — mismo espíritu que el punto de partida de los exámenes de Flutter. */
+  private buildReactBaseCrudFiles(): PlaygroundTemplate['files'] {
+    const routerTsx = [
+      "import { useEffect, useState, type ReactNode } from 'react';",
+      '',
+      '/** Router mínimo basado en el hash de la URL (#/ruta), sin dependencias externas. */',
+      'function normalize(hash: string) {',
+      "  const path = hash.replace(/^#/, '');",
+      "  return path === '' ? '/' : path;",
+      '}',
+      '',
+      'export function useHashPath(): string {',
+      '  const [path, setPath] = useState(() => normalize(window.location.hash));',
+      '',
+      '  useEffect(() => {',
+      '    function onHashChange() {',
+      '      setPath(normalize(window.location.hash));',
+      '    }',
+      "    window.addEventListener('hashchange', onHashChange);",
+      "    return () => window.removeEventListener('hashchange', onHashChange);",
+      '  }, []);',
+      '',
+      '  return path;',
+      '}',
+      '',
+      'interface LinkProps {',
+      '  to: string;',
+      '  className?: string;',
+      '  children: ReactNode;',
+      '}',
+      '',
+      'export function Link({ to, className, children }: LinkProps) {',
+      '  return (',
+      '    <a href={`#${to}`} className={className}>',
+      '      {children}',
+      '    </a>',
+      '  );',
+      '}',
+      '',
+    ].join('\n');
+
+    const stylesCss = [
+      ':root {',
+      '  --bg: #f4f5fb;',
+      '  --surface: #ffffff;',
+      '  --border: #e2e4f3;',
+      '  --text: #1e1b3a;',
+      '  --text-muted: #6b7280;',
+      '  --primary: #4f46e5;',
+      '  --primary-dark: #4338ca;',
+      '  --radius: 12px;',
+      '  --shadow: 0 1px 3px rgba(30, 27, 58, 0.08), 0 1px 2px rgba(30, 27, 58, 0.06);',
+      '}',
+      '',
+      '* { box-sizing: border-box; }',
+      '',
+      'body {',
+      '  margin: 0;',
+      "  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+      '  background: var(--bg);',
+      '  color: var(--text);',
+      '}',
+      '',
+      '.app-shell { min-height: 100vh; display: flex; flex-direction: column; }',
+      '',
+      '.navbar {',
+      '  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;',
+      '  gap: 12px; padding: 14px 24px; background: linear-gradient(135deg, #312e81, #4f46e5);',
+      '  color: #fff; box-shadow: var(--shadow);',
+      '}',
+      '.brand { font-weight: 700; font-size: 1.05rem; letter-spacing: 0.02em; }',
+      '.nav-links { display: flex; gap: 6px; flex-wrap: wrap; }',
+      '.nav-link {',
+      '  color: rgba(255, 255, 255, 0.85); text-decoration: none; padding: 8px 14px;',
+      '  border-radius: 999px; font-size: 0.85rem; font-weight: 500;',
+      '  transition: background 0.15s ease, color 0.15s ease;',
+      '}',
+      '.nav-link:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }',
+      '.nav-link.active { background: #fff; color: var(--primary-dark); }',
+      '',
+      '.content { flex: 1; padding: 24px; max-width: 720px; margin: 0 auto; width: 100%; }',
+      '.page-title { margin: 0 0 16px; font-size: 1.4rem; }',
+      '.card {',
+      '  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);',
+      '  box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 16px;',
+      '}',
+      '.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }',
+      '.field label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }',
+      '.field input { padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; }',
+      '.toggle-row { flex-direction: row; align-items: center; gap: 8px; }',
+      '.btn {',
+      '  border: none; background: var(--primary); color: #fff; padding: 9px 18px; border-radius: 8px;',
+      '  font-size: 0.85rem; font-weight: 600; cursor: pointer; margin-right: 8px;',
+      '}',
+      '.btn:hover { background: var(--primary-dark); }',
+      '.list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }',
+      '.list li { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }',
+      '',
+    ].join('\n');
+
+    const todoModelTs = [
+      'export interface Todo {',
+      '  id: string;',
+      '  nombre: string;',
+      '  hecho: boolean;',
+      '  duracion: number;',
+      '  presupuesto: number;',
+      '}',
+      '',
+    ].join('\n');
+
+    const todoApiTs = [
+      "import type { Todo } from '../models/todo';",
+      '',
+      "const API_URL = 'https://api.franciscohiguera.site/api/todo-api/todos';",
+      '',
+      'export async function fetchTodos(): Promise<Todo[]> {',
+      '  const res = await fetch(API_URL);',
+      '  return res.json();',
+      '}',
+      '',
+      "export async function createTodo(data: Omit<Todo, 'id'>): Promise<Todo> {",
+      '  const res = await fetch(API_URL, {',
+      "    method: 'POST',",
+      "    headers: { 'Content-Type': 'application/json' },",
+      '    body: JSON.stringify(data),',
+      '  });',
+      '  return res.json();',
+      '}',
+      '',
+      "export async function updateTodo(id: string, data: Omit<Todo, 'id'>): Promise<Todo> {",
+      '  const res = await fetch(`${API_URL}/${id}`, {',
+      "    method: 'PATCH',",
+      "    headers: { 'Content-Type': 'application/json' },",
+      '    body: JSON.stringify(data),',
+      '  });',
+      '  return res.json();',
+      '}',
+      '',
+      'export async function deleteTodo(id: string): Promise<void> {',
+      "  await fetch(`${API_URL}/${id}`, { method: 'DELETE' });",
+      '}',
+      '',
+    ].join('\n');
+
+    const todoCrudPageTsx = [
+      "import { useEffect, useState, type FormEvent } from 'react';",
+      "import type { Todo } from '../models/todo';",
+      "import { fetchTodos, createTodo, updateTodo, deleteTodo } from '../api/todoApi';",
+      '',
+      "const EMPTY = { nombre: '', hecho: false, duracion: 0, presupuesto: 0 };",
+      '',
+      'export function TodoCrudPage() {',
+      '  const [todos, setTodos] = useState<Todo[]>([]);',
+      '  const [loading, setLoading] = useState(true);',
+      '  const [editingId, setEditingId] = useState<string | null>(null);',
+      '  const [form, setForm] = useState(EMPTY);',
+      '',
+      '  function load() {',
+      '    setLoading(true);',
+      '    fetchTodos().then(setTodos).finally(() => setLoading(false));',
+      '  }',
+      '',
+      '  useEffect(() => {',
+      '    load();',
+      '  }, []);',
+      '',
+      '  function startCreate() {',
+      '    setEditingId(null);',
+      '    setForm(EMPTY);',
+      '  }',
+      '',
+      '  function startEdit(todo: Todo) {',
+      '    setEditingId(todo.id);',
+      '    setForm({ nombre: todo.nombre, hecho: todo.hecho, duracion: todo.duracion, presupuesto: todo.presupuesto });',
+      '  }',
+      '',
+      '  async function handleSubmit(e: FormEvent) {',
+      '    e.preventDefault();',
+      "    if (form.nombre.trim() === '') return;",
+      '    if (editingId) {',
+      '      await updateTodo(editingId, form);',
+      '    } else {',
+      '      await createTodo(form);',
+      '    }',
+      '    setEditingId(null);',
+      '    setForm(EMPTY);',
+      '    load();',
+      '  }',
+      '',
+      '  async function handleDelete(id: string) {',
+      '    await deleteTodo(id);',
+      '    load();',
+      '  }',
+      '',
+      '  return (',
+      '    <div className="page">',
+      '      <h2 className="page-title">Tareas (CRUD contra /todo-api/todos)</h2>',
+      '      <form className="card" onSubmit={handleSubmit}>',
+      '        <div className="field">',
+      '          <label htmlFor="nombre">Nombre</label>',
+      '          <input id="nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />',
+      '        </div>',
+      '        <div className="field">',
+      '          <label htmlFor="duracion">Duración (min)</label>',
+      '          <input id="duracion" type="number" value={form.duracion} onChange={(e) => setForm({ ...form, duracion: Number(e.target.value) })} />',
+      '        </div>',
+      '        <div className="field">',
+      '          <label htmlFor="presupuesto">Presupuesto</label>',
+      '          <input id="presupuesto" type="number" value={form.presupuesto} onChange={(e) => setForm({ ...form, presupuesto: Number(e.target.value) })} />',
+      '        </div>',
+      '        <div className="field toggle-row">',
+      '          <label htmlFor="hecho">Hecho</label>',
+      '          <input id="hecho" type="checkbox" checked={form.hecho} onChange={(e) => setForm({ ...form, hecho: e.target.checked })} />',
+      '        </div>',
+      '        <button className="btn" type="submit">{editingId ? \'Guardar cambios\' : \'Agregar tarea\'}</button>',
+      '        {editingId && <button className="btn" type="button" onClick={startCreate}>Cancelar edición</button>}',
+      '      </form>',
+      '',
+      '      {loading ? (',
+      '        <p>Cargando...</p>',
+      '      ) : (',
+      '        <ul className="list" data-testid="lista-tareas">',
+      '          {todos.map((todo) => (',
+      '            <li key={todo.id}>',
+      '              <strong>{todo.nombre}</strong> — {todo.duracion} min · {todo.presupuesto} · {todo.hecho ? \'hecho\' : \'pendiente\'}',
+      '              <button className="btn" onClick={() => startEdit(todo)}>Editar</button>',
+      '              <button className="btn" onClick={() => handleDelete(todo.id)}>Eliminar</button>',
+      '            </li>',
+      '          ))}',
+      '        </ul>',
+      '      )}',
+      '    </div>',
+      '  );',
+      '}',
+      '',
+    ].join('\n');
+
+    const todoStat1PageTsx = [
+      "import { useEffect, useState } from 'react';",
+      "import type { Todo } from '../models/todo';",
+      "import { fetchTodos } from '../api/todoApi';",
+      '',
+      '/** Ejercicio de lógica de ejemplo: promedio de duración de las tareas. */',
+      'export function TodoStat1Page() {',
+      '  const [todos, setTodos] = useState<Todo[]>([]);',
+      '  const [loading, setLoading] = useState(true);',
+      '',
+      '  useEffect(() => {',
+      '    fetchTodos().then(setTodos).finally(() => setLoading(false));',
+      '  }, []);',
+      '',
+      '  const promedio = todos.length',
+      '    ? todos.reduce((sum, t) => sum + t.duracion, 0) / todos.length',
+      '    : 0;',
+      '',
+      '  return (',
+      '    <div className="page">',
+      '      <h2 className="page-title">Ejercicio de lógica: promedio de duración</h2>',
+      '      <div className="card">',
+      '        {loading ? <p>Cargando...</p> : (',
+      '          <p data-testid="promedio-duracion">Promedio de duración: {promedio.toFixed(1)} min ({todos.length} tareas)</p>',
+      '        )}',
+      '      </div>',
+      '    </div>',
+      '  );',
+      '}',
+      '',
+    ].join('\n');
+
+    const todoStat2PageTsx = [
+      "import { useEffect, useState } from 'react';",
+      "import type { Todo } from '../models/todo';",
+      "import { fetchTodos } from '../api/todoApi';",
+      '',
+      '/** Ejercicio de lógica de ejemplo: búsqueda de tareas por nombre. */',
+      'export function TodoStat2Page() {',
+      '  const [todos, setTodos] = useState<Todo[]>([]);',
+      "  const [filtro, setFiltro] = useState('');",
+      '  const [loading, setLoading] = useState(true);',
+      '',
+      '  useEffect(() => {',
+      '    fetchTodos().then(setTodos).finally(() => setLoading(false));',
+      '  }, []);',
+      '',
+      '  const resultados = todos.filter((t) => t.nombre.toLowerCase().includes(filtro.toLowerCase()));',
+      '',
+      '  return (',
+      '    <div className="page">',
+      '      <h2 className="page-title">Ejercicio de lógica: búsqueda de tareas</h2>',
+      '      <div className="card">',
+      '        <div className="field">',
+      '          <label htmlFor="filtro">Buscar</label>',
+      '          <input id="filtro" value={filtro} onChange={(e) => setFiltro(e.target.value)} />',
+      '        </div>',
+      '        {loading ? <p>Cargando...</p> : (',
+      '          <>',
+      '            <p data-testid="contador-resultados">{resultados.length} resultado(s)</p>',
+      '            <ul className="list">',
+      '              {resultados.map((t) => <li key={t.id}>{t.nombre}</li>)}',
+      '            </ul>',
+      '          </>',
+      '        )}',
+      '      </div>',
+      '    </div>',
+      '  );',
+      '}',
+      '',
+    ].join('\n');
+
+    const appTsx = [
+      "import './styles.css';",
+      "import { useHashPath, Link } from './router';",
+      "import { TodoCrudPage } from './pages/TodoCrudPage';",
+      "import { TodoStat1Page } from './pages/TodoStat1Page';",
+      "import { TodoStat2Page } from './pages/TodoStat2Page';",
+      '',
+      'const NAV_ITEMS = [',
+      "  { to: '/', label: 'Inicio' },",
+      "  { to: '/tareas', label: 'Tareas' },",
+      "  { to: '/promedio', label: 'Promedio' },",
+      "  { to: '/busqueda', label: 'Búsqueda' },",
+      '];',
+      '',
+      'function HomePage() {',
+      '  return (',
+      '    <div className="page">',
+      '      <h2 className="page-title">Base React — CRUD de Tareas</h2>',
+      '      <div className="card">',
+      '        <p>',
+      '          Usá el menú de arriba para navegar. Este proyecto es un CRUD completo y funcional',
+      '          contra una API real (<code>/todo-api/todos</code>), pensado como punto de partida',
+      '          para armar el mismo patrón contra otra API (por ejemplo la de tu propio examen).',
+      '        </p>',
+      '      </div>',
+      '    </div>',
+      '  );',
+      '}',
+      '',
+      'export function App() {',
+      '  const path = useHashPath();',
+      '',
+      '  let content;',
+      '  switch (path) {',
+      "    case '/tareas':",
+      '      content = <TodoCrudPage />;',
+      '      break;',
+      "    case '/promedio':",
+      '      content = <TodoStat1Page />;',
+      '      break;',
+      "    case '/busqueda':",
+      '      content = <TodoStat2Page />;',
+      '      break;',
+      '    default:',
+      '      content = <HomePage />;',
+      '  }',
+      '',
+      '  return (',
+      '    <div className="app-shell">',
+      '      <header className="navbar">',
+      '        <span className="brand">Base React — Tareas</span>',
+      '        <nav className="nav-links">',
+      '          {NAV_ITEMS.map((item) => (',
+      '            <Link key={item.to} to={item.to} className={`nav-link ${path === item.to ? \'active\' : \'\'}`}>',
+      '              {item.label}',
+      '            </Link>',
+      '          ))}',
+      '        </nav>',
+      '      </header>',
+      '      <main className="content">{content}</main>',
+      '    </div>',
+      '  );',
+      '}',
+      '',
+    ].join('\n');
+
+    const mainTsx = [
+      "import React from 'react';",
+      "import ReactDOM from 'react-dom/client';",
+      "import { App } from './App';",
+      '',
+      "ReactDOM.createRoot(document.getElementById('root')!).render(",
+      '  <React.StrictMode>',
+      '    <App />',
+      '  </React.StrictMode>,',
+      ');',
+      '',
+    ].join('\n');
+
+    return [
+      { name: 'src', path: '/src', is_folder: true, content: '' },
+      { name: 'main.tsx', path: '/src/main.tsx', is_folder: false, content: mainTsx },
+      { name: 'App.tsx', path: '/src/App.tsx', is_folder: false, content: appTsx },
+      { name: 'router.tsx', path: '/src/router.tsx', is_folder: false, content: routerTsx },
+      { name: 'styles.css', path: '/src/styles.css', is_folder: false, content: stylesCss },
+      { name: 'models', path: '/src/models', is_folder: true, content: '' },
+      { name: 'todo.ts', path: '/src/models/todo.ts', is_folder: false, content: todoModelTs },
+      { name: 'api', path: '/src/api', is_folder: true, content: '' },
+      { name: 'todoApi.ts', path: '/src/api/todoApi.ts', is_folder: false, content: todoApiTs },
+      { name: 'pages', path: '/src/pages', is_folder: true, content: '' },
+      { name: 'TodoCrudPage.tsx', path: '/src/pages/TodoCrudPage.tsx', is_folder: false, content: todoCrudPageTsx },
+      { name: 'TodoStat1Page.tsx', path: '/src/pages/TodoStat1Page.tsx', is_folder: false, content: todoStat1PageTsx },
+      { name: 'TodoStat2Page.tsx', path: '/src/pages/TodoStat2Page.tsx', is_folder: false, content: todoStat2PageTsx },
+    ];
+  }
+
+  /** Base React Native de referencia: mismo CRUD de "Tareas" contra `/todo-api/todos`, pero en
+   *  un único `App.tsx` (Expo Snack, vía el preview embed, sólo lee ese archivo) con navegación
+   *  por estado interno (pantallas: Inicio/Tareas/Promedio/Búsqueda) a modo de "menú". */
+  private buildReactNativeBaseCrudFiles(): PlaygroundTemplate['files'] {
+    const appTsx = [
+      "import { useEffect, useState } from 'react';",
+      'import {',
+      '  View,',
+      '  Text,',
+      '  TextInput,',
+      '  TouchableOpacity,',
+      '  FlatList,',
+      '  StyleSheet,',
+      '  Switch,',
+      '  ScrollView,',
+      "} from 'react-native';",
+      '',
+      'interface Todo {',
+      '  id: string;',
+      '  nombre: string;',
+      '  hecho: boolean;',
+      '  duracion: number;',
+      '  presupuesto: number;',
+      '}',
+      '',
+      "const API_URL = 'https://api.franciscohiguera.site/api/todo-api/todos';",
+      '',
+      'async function fetchTodos(): Promise<Todo[]> {',
+      '  const res = await fetch(API_URL);',
+      '  return res.json();',
+      '}',
+      '',
+      "async function createTodo(data: Omit<Todo, 'id'>): Promise<Todo> {",
+      '  const res = await fetch(API_URL, {',
+      "    method: 'POST',",
+      "    headers: { 'Content-Type': 'application/json' },",
+      '    body: JSON.stringify(data),',
+      '  });',
+      '  return res.json();',
+      '}',
+      '',
+      "async function updateTodo(id: string, data: Omit<Todo, 'id'>): Promise<Todo> {",
+      '  const res = await fetch(`${API_URL}/${id}`, {',
+      "    method: 'PATCH',",
+      "    headers: { 'Content-Type': 'application/json' },",
+      '    body: JSON.stringify(data),',
+      '  });',
+      '  return res.json();',
+      '}',
+      '',
+      'async function deleteTodo(id: string): Promise<void> {',
+      "  await fetch(`${API_URL}/${id}`, { method: 'DELETE' });",
+      '}',
+      '',
+      "type Screen = 'home' | 'tareas' | 'promedio' | 'busqueda';",
+      '',
+      '/** "Menú" de la app: barra superior con botones que cambian de pantalla (equivalente,',
+      ' *  en mobile, a un router de pantallas). */',
+      'function Menu({ screen, onNavigate }: { screen: Screen; onNavigate: (s: Screen) => void }) {',
+      '  const items: { key: Screen; label: string }[] = [',
+      "    { key: 'home', label: 'Inicio' },",
+      "    { key: 'tareas', label: 'Tareas' },",
+      "    { key: 'promedio', label: 'Promedio' },",
+      "    { key: 'busqueda', label: 'Buscar' },",
+      '  ];',
+      '  return (',
+      '    <View style={styles.menu}>',
+      '      {items.map((item) => (',
+      '        <TouchableOpacity',
+      '          key={item.key}',
+      '          onPress={() => onNavigate(item.key)}',
+      '          style={[styles.menuBtn, screen === item.key && styles.menuBtnActive]}',
+      '        >',
+      '          <Text style={[styles.menuBtnText, screen === item.key && styles.menuBtnTextActive]}>',
+      '            {item.label}',
+      '          </Text>',
+      '        </TouchableOpacity>',
+      '      ))}',
+      '    </View>',
+      '  );',
+      '}',
+      '',
+      'function HomeScreen() {',
+      '  return (',
+      '    <View style={styles.card}>',
+      '      <Text style={styles.title}>Base React Native — Tareas</Text>',
+      '      <Text>',
+      '        Usá el menú de arriba para navegar. CRUD completo contra una API real',
+      "        ({'/todo-api/todos'}), punto de partida para armar el mismo patrón contra otra API.",
+      '      </Text>',
+      '    </View>',
+      '  );',
+      '}',
+      '',
+      'function TareasScreen() {',
+      '  const [todos, setTodos] = useState<Todo[]>([]);',
+      '  const [loading, setLoading] = useState(true);',
+      '  const [editingId, setEditingId] = useState<string | null>(null);',
+      "  const [nombre, setNombre] = useState('');",
+      "  const [duracion, setDuracion] = useState('0');",
+      "  const [presupuesto, setPresupuesto] = useState('0');",
+      '  const [hecho, setHecho] = useState(false);',
+      '',
+      '  function load() {',
+      '    setLoading(true);',
+      '    fetchTodos().then(setTodos).finally(() => setLoading(false));',
+      '  }',
+      '',
+      '  useEffect(() => {',
+      '    load();',
+      '  }, []);',
+      '',
+      '  function resetForm() {',
+      '    setEditingId(null);',
+      "    setNombre('');",
+      "    setDuracion('0');",
+      "    setPresupuesto('0');",
+      '    setHecho(false);',
+      '  }',
+      '',
+      '  async function handleSubmit() {',
+      "    if (nombre.trim() === '') return;",
+      '    const data = { nombre, hecho, duracion: Number(duracion), presupuesto: Number(presupuesto) };',
+      '    if (editingId) {',
+      '      await updateTodo(editingId, data);',
+      '    } else {',
+      '      await createTodo(data);',
+      '    }',
+      '    resetForm();',
+      '    load();',
+      '  }',
+      '',
+      '  function startEdit(todo: Todo) {',
+      '    setEditingId(todo.id);',
+      '    setNombre(todo.nombre);',
+      '    setDuracion(String(todo.duracion));',
+      '    setPresupuesto(String(todo.presupuesto));',
+      '    setHecho(todo.hecho);',
+      '  }',
+      '',
+      '  async function handleDelete(id: string) {',
+      '    await deleteTodo(id);',
+      '    load();',
+      '  }',
+      '',
+      '  return (',
+      '    <View style={styles.card}>',
+      '      <Text style={styles.title}>Tareas</Text>',
+      '      <TextInput style={styles.input} placeholder="Nombre" value={nombre} onChangeText={setNombre} />',
+      '      <TextInput style={styles.input} placeholder="Duración (min)" value={duracion} onChangeText={setDuracion} keyboardType="numeric" />',
+      '      <TextInput style={styles.input} placeholder="Presupuesto" value={presupuesto} onChangeText={setPresupuesto} keyboardType="numeric" />',
+      '      <View style={styles.row}>',
+      '        <Text>Hecho</Text>',
+      '        <Switch value={hecho} onValueChange={setHecho} />',
+      '      </View>',
+      '      <TouchableOpacity style={styles.btn} onPress={handleSubmit}>',
+      "        <Text style={styles.btnText}>{editingId ? 'Guardar cambios' : 'Agregar tarea'}</Text>",
+      '      </TouchableOpacity>',
+      '      {loading ? (',
+      '        <Text>Cargando...</Text>',
+      '      ) : (',
+      '        <FlatList',
+      '          data={todos}',
+      '          keyExtractor={(item) => item.id}',
+      '          renderItem={({ item }) => (',
+      '            <View style={styles.listItem}>',
+      '              <Text style={styles.listItemText}>',
+      "                {item.nombre} — {item.duracion} min · {item.presupuesto} · {item.hecho ? 'hecho' : 'pendiente'}",
+      '              </Text>',
+      '              <View style={styles.row}>',
+      '                <TouchableOpacity style={styles.btnSmall} onPress={() => startEdit(item)}>',
+      '                  <Text style={styles.btnText}>Editar</Text>',
+      '                </TouchableOpacity>',
+      '                <TouchableOpacity style={styles.btnSmall} onPress={() => handleDelete(item.id)}>',
+      '                  <Text style={styles.btnText}>Eliminar</Text>',
+      '                </TouchableOpacity>',
+      '              </View>',
+      '            </View>',
+      '          )}',
+      '        />',
+      '      )}',
+      '    </View>',
+      '  );',
+      '}',
+      '',
+      '/** Ejercicio de lógica de ejemplo: promedio de duración. */',
+      'function PromedioScreen() {',
+      '  const [todos, setTodos] = useState<Todo[]>([]);',
+      '  const [loading, setLoading] = useState(true);',
+      '',
+      '  useEffect(() => {',
+      '    fetchTodos().then(setTodos).finally(() => setLoading(false));',
+      '  }, []);',
+      '',
+      '  const promedio = todos.length',
+      '    ? todos.reduce((sum, t) => sum + t.duracion, 0) / todos.length',
+      '    : 0;',
+      '',
+      '  return (',
+      '    <View style={styles.card}>',
+      '      <Text style={styles.title}>Promedio de duración</Text>',
+      '      {loading ? (',
+      '        <Text>Cargando...</Text>',
+      '      ) : (',
+      '        <Text>Promedio: {promedio.toFixed(1)} min ({todos.length} tareas)</Text>',
+      '      )}',
+      '    </View>',
+      '  );',
+      '}',
+      '',
+      '/** Ejercicio de lógica de ejemplo: búsqueda por nombre. */',
+      'function BusquedaScreen() {',
+      '  const [todos, setTodos] = useState<Todo[]>([]);',
+      "  const [filtro, setFiltro] = useState('');",
+      '  const [loading, setLoading] = useState(true);',
+      '',
+      '  useEffect(() => {',
+      '    fetchTodos().then(setTodos).finally(() => setLoading(false));',
+      '  }, []);',
+      '',
+      '  const resultados = todos.filter((t) => t.nombre.toLowerCase().includes(filtro.toLowerCase()));',
+      '',
+      '  return (',
+      '    <View style={styles.card}>',
+      '      <Text style={styles.title}>Búsqueda de tareas</Text>',
+      '      <TextInput style={styles.input} placeholder="Buscar" value={filtro} onChangeText={setFiltro} />',
+      '      {loading ? (',
+      '        <Text>Cargando...</Text>',
+      '      ) : (',
+      '        <>',
+      '          <Text>{resultados.length} resultado(s)</Text>',
+      '          <FlatList',
+      '            data={resultados}',
+      '            keyExtractor={(item) => item.id}',
+      '            renderItem={({ item }) => <Text style={styles.listItemText}>{item.nombre}</Text>}',
+      '          />',
+      '        </>',
+      '      )}',
+      '    </View>',
+      '  );',
+      '}',
+      '',
+      'export default function App() {',
+      "  const [screen, setScreen] = useState<Screen>('home');",
+      '',
+      '  let content;',
+      '  switch (screen) {',
+      "    case 'tareas':",
+      '      content = <TareasScreen />;',
+      '      break;',
+      "    case 'promedio':",
+      '      content = <PromedioScreen />;',
+      '      break;',
+      "    case 'busqueda':",
+      '      content = <BusquedaScreen />;',
+      '      break;',
+      '    default:',
+      '      content = <HomeScreen />;',
+      '  }',
+      '',
+      '  return (',
+      '    <View style={styles.app}>',
+      '      <Menu screen={screen} onNavigate={setScreen} />',
+      '      <ScrollView style={styles.content}>{content}</ScrollView>',
+      '    </View>',
+      '  );',
+      '}',
+      '',
+      'const styles = StyleSheet.create({',
+      "  app: { flex: 1, backgroundColor: '#f4f5fb' },",
+      '  menu: {',
+      "    flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#4338ca',",
+      '    paddingTop: 40, paddingBottom: 10, paddingHorizontal: 10, gap: 6,',
+      '  },',
+      '  menuBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },',
+      "  menuBtnActive: { backgroundColor: '#ffffff' },",
+      "  menuBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600' },",
+      "  menuBtnTextActive: { color: '#4338ca' },",
+      '  content: { flex: 1, padding: 16 },',
+      '  card: {',
+      "    backgroundColor: '#ffffff', borderRadius: 12, padding: 16, marginBottom: 12,",
+      "    borderWidth: 1, borderColor: '#e2e4f3',",
+      '  },',
+      "  title: { fontSize: 18, fontWeight: '700', marginBottom: 10 },",
+      '  input: {',
+      "    borderWidth: 1, borderColor: '#e2e4f3', borderRadius: 8, padding: 10, marginBottom: 10,",
+      '  },',
+      "  row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },",
+      '  btn: {',
+      "    backgroundColor: '#4f46e5', borderRadius: 8, paddingVertical: 10, alignItems: 'center',",
+      '    marginBottom: 12,',
+      '  },',
+      '  btnSmall: {',
+      "    backgroundColor: '#4f46e5', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10,",
+      '    marginRight: 8, marginTop: 6,',
+      '  },',
+      "  btnText: { color: '#fff', fontWeight: '600' },",
+      '  listItem: {',
+      "    borderTopWidth: 1, borderTopColor: '#e2e4f3', paddingVertical: 10,",
+      '  },',
+      '  listItemText: { fontSize: 13 },',
+      '});',
+      '',
+    ].join('\n');
+
+    return [{ name: 'App.tsx', path: '/App.tsx', is_folder: false, content: appTsx }];
+  }
+
   // ── 7. Plantillas de Playground (Hello World básico por lenguaje) ────────────
   private async seedPlaygroundTemplates(admin: User) {
     const templates: {
@@ -1132,6 +1853,16 @@ const { data: user } = useQuery({
             content: `import { Test, TestingModule } from '@nestjs/testing';\nimport { INestApplication } from '@nestjs/common';\nimport request from 'supertest';\nimport { AppModule } from './app.module';\n\ndescribe('AppController (e2e)', () => {\n  let app: INestApplication;\n\n  beforeAll(async () => {\n    const moduleFixture: TestingModule = await Test.createTestingModule({\n      imports: [AppModule],\n    }).compile();\n\n    app = moduleFixture.createNestApplication();\n    await app.init();\n  });\n\n  afterAll(async () => {\n    await app.close();\n  });\n\n  it('GET /tareas devuelve el listado de tareas', () => {\n    return request(app.getHttpServer())\n      .get('/tareas')\n      .expect(200)\n      .expect((res) => {\n        expect(res.body).toHaveLength(2);\n      });\n  });\n\n  it('GET /tareas/:id/completar marca una tarea como completada', () => {\n    return request(app.getHttpServer())\n      .get('/tareas/1/completar')\n      .expect(200)\n      .expect((res) => {\n        expect(res.body.completada).toBe(true);\n      });\n  });\n});\n`,
           },
         ],
+      },
+      {
+        name: 'React — Base CRUD de Tareas (Router + API)', language: 'react',
+        description: 'Proyecto base full-funcional: router (hash) + menú, CRUD completo de tareas contra la API real /todo-api/todos, y 2 pantallas separadas de ejercicios de lógica (promedio, búsqueda). Punto de partida para armar el mismo patrón contra otras APIs.',
+        files: this.buildReactBaseCrudFiles(),
+      },
+      {
+        name: 'React Native — Base CRUD de Tareas', language: 'react-native',
+        description: 'Proyecto base full-funcional (Expo Snack): CRUD completo de tareas contra la API real /todo-api/todos, con menú de navegación por pantallas y 2 ejercicios de lógica (promedio, búsqueda). Punto de partida para armar el mismo patrón contra otras APIs.',
+        files: this.buildReactNativeBaseCrudFiles(),
       },
     ];
 
@@ -1817,6 +2548,347 @@ const { data: user } = useQuery({
     const version: { theme_name: string; order_index: number } = { theme_name: 'Papelería', order_index: 0 };
 
     // Upsert: mismo criterio que seedExamTemplateFlutterSingle (conserva IDs si el template ya existe).
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions,
+        }),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react';
+    await this.examTemplatesRepo.save(template);
+
+    const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
+    if (existing) {
+      existing.order_index = version.order_index;
+      existing.questions = questions;
+      await this.examVersionsRepo.save(existing);
+    } else {
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions,
+        }),
+      );
+    }
+  }
+
+  private async seedExamTemplateReactNative(admin: User) {
+    // Sin prefijo "Programación IV —" a pedido: este template es nuevo, distinto de los 8
+    // templates ya existentes (esos sí mantienen el prefijo, no se tocan).
+    const templateName = 'React Native — CRUD y pantallas de lógica (Expo Snack)';
+    const description =
+      'Examen de React Native (previsualizado con Expo Snack, un solo archivo `App.tsx`) con 4 ' +
+      'variantes temáticas. El proyecto trae una app "Tareas" de referencia YA RESUELTA (CRUD ' +
+      'completo + 2 pantallas de cálculo) contra una API distinta a la asignada. El alumno debe ' +
+      'duplicar y adaptar ese mismo patrón en 3 pantallas propias (CRUD contra su API asignada + ' +
+      '2 pantallas de cálculo). No hay tests automáticos: la corrección es manual (código + preview).';
+
+    const questions: ExamQuestion[] = [
+      {
+        order: 1, points: 6, title: 'CRUD contra tu API asignada',
+        statement: 'Completá la pantalla `Mi<Recurso>Screen` (en `App.tsx`, el nombre exacto de la función depende de tu recurso, p.ej. `MiPrendaScreen`) para que liste, cree, edite y elimine registros contra el endpoint de tu variante, con los campos indicados en el ENUNCIADO. Debe seguir el mismo patrón (fetch → estado → render) que `ReferenciaScreen`, adaptado a los campos de tu recurso.',
+      },
+      {
+        order: 2, points: 2, title: 'Pantalla de cálculo 1',
+        statement: 'Completá `Pregunta2Screen` con una pantalla de cálculo propia sobre los registros de tu API (siguiendo el patrón de `ReferenciaPromedioScreen`), calculando lo que pida el enunciado específico de tu variante (no repitas el mismo cálculo del ejemplo de referencia).',
+      },
+      {
+        order: 3, points: 2, title: 'Pantalla de cálculo 2',
+        statement: 'Completá `Pregunta3Screen` con una segunda pantalla de lógica propia (siguiendo el patrón de `ReferenciaBusquedaScreen`), distinta de la anterior y del ejemplo de referencia.',
+      },
+    ];
+
+    // Nota: no se usa la variante "Tareas" — es la que sirve de base/referencia (app ToDo)
+    // dentro del propio examen, así que asignarla también como variante del alumno generaría
+    // confusión (coincidiría con lo que ya viene resuelto de ejemplo).
+    const versions: { theme_name: string; order_index: number }[] = [
+      { theme_name: 'Ropa', order_index: 0 },
+      { theme_name: 'Libros', order_index: 1 },
+      { theme_name: 'Farmacia', order_index: 2 },
+      { theme_name: 'Papelería', order_index: 3 },
+    ];
+
+    // Upsert: mismo criterio que seedExamTemplateReact (conserva IDs si el template ya existe,
+    // y refresca descripción/preguntas si cambian entre deploys).
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react-native',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react-native';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = questions;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions,
+          }),
+        );
+      }
+    }
+  }
+
+  private async seedExamTemplateReactNativeSingle(admin: User) {
+    // Sin prefijo "Programación IV —", igual criterio que seedExamTemplateReactNative.
+    // Variante única (Papelería) — la misma que usan los "Ejercicio único" de Flutter/React.
+    const templateName = 'React Native — CRUD y pantallas de lógica (Expo Snack) (Ejercicio único)';
+    const description =
+      'Examen de React Native (previsualizado con Expo Snack, un solo archivo `App.tsx`) de una ' +
+      'sola variante (Papelería). El proyecto trae una app "Tareas" de referencia YA RESUELTA ' +
+      '(CRUD completo + 2 pantallas de cálculo) contra una API distinta a la asignada. El alumno ' +
+      'debe duplicar y adaptar ese mismo patrón en 3 pantallas propias (CRUD contra su API ' +
+      'asignada + 2 pantallas de cálculo). No hay tests automáticos: la corrección es manual ' +
+      '(código + preview).';
+
+    // Mismas `questions` que seedExamTemplateReactNative — ver ese método para el detalle de lo
+    // que se evalúa en cada una.
+    const questions: ExamQuestion[] = [
+      {
+        order: 1, points: 6, title: 'CRUD contra tu API asignada',
+        statement: 'Completá la pantalla `Mi<Recurso>Screen` (en `App.tsx`, el nombre exacto de la función depende de tu recurso, p.ej. `MiPrendaScreen`) para que liste, cree, edite y elimine registros contra el endpoint de tu variante, con los campos indicados en el ENUNCIADO. Debe seguir el mismo patrón (fetch → estado → render) que `ReferenciaScreen`, adaptado a los campos de tu recurso.',
+      },
+      {
+        order: 2, points: 2, title: 'Pantalla de cálculo 1',
+        statement: 'Completá `Pregunta2Screen` con una pantalla de cálculo propia sobre los registros de tu API (siguiendo el patrón de `ReferenciaPromedioScreen`), calculando lo que pida el enunciado específico de tu variante (no repitas el mismo cálculo del ejemplo de referencia).',
+      },
+      {
+        order: 3, points: 2, title: 'Pantalla de cálculo 2',
+        statement: 'Completá `Pregunta3Screen` con una segunda pantalla de lógica propia (siguiendo el patrón de `ReferenciaBusquedaScreen`), distinta de la anterior y del ejemplo de referencia.',
+      },
+    ];
+
+    const version: { theme_name: string; order_index: number } = { theme_name: 'Papelería', order_index: 0 };
+
+    // Upsert: mismo criterio que seedExamTemplateReactSingle (conserva IDs si el template ya existe).
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react-native',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions,
+        }),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react-native';
+    await this.examTemplatesRepo.save(template);
+
+    const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
+    if (existing) {
+      existing.order_index = version.order_index;
+      existing.questions = questions;
+      await this.examVersionsRepo.save(existing);
+    } else {
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions,
+        }),
+      );
+    }
+  }
+
+  private async seedExamTemplateReactRealApi(admin: User) {
+    // Sin prefijo "Programación IV —" (a pedido): template nuevo y separado de
+    // "Programación IV — React, componentes y Tests con Vitest" (que se mantiene sin tocar).
+    // Reutiliza el mismo generador (`buildReactExamFiles`, ya actualizado para consumir la API
+    // real de la variante vía `fetch`) — mismas 4 variantes y preguntas.
+    const templateName = 'React — CRUD y Tests con Vitest (API real)';
+    const description =
+      'Examen de React + TypeScript con 4 variantes temáticas. Cada proyecto trae un componente y ' +
+      'una página de referencia YA RESUELTOS que consultan la API real de tu variante con `fetch` ' +
+      '(con sus 2 archivos de test como guía) y 2 páginas más (Registro, Búsqueda) y 2 componentes ' +
+      'más (ContadorLimite, ToggleControl), todos YA IMPLEMENTADOS, cada uno con un comportamiento ' +
+      '(validación, filtro, límites, estado derivado) que NO está en la pieza de referencia. El ' +
+      'alumno no programa esas piezas: su único trabajo es escribir los 4 archivos de test que ' +
+      'faltan, cubriendo también esos comportamientos (copiar los tests de referencia cambiando ' +
+      'nombres de variables no alcanza para cubrirlos).';
+
+    // Mismas `questions` que seedExamTemplateReact — ver ese método para el detalle de lo que se
+    // evalúa en cada una.
+    const questions: ExamQuestion[] = [
+      {
+        order: 1, points: 4, title: 'Tests de páginas',
+        statement: 'Escribe `RegistroPage.test.tsx` (mínimo 3 tests: la lista de contactos inicia vacía; al completar nombre y edad válidos y enviar el formulario, el contacto se agrega a `data-testid="lista-contactos"` y el formulario se limpia; al enviar con nombre vacío o edad inválida —no numérica o menor/igual a 0— se muestra un `role="alert"` y NO se agrega nada) y `BusquedaPage.test.tsx` (mínimo 3 tests: se renderizan los 4 productos iniciales; al escribir un texto en el input `#filtro` la lista se filtra, sin distinguir mayúsculas/minúsculas, y `data-testid="contador-resultados"` refleja la cantidad correcta; si el filtro no coincide con ningún producto se muestra "0 resultado(s)").',
+      },
+      {
+        order: 2, points: 4, title: 'Tests de componentes',
+        statement: 'Escribe `ContadorLimite.test.tsx` (mínimo 4 tests: valor inicial correcto; el botón `aria-label="Sumar"` incrementa el valor de `data-testid="valor-contador"`; el valor no baja del mínimo —el botón `aria-label="Restar"` se deshabilita en el mínimo—; el valor no sube del máximo —el botón `aria-label="Sumar"` se deshabilita en el máximo—) y `ToggleControl.test.tsx` (mínimo 3 tests: el input `aria-label="Campo editable"` empieza deshabilitado; al marcar el checkbox `#habilitar` el campo se habilita; al desmarcarlo el campo vuelve a deshabilitarse).',
+      },
+      {
+        order: 3, points: 2, title: 'Cobertura de casos anti-copia',
+        statement: 'RegistroPage, BusquedaPage, ContadorLimite y ToggleControl tienen cada uno un comportamiento (validación de formulario, filtro + contador derivado, límites min/max, estado derivado de un checkbox) que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 4 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
+      },
+    ];
+
+    // Nota: no se usa la variante "Tareas" — el ejemplo de referencia (Card/ListaPage YA
+    // resueltos) ya consume esa misma variante ("tareas") internamente en algunos casos de
+    // prueba previos; para evitar confusión no se asigna como variante del alumno acá.
+    // Tampoco se usa "Papelería" — es la variante exclusiva del examen de una sola variante
+    // (`seedExamTemplateReactRealApiSingle`); se usa "Nómina" para que ambos templates queden
+    // con variantes totalmente distintas entre sí.
+    const versions: { theme_name: string; order_index: number }[] = [
+      { theme_name: 'Ropa', order_index: 0 },
+      { theme_name: 'Libros', order_index: 1 },
+      { theme_name: 'Farmacia', order_index: 2 },
+      { theme_name: 'Nómina', order_index: 3 },
+    ];
+
+    // Upsert: mismo criterio que seedExamTemplateReact (conserva IDs si el template ya existe,
+    // y refresca descripción/preguntas si cambian entre deploys).
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = questions;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions,
+          }),
+        );
+      }
+    }
+  }
+
+  private async seedExamTemplateReactRealApiSingle(admin: User) {
+    // Sin prefijo "Programación IV —", igual criterio que seedExamTemplateReactRealApi.
+    // Variante única (Papelería) — la misma que usan los "Ejercicio único" de Flutter/React/RN.
+    const templateName = 'React — CRUD y Tests con Vitest (API real) (Ejercicio único)';
+    const description =
+      'Examen de React + TypeScript de una sola variante (Papelería): componente y página de ' +
+      'referencia YA RESUELTOS que consultan la API real de tu variante con `fetch` (con sus 2 ' +
+      'archivos de test como guía) y 2 páginas + 2 componentes más YA IMPLEMENTADOS, cada uno con ' +
+      'un comportamiento adicional que el alumno debe cubrir con sus propios tests.';
+
+    // Mismas `questions` que seedExamTemplateReactRealApi — ver ese método para el detalle.
+    const questions: ExamQuestion[] = [
+      {
+        order: 1, points: 4, title: 'Tests de páginas',
+        statement: 'Escribe `RegistroPage.test.tsx` (mínimo 3 tests: la lista de contactos inicia vacía; al completar nombre y edad válidos y enviar el formulario, el contacto se agrega a `data-testid="lista-contactos"` y el formulario se limpia; al enviar con nombre vacío o edad inválida —no numérica o menor/igual a 0— se muestra un `role="alert"` y NO se agrega nada) y `BusquedaPage.test.tsx` (mínimo 3 tests: se renderizan los 4 productos iniciales; al escribir un texto en el input `#filtro` la lista se filtra, sin distinguir mayúsculas/minúsculas, y `data-testid="contador-resultados"` refleja la cantidad correcta; si el filtro no coincide con ningún producto se muestra "0 resultado(s)").',
+      },
+      {
+        order: 2, points: 4, title: 'Tests de componentes',
+        statement: 'Escribe `ContadorLimite.test.tsx` (mínimo 4 tests: valor inicial correcto; el botón `aria-label="Sumar"` incrementa el valor de `data-testid="valor-contador"`; el valor no baja del mínimo —el botón `aria-label="Restar"` se deshabilita en el mínimo—; el valor no sube del máximo —el botón `aria-label="Sumar"` se deshabilita en el máximo—) y `ToggleControl.test.tsx` (mínimo 3 tests: el input `aria-label="Campo editable"` empieza deshabilitado; al marcar el checkbox `#habilitar` el campo se habilita; al desmarcarlo el campo vuelve a deshabilitarse).',
+      },
+      {
+        order: 3, points: 2, title: 'Cobertura de casos anti-copia',
+        statement: 'RegistroPage, BusquedaPage, ContadorLimite y ToggleControl tienen cada uno un comportamiento (validación de formulario, filtro + contador derivado, límites min/max, estado derivado de un checkbox) que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 4 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
+      },
+    ];
+
+    const version: { theme_name: string; order_index: number } = { theme_name: 'Papelería', order_index: 0 };
+
+    // Upsert: mismo criterio que seedExamTemplateReactSingle (conserva IDs si el template ya existe).
     let template = await this.examTemplatesRepo.findOne({
       where: { name: templateName },
       relations: ['versions'],
