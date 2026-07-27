@@ -360,6 +360,7 @@ export class PlaygroundController {
     const projects = await this.playgroundService.findAdminExamsByGroup(groupId);
     if (!projects || projects.length === 0) throw new NotFoundException('Exam group not found');
     const examName = (projects[0] as any).name ?? 'examen';
+    const allowCopyPaste = !!(projects[0] as any).allow_copy_paste;
 
     // Frontend base URL: use first origin from APP_ORIGINS or fallback
     const origins = (process.env.APP_ORIGINS ?? 'http://localhost:5173').split(',');
@@ -399,6 +400,8 @@ export class PlaygroundController {
   <false/>
   <key>enableScreenCapture</key>
   <false/>
+  <key>enablePrivateClipboard</key>
+  <${allowCopyPaste ? 'false' : 'true'}/>
   <key>newBrowserWindowByLinkPolicy</key>
   <integer>2</integer>
   <key>URLFilterEnable</key>

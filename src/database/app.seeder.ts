@@ -70,6 +70,8 @@ export class AppSeeder {
     await this.seedExamTemplateTypeScriptV2(adminUser);
     await this.seedExamTemplateFlutter(adminUser);
     await this.seedExamTemplateFlutterSingle(adminUser);
+    await this.seedExamTemplateFlutterRealApi(adminUser);
+    await this.seedExamTemplateFlutterRealApiSingle(adminUser);
     await this.seedExamTemplateNestJS(adminUser);
     await this.seedExamTemplateNestJSSingle(adminUser);
     await this.seedExamTemplateReact(adminUser);
@@ -2292,6 +2294,214 @@ const { data: user } = useQuery({
     };
 
     // Upsert: mismo criterio que seedExamTemplateFlutter (conserva IDs si el template ya existe).
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'flutter',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions: version.questions,
+        }),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'flutter';
+    await this.examTemplatesRepo.save(template);
+
+    const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
+    if (existing) {
+      existing.order_index = version.order_index;
+      existing.questions = version.questions;
+      await this.examVersionsRepo.save(existing);
+    } else {
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions: version.questions,
+        }),
+      );
+    }
+  }
+
+  // ── Examen con variantes temáticas (Flutter, CRUD + pantallas de lógica, API real) ──
+  // Mismo generador (`buildFlutterExamFiles`) y mismo paradigma que `seedExamTemplateFlutter`
+  // (pantalla principal con menú + 3 botones, referencia ToDo, CRUD contra la API de práctica),
+  // pero con el MISMO conjunto de variantes que el examen "React — CRUD y Tests con Vitest (API
+  // real)" (Ropa/Libros/Farmacia/Nómina + Papelería en el ejercicio único), para poder asignarlas
+  // en paralelo a un mismo grupo sin repetir variante entre React y Flutter.
+  private async seedExamTemplateFlutterRealApi(admin: User) {
+    const templateName = 'Flutter — CRUD y pantallas de lógica (API real)';
+    const description =
+      'Examen de Flutter con 4 variantes temáticas (mismas que "React — CRUD y Tests con Vitest ' +
+      '(API real)"): pantalla principal con menú + 3 botones — CRUD contra la API de práctica ' +
+      '(7 pts) y 2 pantallas de cálculo (1.5 pts c/u) — más un ejemplo de referencia (ToDo) ' +
+      'accesible desde el menú.';
+
+    const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
+      {
+        theme_name: 'Ropa', order_index: 0,
+        questions: [
+          {
+            order: 1, points: 7, title: 'CRUD de tienda de ropa contra la API',
+            statement: 'Construye la pantalla de CRUD (accedida desde el primer botón de la pantalla principal) que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el catálogo de una tienda de ropa. El recurso maneja los campos: prenda, talla, color, categoria, precio, stock y disponible. Debe permitir: (1) listar las prendas mostrando al menos prenda, categoria, precio y stock; (2) crear una prenda nueva desde un formulario con todos los campos; (3) editar una prenda existente; (4) eliminar una prenda. Usa las funciones ya provistas en ApiService (fetchItems, createItem, updateItem, deleteItem) y actualiza la lista en pantalla después de cada operación.',
+          },
+          {
+            order: 2, points: 1.5, title: 'Valor total del inventario',
+            statement: 'En la pantalla propia de la Pregunta 2 (accedida desde el segundo botón de la pantalla principal), calcula y muestra el valor total del inventario: la suma de precio × stock de todas las prendas con disponible == true.',
+          },
+          {
+            order: 3, points: 1.5, title: 'Precio promedio de prendas disponibles',
+            statement: 'En la pantalla propia de la Pregunta 3 (accedida desde el tercer botón de la pantalla principal), calcula y muestra el precio promedio de las prendas con disponible == true.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Libros', order_index: 1,
+        questions: [
+          {
+            order: 1, points: 7, title: 'CRUD de biblioteca contra la API',
+            statement: 'Construye la pantalla de CRUD (accedida desde el primer botón de la pantalla principal) que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el catálogo de una biblioteca. El recurso maneja los campos: titulo, autor, genero, precio, ejemplares, anioPublicacion y disponible. Debe permitir: (1) listar los libros mostrando al menos titulo, autor, precio y ejemplares; (2) crear un libro nuevo desde un formulario con todos los campos; (3) editar un libro existente; (4) eliminar un libro. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
+          },
+          {
+            order: 2, points: 1.5, title: 'Libros agotados',
+            statement: 'En la pantalla propia de la Pregunta 2 (accedida desde el segundo botón de la pantalla principal), cuenta cuántos libros tienen ejemplares igual a 0 ("agotados") y muestra ese total.',
+          },
+          {
+            order: 3, points: 1.5, title: 'Precio promedio del catálogo',
+            statement: 'En la pantalla propia de la Pregunta 3 (accedida desde el tercer botón de la pantalla principal), calcula y muestra el precio promedio de todos los libros del catálogo.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Farmacia', order_index: 2,
+        questions: [
+          {
+            order: 1, points: 7, title: 'CRUD de farmacia contra la API',
+            statement: 'Construye la pantalla de CRUD (accedida desde el primer botón de la pantalla principal) que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar el inventario de una farmacia. El recurso maneja los campos: medicamento, presentacion, laboratorio, precio, existencias, requiereReceta y fechaVencimiento. Debe permitir: (1) listar los medicamentos mostrando al menos medicamento, presentacion, precio y existencias; (2) crear un medicamento nuevo desde un formulario con todos los campos; (3) editar un medicamento existente; (4) eliminar un medicamento. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
+          },
+          {
+            order: 2, points: 1.5, title: 'Medicamentos con stock bajo',
+            statement: 'En la pantalla propia de la Pregunta 2 (accedida desde el segundo botón de la pantalla principal), cuenta cuántos medicamentos tienen existencias menores a 5 unidades y muestra ese total.',
+          },
+          {
+            order: 3, points: 1.5, title: 'Total con descuento por volumen',
+            statement: 'En la pantalla propia de la Pregunta 3 (accedida desde el tercer botón de la pantalla principal), calcula y muestra la suma de los precios aplicando un 10% de descuento a los medicamentos cuyas existencias sean mayores a 20 unidades (el resto sin descuento).',
+          },
+        ],
+      },
+      {
+        theme_name: 'Nómina', order_index: 3,
+        questions: [
+          {
+            order: 1, points: 7, title: 'CRUD de nómina de empleados contra la API',
+            statement: 'Construye la pantalla de CRUD (accedida desde el primer botón de la pantalla principal) que consuma la API de práctica (ver ENUNCIADO.md/lib/services/api_service.dart) para gestionar la nómina de empleados de una empresa. El recurso maneja los campos: nombre, cargo, departamento, salarioBase, antiguedad, codigoEmpleado y activo. Debe permitir: (1) listar los empleados mostrando al menos nombre, cargo, departamento y salarioBase; (2) crear un empleado nuevo desde un formulario con todos los campos; (3) editar un empleado existente; (4) eliminar un empleado. Usa las funciones ya provistas en ApiService y actualiza la lista en pantalla después de cada operación.',
+          },
+          {
+            order: 2, points: 1.5, title: 'Nómina total mensual',
+            statement: 'En la pantalla propia de la Pregunta 2 (accedida desde el segundo botón de la pantalla principal), calcula y muestra la suma de salarioBase de todos los empleados con activo == true (la nómina total mensual).',
+          },
+          {
+            order: 3, points: 1.5, title: 'Antigüedad promedio',
+            statement: 'En la pantalla propia de la Pregunta 3 (accedida desde el tercer botón de la pantalla principal), calcula y muestra la antigüedad promedio (campo antiguedad) de los empleados con activo == true.',
+          },
+        ],
+      },
+    ];
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'flutter',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'flutter';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = v.questions;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+          }),
+        );
+      }
+    }
+  }
+
+  private async seedExamTemplateFlutterRealApiSingle(admin: User) {
+    const templateName = 'Flutter — CRUD y pantallas de lógica (API real) (Ejercicio único)';
+    const description =
+      'Examen de Flutter de una sola variante (Papelería), partiendo del ejemplo de referencia ToDo ' +
+      '(ver ENUNCIADO.md): CRUD completo contra la API de práctica (7 pts) y 2 pantallas de cálculo ' +
+      '(1.5 pts c/u).';
+
+    const version: { theme_name: string; order_index: number; questions: ExamQuestion[] } = {
+      theme_name: 'Papelería',
+      order_index: 0,
+      questions: [
+        {
+          order: 1, points: 7, title: 'CRUD de papelería contra la API',
+          statement: 'Construye el CRUD (duplicando/adaptando el ejemplo de referencia ToDo, ver ENUNCIADO.md) para gestionar el inventario de una papelería, consumiendo la API de práctica de tu variante. El recurso maneja los campos: producto, marca, categoria, precio, stock, codigo y disponible. Debe permitir: (1) listar los productos mostrando al menos producto, categoria, precio y stock; (2) crear un producto nuevo desde un formulario con todos los campos; (3) editar un producto existente; (4) eliminar un producto. Actualiza la lista en pantalla después de cada operación.',
+        },
+        {
+          order: 2, points: 1.5, title: 'Valor total del inventario',
+          statement: 'En tu propia pantalla de cálculo (duplicando/adaptando `todo_stat1_screen.dart`, ver ENUNCIADO.md), calcula y muestra el valor total del inventario: la suma de precio × stock de todos los productos con disponible == true.',
+        },
+        {
+          order: 3, points: 1.5, title: 'Precio promedio de productos disponibles',
+          statement: 'En tu propia pantalla de cálculo (duplicando/adaptando `todo_stat2_screen.dart`, ver ENUNCIADO.md), calcula y muestra el precio promedio de los productos con disponible == true.',
+        },
+      ],
+    };
+
     let template = await this.examTemplatesRepo.findOne({
       where: { name: templateName },
       relations: ['versions'],
