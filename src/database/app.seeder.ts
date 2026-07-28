@@ -3329,7 +3329,7 @@ const { data: user } = useQuery({
         this.examTemplatesRepo.create({
           name: templateName,
           description,
-          language: 'react',
+          language: 'react-crud',
           created_by: admin.id,
         }),
       );
@@ -3347,7 +3347,7 @@ const { data: user } = useQuery({
     }
 
     template.description = description;
-    template.language = 'react';
+    template.language = 'react-crud';
     await this.examTemplatesRepo.save(template);
 
     const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
@@ -3406,7 +3406,7 @@ const { data: user } = useQuery({
         this.examTemplatesRepo.create({
           name: templateName,
           description,
-          language: 'react',
+          language: 'react-crud',
           created_by: admin.id,
         }),
       );
@@ -3422,7 +3422,7 @@ const { data: user } = useQuery({
     }
 
     template.description = description;
-    template.language = 'react';
+    template.language = 'react-crud';
     await this.examTemplatesRepo.save(template);
 
     const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);

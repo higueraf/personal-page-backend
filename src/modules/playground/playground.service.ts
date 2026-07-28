@@ -77,19 +77,13 @@ export class PlaygroundService {
 
   /** Builds blank exam files with only the question statement as a top comment, per the requested file mode. */
   private buildExamVersionFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion', language?: string) {
-    // NOTE: the seeded template was originally named "React — CRUD y Tests con Vitest (API real)"
-    // and later renamed in app.seeder.ts to "React — CRUD y pantallas de lógica (API real)". Since
-    // seeding upserts by name (and re-running seed does NOT rename existing rows), any environment
-    // whose DB still has the old row name would otherwise silently fall through to the generic
-    // buildReactExamFiles() below — generating the wrong app (mismatched routes/components vs. the
-    // seeded questions, which describe the CRUD+cálculo pattern from buildReactCrudExamFiles).
-    if (
-      version.examTemplate?.name?.includes('React — CRUD y pantallas de lógica') ||
-      version.examTemplate?.name?.includes('React — CRUD y Tests con Vitest (API real)')
-    ) return this.buildReactCrudExamFiles(version);
+    // Dispatch is purely by ExamTemplate.language — no name-string matching. Each React variant
+    // (CRUD-only vs. Vitest-testing vs. Cypress vs. Native) has its OWN distinct language value so
+    // there's no ambiguity, even if two templates happen to share similar/overlapping names.
     if (language === 'flutter') return this.buildFlutterExamFiles(version);
     if (language === 'nestjs') return this.buildNestExamFiles(version);
     if (language === 'react') return this.buildReactExamFiles(version);
+    if (language === 'react-crud') return this.buildReactCrudExamFiles(version);
     if (language === 'react-cypress') return this.buildReactCypressExamFiles(version);
     if (language === 'react-native') return this.buildReactNativeExamFiles(version);
 
