@@ -2736,32 +2736,33 @@ const { data: user } = useQuery({
     const templateName = 'Programación IV — React, componentes y Tests con Vitest';
     const description =
       'Examen de React + TypeScript con 4 variantes temáticas. Cada proyecto trae un componente y ' +
-      'una página CRUD de referencia YA RESUELTOS (con sus 2 archivos de test como guía) contra la ' +
-      'API real de la variante, más otra página CRUD (formulario de creación), un componente con ' +
-      'límites y 2 páginas de lógica pura (Registro, Búsqueda) — todos YA IMPLEMENTADOS, cada uno con ' +
-      'un comportamiento (validación, límites min/max) que NO está en la pieza de referencia. El ' +
-      'alumno no programa esas piezas: su único trabajo es escribir los 2 archivos de test que ' +
-      'faltan (uno de página, uno de componente), cubriendo también esos comportamientos (copiar los ' +
-      'tests de referencia cambiando nombres de variables no alcanza para cubrirlos).';
+      'una página de referencia YA RESUELTOS que consultan la API real de la variante con `fetch` ' +
+      '(junto con `Acordeon`, un componente genérico también resuelto — las 3 piezas traen su test ' +
+      'como guía de estilo) y una 2da página de lista filtrada + un badge de estado + un contador de ' +
+      'pasos, todos YA IMPLEMENTADOS, cada uno con un comportamiento (filtro + contador derivado, ' +
+      'badge según estado, paso configurable) que NO está en la pieza de referencia. El alumno no ' +
+      'programa esas piezas: su único trabajo es escribir los 3 archivos de test que faltan, ' +
+      'cubriendo también esos comportamientos (copiar los tests de referencia cambiando nombres de ' +
+      'variables no alcanza para cubrirlos).';
 
     // Cada variante solo cambia el recurso/los campos del componente+página de referencia (ver
-    // `practice-variants.config.ts`, mismas claves que usan los exámenes de Flutter/NestJS). Las 2
-    // páginas CRUD, el componente ContadorLimite y las 2 páginas de lógica (siempre implementadas,
-    // sin test excepto el par de referencia) son siempre los mismos — ver `buildReactExamFiles` en
-    // `playground.service.ts`. Las preguntas describen lo que se califica (también alimentan el
-    // rubric de `buildGradingPrompt`).
+    // `practice-variants.config.ts`, mismas claves que usan los exámenes de Flutter/NestJS). La
+    // página de lista filtrada, el badge de estado y ContadorPasos (siempre implementados, sin
+    // test excepto el trío de referencia Card/ListaPage/Acordeon) son siempre los mismos — ver
+    // `buildReactExamFiles` en `playground.service.ts`. Las preguntas describen lo que se califica
+    // (también alimentan el rubric de `buildGradingPrompt`).
     const questions: ExamQuestion[] = [
       {
-        order: 1, points: 4, title: 'Test de página (FormPage)',
-        statement: 'Escribe `<Recurso>FormPage.test.tsx` (mínimo 3 tests: al completar todos los campos de texto obligatorios y enviar el formulario, se llama a `fetch` con `POST` al endpoint correcto y el registro creado se agrega a la lista de creados; si falta algún campo de texto obligatorio se muestra un `role="alert"` y NO se llama a `fetch`).',
+        order: 1, points: 4, title: 'Tests de página filtrada',
+        statement: 'Escribe `<Recurso>ListaFiltradaPage.test.tsx` (mínimo 4 tests): mockeá `fetch` y verificá que se llama al endpoint correcto; que solo se listan (`data-testid="lista-filtrada-<recurso>"`) los registros con el campo booleano de la variante en `true`; que el contador (`data-testid="<recurso>-filtrados-count"`) muestra la cantidad correcta de resultados filtrados; y que si ningún registro cumple la condición la lista queda vacía y el contador muestra 0.',
       },
       {
-        order: 2, points: 4, title: 'Test de componente (ContadorLimite)',
-        statement: 'Escribe `ContadorLimite.test.tsx` (mínimo 4 tests: valor inicial correcto; el botón `aria-label="Sumar"` incrementa el valor de `data-testid="valor-contador"`; el valor no baja del mínimo —el botón `aria-label="Restar"` se deshabilita en el mínimo—; el valor no sube del máximo —el botón `aria-label="Sumar"` se deshabilita en el máximo—).',
+        order: 2, points: 4, title: 'Tests de componentes (Badge y ContadorPasos)',
+        statement: 'Escribe `<Recurso>Badge.test.tsx` (mínimo 3 tests: con un item con el campo booleano en `true` el badge —`data-testid="<recurso>-badge"`— muestra el texto correspondiente a "Sí"; con el campo en `false` muestra "No"; y el badge cambia de clase CSS según el estado —`badge-on` / `badge-off`—) y `ContadorPasos.test.tsx` (mínimo 3 tests: valor inicial en 0; el botón `aria-label="Sumar paso"` incrementa el valor mostrado en `data-testid="valor-pasos"` según el `paso` configurado —no siempre +1—; el botón `aria-label="Restar paso"` no baja el valor de 0 y se deshabilita en 0).',
       },
       {
         order: 3, points: 2, title: 'Cobertura de casos anti-copia',
-        statement: 'La página FormPage (validación de campos + POST) y el componente ContadorLimite (límites min/max) tienen cada uno un comportamiento que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 2 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
+        statement: 'La página `<Recurso>ListaFiltradaPage`, el componente `<Recurso>Badge` y `ContadorPasos` tienen cada uno un comportamiento (filtro + contador derivado, badge de estado según el campo booleano, paso configurable no siempre +1) que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 3 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
       },
     ];
 
@@ -2828,25 +2829,26 @@ const { data: user } = useQuery({
   private async seedExamTemplateReactSingle(admin: User) {
     const templateName = 'Programación IV — React, componentes y Tests con Vitest (Ejercicio único)';
     const description =
-      'Examen de React + TypeScript de una sola variante (Papelería): componente y página CRUD de ' +
-      'referencia YA RESUELTOS (con sus 2 archivos de test como guía) y otra página CRUD + un ' +
-      'componente con límites + 2 páginas de lógica pura, todos YA IMPLEMENTADOS, cada uno con un ' +
-      'comportamiento adicional que el alumno debe cubrir con sus propios tests.';
+      'Examen de React + TypeScript de una sola variante (Papelería): componente y página de ' +
+      'referencia YA RESUELTOS que consultan la API real de la variante con `fetch` (junto con ' +
+      '`Acordeon`, con su test como guía de estilo) y una 2da página de lista filtrada + un badge de ' +
+      'estado + un contador de pasos, todos YA IMPLEMENTADOS, cada uno con un comportamiento ' +
+      'adicional que el alumno debe cubrir con sus propios tests.';
 
     // Una sola variante (Papelería). Mismas `questions` que `seedExamTemplateReact` — ver ese
     // método para el detalle de lo que se evalúa en cada una.
     const questions: ExamQuestion[] = [
       {
-        order: 1, points: 4, title: 'Test de página (FormPage)',
-        statement: 'Escribe `<Recurso>FormPage.test.tsx` (mínimo 3 tests: al completar todos los campos de texto obligatorios y enviar el formulario, se llama a `fetch` con `POST` al endpoint correcto y el registro creado se agrega a la lista de creados; si falta algún campo de texto obligatorio se muestra un `role="alert"` y NO se llama a `fetch`).',
+        order: 1, points: 4, title: 'Tests de página filtrada',
+        statement: 'Escribe `<Recurso>ListaFiltradaPage.test.tsx` (mínimo 4 tests): mockeá `fetch` y verificá que se llama al endpoint correcto; que solo se listan (`data-testid="lista-filtrada-<recurso>"`) los registros con el campo booleano de la variante en `true`; que el contador (`data-testid="<recurso>-filtrados-count"`) muestra la cantidad correcta de resultados filtrados; y que si ningún registro cumple la condición la lista queda vacía y el contador muestra 0.',
       },
       {
-        order: 2, points: 4, title: 'Test de componente (ContadorLimite)',
-        statement: 'Escribe `ContadorLimite.test.tsx` (mínimo 4 tests: valor inicial correcto; el botón `aria-label="Sumar"` incrementa el valor de `data-testid="valor-contador"`; el valor no baja del mínimo —el botón `aria-label="Restar"` se deshabilita en el mínimo—; el valor no sube del máximo —el botón `aria-label="Sumar"` se deshabilita en el máximo—).',
+        order: 2, points: 4, title: 'Tests de componentes (Badge y ContadorPasos)',
+        statement: 'Escribe `<Recurso>Badge.test.tsx` (mínimo 3 tests: con un item con el campo booleano en `true` el badge —`data-testid="<recurso>-badge"`— muestra el texto correspondiente a "Sí"; con el campo en `false` muestra "No"; y el badge cambia de clase CSS según el estado —`badge-on` / `badge-off`—) y `ContadorPasos.test.tsx` (mínimo 3 tests: valor inicial en 0; el botón `aria-label="Sumar paso"` incrementa el valor mostrado en `data-testid="valor-pasos"` según el `paso` configurado —no siempre +1—; el botón `aria-label="Restar paso"` no baja el valor de 0 y se deshabilita en 0).',
       },
       {
         order: 3, points: 2, title: 'Cobertura de casos anti-copia',
-        statement: 'La página FormPage (validación de campos + POST) y el componente ContadorLimite (límites min/max) tienen cada uno un comportamiento que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 2 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
+        statement: 'La página `<Recurso>ListaFiltradaPage`, el componente `<Recurso>Badge` y `ContadorPasos` tienen cada uno un comportamiento (filtro + contador derivado, badge de estado según el campo booleano, paso configurable no siempre +1) que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 3 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
       },
     ];
 
@@ -3075,27 +3077,29 @@ const { data: user } = useQuery({
     const description =
       'Examen de React + TypeScript con 4 variantes temáticas. Cada proyecto trae un componente y ' +
       'una página de referencia YA RESUELTOS que consultan la API real de tu variante con `fetch` ' +
-      '(con sus 2 archivos de test como guía) y 2 páginas más (Registro, Búsqueda) y 2 componentes ' +
-      'más (ContadorLimite, ToggleControl), todos YA IMPLEMENTADOS, cada uno con un comportamiento ' +
-      '(validación, filtro, límites, estado derivado) que NO está en la pieza de referencia. El ' +
-      'alumno no programa esas piezas: su único trabajo es escribir los 4 archivos de test que ' +
-      'faltan, cubriendo también esos comportamientos (copiar los tests de referencia cambiando ' +
-      'nombres de variables no alcanza para cubrirlos).';
+      '(junto con `Acordeon`, un componente genérico también resuelto — las 3 piezas traen su test ' +
+      'como guía de estilo) y una 2da página de lista filtrada + un badge de estado + un contador de ' +
+      'pasos, todos YA IMPLEMENTADOS, cada uno con un comportamiento (filtro + contador derivado, ' +
+      'badge según estado, paso configurable) que NO está en la pieza de referencia. El alumno no ' +
+      'programa esas piezas: su único trabajo es escribir los 3 archivos de test que faltan, ' +
+      'cubriendo también esos comportamientos (copiar los tests de referencia cambiando nombres de ' +
+      'variables no alcanza para cubrirlos).';
 
-    // Mismas `questions` que seedExamTemplateReact — ver ese método para el detalle de lo que se
-    // evalúa en cada una.
+    // Mismas `questions` que seedExamTemplateReact (comparten el mismo generador
+    // `buildReactExamFiles` en playground.service.ts, dispatcheado por `language === 'react'`) — ver
+    // ese método para el detalle de lo que se evalúa en cada una.
     const questions: ExamQuestion[] = [
       {
-        order: 1, points: 4, title: 'Tests de páginas',
-        statement: 'Escribe `RegistroPage.test.tsx` (mínimo 3 tests: la lista de contactos inicia vacía; al completar nombre y edad válidos y enviar el formulario, el contacto se agrega a `data-testid="lista-contactos"` y el formulario se limpia; al enviar con nombre vacío o edad inválida —no numérica o menor/igual a 0— se muestra un `role="alert"` y NO se agrega nada) y `BusquedaPage.test.tsx` (mínimo 3 tests: se renderizan los 4 productos iniciales; al escribir un texto en el input `#filtro` la lista se filtra, sin distinguir mayúsculas/minúsculas, y `data-testid="contador-resultados"` refleja la cantidad correcta; si el filtro no coincide con ningún producto se muestra "0 resultado(s)").',
+        order: 1, points: 4, title: 'Tests de página filtrada',
+        statement: 'Escribe `<Recurso>ListaFiltradaPage.test.tsx` (mínimo 4 tests): mockeá `fetch` y verificá que se llama al endpoint correcto; que solo se listan (`data-testid="lista-filtrada-<recurso>"`) los registros con el campo booleano de la variante en `true`; que el contador (`data-testid="<recurso>-filtrados-count"`) muestra la cantidad correcta de resultados filtrados; y que si ningún registro cumple la condición la lista queda vacía y el contador muestra 0.',
       },
       {
-        order: 2, points: 4, title: 'Tests de componentes',
-        statement: 'Escribe `ContadorLimite.test.tsx` (mínimo 4 tests: valor inicial correcto; el botón `aria-label="Sumar"` incrementa el valor de `data-testid="valor-contador"`; el valor no baja del mínimo —el botón `aria-label="Restar"` se deshabilita en el mínimo—; el valor no sube del máximo —el botón `aria-label="Sumar"` se deshabilita en el máximo—) y `ToggleControl.test.tsx` (mínimo 3 tests: el input `aria-label="Campo editable"` empieza deshabilitado; al marcar el checkbox `#habilitar` el campo se habilita; al desmarcarlo el campo vuelve a deshabilitarse).',
+        order: 2, points: 4, title: 'Tests de componentes (Badge y ContadorPasos)',
+        statement: 'Escribe `<Recurso>Badge.test.tsx` (mínimo 3 tests: con un item con el campo booleano en `true` el badge —`data-testid="<recurso>-badge"`— muestra el texto correspondiente a "Sí"; con el campo en `false` muestra "No"; y el badge cambia de clase CSS según el estado —`badge-on` / `badge-off`—) y `ContadorPasos.test.tsx` (mínimo 3 tests: valor inicial en 0; el botón `aria-label="Sumar paso"` incrementa el valor mostrado en `data-testid="valor-pasos"` según el `paso` configurado —no siempre +1—; el botón `aria-label="Restar paso"` no baja el valor de 0 y se deshabilita en 0).',
       },
       {
         order: 3, points: 2, title: 'Cobertura de casos anti-copia',
-        statement: 'RegistroPage, BusquedaPage, ContadorLimite y ToggleControl tienen cada uno un comportamiento (validación de formulario, filtro + contador derivado, límites min/max, estado derivado de un checkbox) que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 4 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
+        statement: 'La página `<Recurso>ListaFiltradaPage`, el componente `<Recurso>Badge` y `ContadorPasos` tienen cada uno un comportamiento (filtro + contador derivado, badge de estado según el campo booleano, paso configurable no siempre +1) que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 3 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
       },
     ];
 
@@ -3171,23 +3175,24 @@ const { data: user } = useQuery({
     const templateName = 'React — CRUD y Tests con Vitest (API real) (Ejercicio único)';
     const description =
       'Examen de React + TypeScript de una sola variante (Papelería): componente y página de ' +
-      'referencia YA RESUELTOS que consultan la API real de tu variante con `fetch` (con sus 2 ' +
-      'archivos de test como guía) y 2 páginas + 2 componentes más YA IMPLEMENTADOS, cada uno con ' +
-      'un comportamiento adicional que el alumno debe cubrir con sus propios tests.';
+      'referencia YA RESUELTOS que consultan la API real de tu variante con `fetch` (junto con ' +
+      '`Acordeon`, con su test como guía de estilo) y una 2da página de lista filtrada + un badge de ' +
+      'estado + un contador de pasos, todos YA IMPLEMENTADOS, cada uno con un comportamiento ' +
+      'adicional que el alumno debe cubrir con sus propios tests.';
 
     // Mismas `questions` que seedExamTemplateReactRealApi — ver ese método para el detalle.
     const questions: ExamQuestion[] = [
       {
-        order: 1, points: 4, title: 'Tests de páginas',
-        statement: 'Escribe `RegistroPage.test.tsx` (mínimo 3 tests: la lista de contactos inicia vacía; al completar nombre y edad válidos y enviar el formulario, el contacto se agrega a `data-testid="lista-contactos"` y el formulario se limpia; al enviar con nombre vacío o edad inválida —no numérica o menor/igual a 0— se muestra un `role="alert"` y NO se agrega nada) y `BusquedaPage.test.tsx` (mínimo 3 tests: se renderizan los 4 productos iniciales; al escribir un texto en el input `#filtro` la lista se filtra, sin distinguir mayúsculas/minúsculas, y `data-testid="contador-resultados"` refleja la cantidad correcta; si el filtro no coincide con ningún producto se muestra "0 resultado(s)").',
+        order: 1, points: 4, title: 'Tests de página filtrada',
+        statement: 'Escribe `<Recurso>ListaFiltradaPage.test.tsx` (mínimo 4 tests): mockeá `fetch` y verificá que se llama al endpoint correcto; que solo se listan (`data-testid="lista-filtrada-<recurso>"`) los registros con el campo booleano de la variante en `true`; que el contador (`data-testid="<recurso>-filtrados-count"`) muestra la cantidad correcta de resultados filtrados; y que si ningún registro cumple la condición la lista queda vacía y el contador muestra 0.',
       },
       {
-        order: 2, points: 4, title: 'Tests de componentes',
-        statement: 'Escribe `ContadorLimite.test.tsx` (mínimo 4 tests: valor inicial correcto; el botón `aria-label="Sumar"` incrementa el valor de `data-testid="valor-contador"`; el valor no baja del mínimo —el botón `aria-label="Restar"` se deshabilita en el mínimo—; el valor no sube del máximo —el botón `aria-label="Sumar"` se deshabilita en el máximo—) y `ToggleControl.test.tsx` (mínimo 3 tests: el input `aria-label="Campo editable"` empieza deshabilitado; al marcar el checkbox `#habilitar` el campo se habilita; al desmarcarlo el campo vuelve a deshabilitarse).',
+        order: 2, points: 4, title: 'Tests de componentes (Badge y ContadorPasos)',
+        statement: 'Escribe `<Recurso>Badge.test.tsx` (mínimo 3 tests: con un item con el campo booleano en `true` el badge —`data-testid="<recurso>-badge"`— muestra el texto correspondiente a "Sí"; con el campo en `false` muestra "No"; y el badge cambia de clase CSS según el estado —`badge-on` / `badge-off`—) y `ContadorPasos.test.tsx` (mínimo 3 tests: valor inicial en 0; el botón `aria-label="Sumar paso"` incrementa el valor mostrado en `data-testid="valor-pasos"` según el `paso` configurado —no siempre +1—; el botón `aria-label="Restar paso"` no baja el valor de 0 y se deshabilita en 0).',
       },
       {
         order: 3, points: 2, title: 'Cobertura de casos anti-copia',
-        statement: 'RegistroPage, BusquedaPage, ContadorLimite y ToggleControl tienen cada uno un comportamiento (validación de formulario, filtro + contador derivado, límites min/max, estado derivado de un checkbox) que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 4 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
+        statement: 'La página `<Recurso>ListaFiltradaPage`, el componente `<Recurso>Badge` y `ContadorPasos` tienen cada uno un comportamiento (filtro + contador derivado, badge de estado según el campo booleano, paso configurable no siempre +1) que NO existe en la página/componente de referencia: los tests que solo copian los del recurso de referencia cambiando nombres no los cubren y pierden estos puntos. Se evalúa que los 3 archivos de test incluyan casos explícitos para ese comportamiento adicional de cada pieza.',
       },
     ];
 

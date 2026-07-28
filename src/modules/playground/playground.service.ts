@@ -3816,16 +3816,33 @@ flutter:
     return this.projectRepo.remove(project);
   }
   
+  // Ventana de deduplicación: `fullscreenchange`, `visibilitychange` y `blur` son 3 listeners de
+  // navegador independientes que suelen dispararse casi simultáneamente por UNA sola acción real
+  // del alumno (ej. un solo Alt+Tab dispara `blur` + `visibilitychange` con <50ms de diferencia).
+  // Sin este umbral, un mismo incidente se cuenta 2-3 veces en `cheating_logs`, inflando el
+  // contador de infracciones que ve el profesor. Se ignora (no se persiste) cualquier evento nuevo
+  // que llegue a menos de este umbral del último evento ya logueado, sin importar el `action`.
+  private static readonly CHEAT_LOG_DEDUPE_WINDOW_MS = 2000;
+
   async logCheat(projectId: string, userId: string, action: string, details?: string) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();
 
-    const timestamp = new Date().toISOString();
+    const now = new Date();
     const currentLogs = Array.isArray(project.cheating_logs) ? project.cheating_logs : [];
-    
-    currentLogs.push({ timestamp, action, details });
+
+    const lastLog = currentLogs[currentLogs.length - 1];
+    if (lastLog) {
+      const lastTs = new Date(lastLog.timestamp).getTime();
+      if (now.getTime() - lastTs < PlaygroundService.CHEAT_LOG_DEDUPE_WINDOW_MS) {
+        // Mismo incidente real ya registrado por otro listener hace instantes: no duplicar.
+        return { status: 'deduped' };
+      }
+    }
+
+    currentLogs.push({ timestamp: now.toISOString(), action, details });
     project.cheating_logs = currentLogs;
-    
+
     await this.projectRepo.save(project);
     return { status: 'logged' };
   }

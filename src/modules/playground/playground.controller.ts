@@ -402,6 +402,8 @@ export class PlaygroundController {
   <false/>
   <key>enablePrivateClipboard</key>
   <${allowCopyPaste ? 'false' : 'true'}/>
+  <key>clipboardPolicy</key>
+  <integer>${allowCopyPaste ? 0 : 2}</integer>
   <key>newBrowserWindowByLinkPolicy</key>
   <integer>2</integer>
   <key>URLFilterEnable</key>
