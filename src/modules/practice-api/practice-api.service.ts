@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PracticeItem } from '../../entities/practice-item.entity';
@@ -7,6 +12,13 @@ import { getVariantConfig } from './practice-variants.config';
 function toResponse(item: PracticeItem) {
   return { id: item.id, ...item.data };
 }
+
+// Regla de negocio nueva (distinta a Flutter/React, que hoy son CRUD 100%
+// genérico): estas variantes exigen unicidad de un campo al crear/editar.
+const UNIQUE_FIELD_BY_VARIANT: Record<string, string> = {
+  vehiculos: 'placa',
+  mascotas: 'codigo',
+};
 
 @Injectable()
 export class PracticeApiService {
@@ -37,7 +49,9 @@ export class PracticeApiService {
   }
 
   async create(type: string, body: Record<string, any>) {
+    await this.ensureSeeded(type);
     const { id, type: _ignored, ...data } = body ?? {};
+    await this.assertUnique(type, data, null);
     const item = this.itemRepo.create({ type, data });
     return toResponse(await this.itemRepo.save(item));
   }
@@ -46,13 +60,20 @@ export class PracticeApiService {
     const existing = await this.itemRepo.findOne({ where: { id, type } });
     if (!existing) throw new NotFoundException('Ítem no encontrado');
     const { id: _ignoredId, type: _ignoredType, ...data } = body ?? {};
-    existing.data = { ...existing.data, ...data };
+    const merged = { ...existing.data, ...data };
+    await this.assertUnique(type, merged, id);
+    existing.data = merged;
     return toResponse(await this.itemRepo.save(existing));
   }
 
   async remove(type: string, id: string) {
     const existing = await this.itemRepo.findOne({ where: { id, type } });
     if (!existing) throw new NotFoundException('Ítem no encontrado');
+    if (type === 'restaurante' && existing.data?.disponible === true) {
+      throw new BadRequestException(
+        'No se puede eliminar un plato disponible; márcalo como no disponible primero.',
+      );
+    }
     await this.itemRepo.delete(id);
     return { success: true };
   }
@@ -61,5 +82,38 @@ export class PracticeApiService {
     await this.itemRepo.delete({ type });
     await this.ensureSeeded(type);
     return this.list(type);
+  }
+
+  /** Filtra los registros con `disponible === true` (variantes `vehiculos`/`mascotas`). */
+  async disponibles(type: string) {
+    await this.ensureSeeded(type);
+    const items = await this.itemRepo.find({ where: { type }, order: { created_at: 'ASC' } });
+    return items.filter((i) => i.data?.disponible === true).map(toResponse);
+  }
+
+  /** Resumen agregado (variante `restaurante`): total, precio promedio y destacados. */
+  async resumen(type: string) {
+    await this.ensureSeeded(type);
+    const items = await this.itemRepo.find({ where: { type } });
+    const total = items.length;
+    const precios = items.map((i) => Number(i.data?.precio) || 0);
+    const precioPromedio = total ? precios.reduce((a, b) => a + b, 0) / total : 0;
+    const destacados = items.filter((i) => i.data?.destacado === true).length;
+    return { total, precioPromedio: Math.round(precioPromedio * 100) / 100, destacados };
+  }
+
+  private async assertUnique(type: string, data: Record<string, any>, excludeId: string | null) {
+    const field = UNIQUE_FIELD_BY_VARIANT[type];
+    if (!field || data[field] == null) return;
+    const siblings = await this.itemRepo.find({ where: { type } });
+    const duplicate = siblings.find(
+      (s) =>
+        s.id !== excludeId &&
+        String(s.data?.[field]).toLowerCase() === String(data[field]).toLowerCase(),
+    );
+    if (duplicate) {
+      const label = field === 'placa' ? 'esa placa' : 'ese código';
+      throw new ConflictException(`Ya existe un registro con ${label}.`);
+    }
   }
 }

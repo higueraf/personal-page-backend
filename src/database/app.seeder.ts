@@ -84,6 +84,10 @@ export class AppSeeder {
     await this.seedExamTemplateReactCrudRealApiSingle(adminUser);
     await this.seedExamTemplateReactCypress(adminUser);
     await this.seedExamTemplateReactCypressSingle(adminUser);
+    await this.seedExamTemplateDom(adminUser);
+    await this.seedExamTemplateDomSingle(adminUser);
+    await this.seedExamTemplateReactNativeBusinessRules(adminUser);
+    await this.seedExamTemplateReactNativeBusinessRulesSingle(adminUser);
 
     return { ok: true };
   }
@@ -3063,6 +3067,361 @@ const { data: user } = useQuery({
           theme_name: version.theme_name,
           order_index: version.order_index,
           questions,
+        }),
+      );
+    }
+  }
+
+  // ── Examen HTML/CSS/JS — manipulación del DOM (API real, con reglas de negocio) ──
+  private async seedExamTemplateDom(admin: User) {
+    const templateName = 'Programación IV — HTML/CSS/JS, manipulación del DOM (API real)';
+    const description =
+      'Examen de HTML/CSS/JS puro (sin frameworks) con 2 variantes temáticas (Vehículos, ' +
+      'Restaurante). El proyecto trae un ejemplo de referencia ("Notas") YA RESUELTO pero ' +
+      'deliberadamente simple (listar/crear/eliminar, sin edición ni búsqueda) contra otra API ' +
+      'distinta a la asignada. El alumno debe duplicar y adaptar ese mismo patrón en `src/mi-crud.js` ' +
+      '(CRUD completo contra su API asignada, 6 pts) y 2 cálculos propios (`src/calculo1.js`/' +
+      '`src/calculo2.js`, 2 pts c/u), manejando además el error de la regla de negocio específica ' +
+      'de su variante. No hay tests automáticos: la corrección es manual (código + preview del DOM).';
+
+    const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
+      {
+        theme_name: 'Vehículos', order_index: 0,
+        questions: [
+          {
+            order: 1, points: 6, title: 'CRUD de vehículos contra la API',
+            statement: 'Completa las funciones `guardarMiItem`, `cargarEdicionMi` y `eliminarMiItem` en `src/mi-crud.js` (duplicando/adaptando el patrón ya resuelto en `src/referencia.js`) para gestionar un lote de vehículos: marca, modelo, anio, precio, kilometraje, placa y disponible. Debe listar, crear, editar y eliminar contra la API de tu variante, refrescando la tabla después de cada operación. La API rechaza con error 409 la creación/edición de un vehículo con una `placa` ya usada por otro registro: tu UI debe mostrarle ese mensaje de error al usuario (por ejemplo con un `alert` o un `<div>` de error) en vez de fallar silenciosamente.',
+          },
+          {
+            order: 2, points: 2, title: 'Vehículos disponibles y precio promedio',
+            statement: 'Completa `calcularPregunta2` en `src/calculo1.js` para calcular y mostrar, sobre los vehículos con `disponible == true`: la cantidad total y el precio promedio.',
+          },
+          {
+            order: 3, points: 2, title: 'Vehículo más caro y más barato',
+            statement: 'Completa `calcularPregunta3` en `src/calculo2.js` para encontrar, entre los vehículos con `disponible == true`, cuál es el más caro y cuál el más barato, mostrando marca, modelo y precio de cada uno.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Restaurante', order_index: 1,
+        questions: [
+          {
+            order: 1, points: 6, title: 'CRUD de platos de restaurante contra la API',
+            statement: 'Completa las funciones `guardarMiItem`, `cargarEdicionMi` y `eliminarMiItem` en `src/mi-crud.js` (duplicando/adaptando el patrón ya resuelto en `src/referencia.js`) para gestionar el menú de un restaurante: plato, categoria, precio, tiempoPreparacion, ingredientePrincipal, destacado y disponible. Debe listar, crear, editar y eliminar contra la API de tu variante, refrescando la tabla después de cada operación. La API rechaza con error 400 el intento de eliminar un plato con `disponible == true`: tu UI debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente (debe marcarse primero como no disponible antes de poder eliminarlo).',
+          },
+          {
+            order: 2, points: 2, title: 'Platos destacados y precio promedio',
+            statement: 'Completa `calcularPregunta2` en `src/calculo1.js` para calcular y mostrar: la cantidad de platos con `destacado == true` y el precio promedio de todo el menú.',
+          },
+          {
+            order: 3, points: 2, title: 'Tiempo total de preparación de platos disponibles',
+            statement: 'Completa `calcularPregunta3` en `src/calculo2.js` para calcular y mostrar la suma de `tiempoPreparacion` de todos los platos con `disponible == true`.',
+          },
+        ],
+      },
+    ];
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'html',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'html';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = v.questions;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+          }),
+        );
+      }
+    }
+  }
+
+  private async seedExamTemplateDomSingle(admin: User) {
+    const templateName =
+      'Programación IV — HTML/CSS/JS, manipulación del DOM (API real) (Ejercicio único)';
+    const description =
+      'Examen de HTML/CSS/JS puro (sin frameworks) de una sola variante (Mascotas). El proyecto ' +
+      'trae un ejemplo de referencia ("Notas") YA RESUELTO pero deliberadamente simple (listar/' +
+      'crear/eliminar, sin edición ni búsqueda) contra otra API distinta a la asignada. El alumno ' +
+      'debe duplicar y adaptar ese mismo patrón en `src/mi-crud.js` (CRUD completo contra su API ' +
+      'asignada, 6 pts) y 2 cálculos propios (`src/calculo1.js`/`src/calculo2.js`, 2 pts c/u), ' +
+      'manejando además el error de la regla de negocio de su variante. No hay tests automáticos: ' +
+      'la corrección es manual (código + preview del DOM).';
+
+    const version: { theme_name: string; order_index: number; questions: ExamQuestion[] } = {
+      theme_name: 'Mascotas',
+      order_index: 0,
+      questions: [
+        {
+          order: 1, points: 6, title: 'CRUD de mascotas contra la API',
+          statement: 'Completa las funciones `guardarMiItem`, `cargarEdicionMi` y `eliminarMiItem` en `src/mi-crud.js` (duplicando/adaptando el patrón ya resuelto en `src/referencia.js`) para gestionar un registro de mascotas en adopción: nombre, especie, raza, edad, peso, codigo y disponible. Debe listar, crear, editar y eliminar contra la API de tu variante, refrescando la tabla después de cada operación. La API rechaza con error 409 la creación/edición de una mascota con un `codigo` ya usado por otro registro: tu UI debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
+        },
+        {
+          order: 2, points: 2, title: 'Mascotas disponibles y edad promedio',
+          statement: 'Completa `calcularPregunta2` en `src/calculo1.js` para calcular y mostrar, sobre las mascotas con `disponible == true`: la cantidad total y la edad promedio.',
+        },
+        {
+          order: 3, points: 2, title: 'Peso total de mascotas no disponibles',
+          statement: 'Completa `calcularPregunta3` en `src/calculo2.js` para calcular y mostrar la suma de `peso` de todas las mascotas con `disponible == false`.',
+        },
+      ],
+    };
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'html',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions: version.questions,
+        }),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'html';
+    await this.examTemplatesRepo.save(template);
+
+    const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
+    if (existing) {
+      existing.order_index = version.order_index;
+      existing.questions = version.questions;
+      await this.examVersionsRepo.save(existing);
+    } else {
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions: version.questions,
+        }),
+      );
+    }
+  }
+
+  // ── Examen React Native — CRUD con reglas de negocio (API real, variantes nuevas) ──
+  private async seedExamTemplateReactNativeBusinessRules(admin: User) {
+    // Reutiliza el generador ya existente `buildReactNativeExamFiles` (genérico sobre cualquier
+    // variante de PRACTICE_VARIANTS) — solo se agregan variantes/preguntas nuevas, sin tocar código.
+    const templateName = 'Programación IV — React Native, CRUD con reglas de negocio (API real)';
+    const description =
+      'Examen de React Native (previsualizado con Expo Snack, un solo archivo `App.tsx`) con 2 ' +
+      'variantes temáticas (Vehículos, Restaurante), distintas de las de "React Native — CRUD y ' +
+      'pantallas de lógica". El proyecto trae una app "Tareas" de referencia YA RESUELTA (CRUD ' +
+      'completo + 2 pantallas de cálculo) contra otra API distinta a la asignada. El alumno debe ' +
+      'duplicar y adaptar ese mismo patrón en 3 pantallas propias (CRUD contra su API asignada + ' +
+      '2 pantallas de cálculo), manejando además el error de la regla de negocio de su variante. ' +
+      'No hay tests automáticos: la corrección es manual (código + preview).';
+
+    const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
+      {
+        theme_name: 'Vehículos', order_index: 0,
+        questions: [
+          {
+            order: 1, points: 6, title: 'CRUD de vehículos contra tu API asignada',
+            statement: 'Completá la pantalla `MiAutosScreen` (en `App.tsx`) para que liste, cree, edite y elimine vehículos (marca, modelo, anio, precio, kilometraje, placa, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaScreen`. La API rechaza con error 409 la creación/edición de un vehículo con una `placa` ya usada por otro registro: tu pantalla debe mostrarle ese mensaje de error al usuario (por ejemplo con un `Alert.alert` o un texto de error en pantalla) en vez de fallar silenciosamente.',
+          },
+          {
+            order: 2, points: 2, title: 'Vehículos disponibles y precio promedio',
+            statement: 'Completá `Pregunta2Screen` (siguiendo el patrón de `ReferenciaPromedioScreen`) para calcular y mostrar, sobre los vehículos con `disponible == true`: la cantidad total y el precio promedio.',
+          },
+          {
+            order: 3, points: 2, title: 'Vehículo más caro y más barato',
+            statement: 'Completá `Pregunta3Screen` (siguiendo el patrón de `ReferenciaBusquedaScreen`) para encontrar, entre los vehículos con `disponible == true`, cuál es el más caro y cuál el más barato, mostrando marca, modelo y precio de cada uno.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Restaurante', order_index: 1,
+        questions: [
+          {
+            order: 1, points: 6, title: 'CRUD de platos de restaurante contra tu API asignada',
+            statement: 'Completá la pantalla `MiPlatosScreen` (en `App.tsx`) para que liste, cree, edite y elimine platos (plato, categoria, precio, tiempoPreparacion, ingredientePrincipal, destacado, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaScreen`. La API rechaza con error 400 el intento de eliminar un plato con `disponible == true` (debe marcarse primero como no disponible): tu pantalla debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
+          },
+          {
+            order: 2, points: 2, title: 'Platos destacados y precio promedio',
+            statement: 'Completá `Pregunta2Screen` (siguiendo el patrón de `ReferenciaPromedioScreen`) para calcular y mostrar: la cantidad de platos con `destacado == true` y el precio promedio de todo el menú.',
+          },
+          {
+            order: 3, points: 2, title: 'Tiempo total de preparación de platos disponibles',
+            statement: 'Completá `Pregunta3Screen` (siguiendo el patrón de `ReferenciaBusquedaScreen`) para calcular y mostrar la suma de `tiempoPreparacion` de todos los platos con `disponible == true`.',
+          },
+        ],
+      },
+    ];
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react-native',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react-native';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = v.questions;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+          }),
+        );
+      }
+    }
+  }
+
+  private async seedExamTemplateReactNativeBusinessRulesSingle(admin: User) {
+    const templateName =
+      'Programación IV — React Native, CRUD con reglas de negocio (API real) (Ejercicio único)';
+    const description =
+      'Examen de React Native (previsualizado con Expo Snack, un solo archivo `App.tsx`) de una ' +
+      'sola variante (Mascotas). El proyecto trae una app "Tareas" de referencia YA RESUELTA (CRUD ' +
+      'completo + 2 pantallas de cálculo) contra otra API distinta a la asignada. El alumno debe ' +
+      'duplicar y adaptar ese mismo patrón en 3 pantallas propias (CRUD contra su API asignada + ' +
+      '2 pantallas de cálculo), manejando además el error de la regla de negocio de su variante. ' +
+      'No hay tests automáticos: la corrección es manual (código + preview).';
+
+    const version: { theme_name: string; order_index: number; questions: ExamQuestion[] } = {
+      theme_name: 'Mascotas',
+      order_index: 0,
+      questions: [
+        {
+          order: 1, points: 6, title: 'CRUD de mascotas contra tu API asignada',
+          statement: 'Completá la pantalla `MiMascotasScreen` (en `App.tsx`) para que liste, cree, edite y elimine mascotas en adopción (nombre, especie, raza, edad, peso, codigo, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaScreen`. La API rechaza con error 409 la creación/edición de una mascota con un `codigo` ya usado por otro registro: tu pantalla debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
+        },
+        {
+          order: 2, points: 2, title: 'Mascotas disponibles y edad promedio',
+          statement: 'Completá `Pregunta2Screen` (siguiendo el patrón de `ReferenciaPromedioScreen`) para calcular y mostrar, sobre las mascotas con `disponible == true`: la cantidad total y la edad promedio.',
+        },
+        {
+          order: 3, points: 2, title: 'Peso total de mascotas no disponibles',
+          statement: 'Completá `Pregunta3Screen` (siguiendo el patrón de `ReferenciaBusquedaScreen`) para calcular y mostrar la suma de `peso` de todas las mascotas con `disponible == false`.',
+        },
+      ],
+    };
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react-native',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions: version.questions,
+        }),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react-native';
+    await this.examTemplatesRepo.save(template);
+
+    const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
+    if (existing) {
+      existing.order_index = version.order_index;
+      existing.questions = version.questions;
+      await this.examVersionsRepo.save(existing);
+    } else {
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions: version.questions,
         }),
       );
     }

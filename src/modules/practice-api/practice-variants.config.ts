@@ -142,6 +142,63 @@ export const PRACTICE_VARIANTS: Record<string, VariantConfig> = {
       { producto: 'Calculadora científica', marca: 'Casio', categoria: 'Electrónica', precio: 25.0, stock: 8, codigo: 'PAP-005', disponible: true },
     ],
   },
+  vehiculos: {
+    resource: 'autos',
+    fields: [
+      { key: 'marca', type: 'string', label: 'Marca' },
+      { key: 'modelo', type: 'string', label: 'Modelo' },
+      { key: 'anio', type: 'int', label: 'Año' },
+      { key: 'precio', type: 'double', label: 'Precio' },
+      { key: 'kilometraje', type: 'int', label: 'Kilometraje' },
+      { key: 'placa', type: 'string', label: 'Placa' },
+      { key: 'disponible', type: 'bool', label: 'Disponible' },
+    ],
+    seeds: [
+      { marca: 'Toyota', modelo: 'Corolla', anio: 2022, precio: 22000.0, kilometraje: 15000, placa: 'PBA-1234', disponible: true },
+      { marca: 'Chevrolet', modelo: 'Sail', anio: 2019, precio: 12500.0, kilometraje: 48000, placa: 'PCD-5566', disponible: true },
+      { marca: 'Kia', modelo: 'Sportage', anio: 2023, precio: 28500.0, kilometraje: 5000, placa: 'PEF-7788', disponible: true },
+      { marca: 'Hyundai', modelo: 'Tucson', anio: 2020, precio: 19500.0, kilometraje: 32000, placa: 'PGH-9900', disponible: false },
+      { marca: 'Nissan', modelo: 'Versa', anio: 2021, precio: 15800.0, kilometraje: 21000, placa: 'PIJ-2211', disponible: true },
+    ],
+  },
+  restaurante: {
+    resource: 'platos',
+    fields: [
+      { key: 'plato', type: 'string', label: 'Plato' },
+      { key: 'categoria', type: 'string', label: 'Categoría' },
+      { key: 'precio', type: 'double', label: 'Precio' },
+      { key: 'tiempoPreparacion', type: 'int', label: 'Tiempo de preparación (min)' },
+      { key: 'ingredientePrincipal', type: 'string', label: 'Ingrediente principal' },
+      { key: 'destacado', type: 'bool', label: 'Destacado' },
+      { key: 'disponible', type: 'bool', label: 'Disponible' },
+    ],
+    seeds: [
+      { plato: 'Seco de pollo', categoria: 'Plato fuerte', precio: 6.5, tiempoPreparacion: 25, ingredientePrincipal: 'Pollo', destacado: true, disponible: true },
+      { plato: 'Ceviche de camarón', categoria: 'Entrada', precio: 8.0, tiempoPreparacion: 15, ingredientePrincipal: 'Camarón', destacado: true, disponible: true },
+      { plato: 'Ensalada César', categoria: 'Entrada', precio: 4.5, tiempoPreparacion: 10, ingredientePrincipal: 'Lechuga', destacado: false, disponible: true },
+      { plato: 'Lomo saltado', categoria: 'Plato fuerte', precio: 7.5, tiempoPreparacion: 20, ingredientePrincipal: 'Res', destacado: false, disponible: false },
+      { plato: 'Torta de chocolate', categoria: 'Postre', precio: 3.5, tiempoPreparacion: 5, ingredientePrincipal: 'Chocolate', destacado: true, disponible: true },
+    ],
+  },
+  mascotas: {
+    resource: 'mascotas',
+    fields: [
+      { key: 'nombre', type: 'string', label: 'Nombre' },
+      { key: 'especie', type: 'string', label: 'Especie' },
+      { key: 'raza', type: 'string', label: 'Raza' },
+      { key: 'edad', type: 'int', label: 'Edad (años)' },
+      { key: 'peso', type: 'double', label: 'Peso (kg)' },
+      { key: 'codigo', type: 'string', label: 'Código' },
+      { key: 'disponible', type: 'bool', label: 'Disponible para adopción' },
+    ],
+    seeds: [
+      { nombre: 'Firulais', especie: 'Perro', raza: 'Mestizo', edad: 2, peso: 14.5, codigo: 'MAS-001', disponible: true },
+      { nombre: 'Michi', especie: 'Gato', raza: 'Siamés', edad: 1, peso: 3.2, codigo: 'MAS-002', disponible: true },
+      { nombre: 'Rocky', especie: 'Perro', raza: 'Pastor Alemán', edad: 4, peso: 28.0, codigo: 'MAS-003', disponible: false },
+      { nombre: 'Nube', especie: 'Gato', raza: 'Mestizo', edad: 3, peso: 4.1, codigo: 'MAS-004', disponible: true },
+      { nombre: 'Toby', especie: 'Perro', raza: 'Beagle', edad: 5, peso: 12.0, codigo: 'MAS-005', disponible: false },
+    ],
+  },
 };
 
 export const GENERIC_VARIANT: VariantConfig = {

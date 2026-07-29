@@ -31,6 +31,20 @@ export class PracticeApiController {
     return this.service.list(variant);
   }
 
+  // Rutas literales — deben ir ANTES de `:id` para que Nest no las trate
+  // como un id. Reglas de negocio nuevas (distintas a las de Flutter/React,
+  // que hoy son 100% CRUD genérico): filtrado por disponibilidad y resumen
+  // agregado, usados por las variantes `vehiculos`/`restaurante`/`mascotas`.
+  @Get('disponibles')
+  disponibles(@Param('variant') variant: string) {
+    return this.service.disponibles(variant);
+  }
+
+  @Get('resumen')
+  resumen(@Param('variant') variant: string) {
+    return this.service.resumen(variant);
+  }
+
   @Get(':id')
   getOne(@Param('variant') variant: string, @Param('id') id: string) {
     return this.service.getOne(variant, id);

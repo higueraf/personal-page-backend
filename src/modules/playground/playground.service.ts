@@ -86,6 +86,7 @@ export class PlaygroundService {
     if (language === 'react-crud') return this.buildReactCrudExamFiles(version);
     if (language === 'react-cypress') return this.buildReactCypressExamFiles(version);
     if (language === 'react-native') return this.buildReactNativeExamFiles(version);
+    if (language === 'html') return this.buildHtmlDomExamFiles(version);
 
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
 
@@ -3594,6 +3595,342 @@ flutter:
     return [
       { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
       { name: 'App.tsx', path: '/App.tsx', content: appTsx, is_folder: false },
+    ];
+  }
+
+  /**
+   * Andamiaje de HTML/CSS/JS (manipulación del DOM, sin frameworks): el proyecto
+   * trae un ejemplo de referencia "Notas" YA RESUELTO pero deliberadamente MUY
+   * simple (listar/crear/eliminar — sin editar, sin buscar) contra una API de
+   * referencia distinta a la asignada (`/todo-api/todos`). En `src/mi-crud.js`
+   * solo el LISTADO del recurso propio ya viene resuelto; el alumno debe
+   * completar crear/editar/eliminar (incluyendo el manejo del error de la regla
+   * de negocio de su variante) y las 2 secciones de cálculo en
+   * `src/calculo1.js` / `src/calculo2.js`. Sin tests automáticos — corrección
+   * manual (código + preview), igual que Flutter RealApi / React Native.
+   */
+  private buildHtmlDomExamFiles(version: ExamVersion) {
+    const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
+    const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0);
+    const typeSlug = slugify(version.theme_name);
+    const variant = getVariantConfig(typeSlug);
+    const fields = variant.fields;
+    const resource = variant.resource;
+    const ClassName = cap(resource);
+    const apiBase = 'https://api.franciscohiguera.site/api';
+    const endpoint = `${apiBase}/practice-api/${typeSlug}/${resource}`;
+    const todoEndpoint = `${apiBase}/todo-api/todos`;
+
+    const sampleRecord = variant.seeds[0] ?? {};
+    const sampleJson = JSON.stringify(sampleRecord, null, 2);
+
+    const businessRuleNotes: Record<string, string> = {
+      vehiculos:
+        'Si creás o editás un vehículo con una **placa** que ya existe en tu variante, la API responde **409 (Conflict)** con el mensaje `Ya existe un registro con esa placa.` — tu pantalla debe mostrar ese mensaje, no fallar en silencio.',
+      restaurante:
+        'Si intentás **eliminar** un plato con `disponible = true`, la API responde **400 (Bad Request)** con el mensaje `No se puede eliminar un plato disponible; márcalo como no disponible primero.` — mostrá ese mensaje y no quites la fila hasta que el usuario lo marque como no disponible y reintente.',
+      mascotas:
+        'Si creás o editás una mascota con un **código** que ya existe en tu variante, la API responde **409 (Conflict)** con el mensaje `Ya existe un registro con ese código.` — tu pantalla debe mostrar ese mensaje.',
+    };
+    const businessRuleNote =
+      businessRuleNotes[typeSlug] ??
+      'Revisá los códigos de error (4xx) que devuelve tu API y mostrá el mensaje al usuario en vez de ignorarlo.';
+
+    const inputType = (t: DartFieldType) => (t === 'bool' ? 'checkbox' : t === 'string' ? 'text' : 'number');
+
+    const enunciado = [
+      `# Examen HTML/CSS/JS (DOM) — ${version.theme_name}`,
+      '',
+      `Puntaje total: ${totalPoints} pts`,
+      '',
+      '## Tu API (variante asignada)',
+      '',
+      `> \`GET/POST ${endpoint}\` y \`GET/PATCH/DELETE ${endpoint}/:id\`.`,
+      '',
+      `> Campos del recurso: ${fields.map((f) => `\`${f.key}\` (${tsType(f.type)})`).join(', ')}.`,
+      '',
+      '> Ejemplo de un registro real de tu API (formato JSON de la respuesta):',
+      '>',
+      '> ```json',
+      ...sampleJson.split('\n').map((l) => `> ${l}`),
+      '> ```',
+      '',
+      `> **Regla de negocio de tu variante:** ${businessRuleNote}`,
+      '',
+      '## Punto de partida: ejemplo de referencia "Notas" (a propósito muy simple)',
+      '',
+      '  El proyecto trae un ejemplo YA RESUELTO en `src/referencia.js` (sección "Referencia" del',
+      '  menú): notas con `nombre` (texto), `hecho` (bool), `duracion` (número) y `presupuesto`',
+      `  (número), contra otra API distinta a la tuya (\`${todoEndpoint}\`). A propósito solo cubre`,
+      '  **listar, crear y eliminar** (sin editar, sin buscar) — es la base mínima para que veas el',
+      '  patrón (fetch → render → manejar eventos del DOM), no la solución completa.',
+      '',
+      '  **Tu trabajo es completar `src/mi-crud.js`, `src/calculo1.js` y `src/calculo2.js`**',
+      '  duplicando y ampliando ese patrón para tu propio recurso — incluyendo lo más difícil,',
+      '  que el ejemplo de referencia NO resuelve: **editar**, y el **manejo del error de la',
+      '  regla de negocio de tu variante** (ver arriba).',
+      '',
+      '  1. **Pregunta 1** (`src/mi-crud.js`): CRUD completo (listar, crear, editar y eliminar)',
+      '     contra el endpoint de arriba, con los campos de tu variante. El listado ya viene',
+      '     resuelto como ejemplo; vos completás crear/editar/eliminar, mostrando el mensaje de',
+      '     error de tu regla de negocio cuando la API lo devuelva.',
+      '  2. **Pregunta 2** (`src/calculo1.js`) y **Pregunta 3** (`src/calculo2.js`): tus propias',
+      '     secciones de cálculo sobre los datos de tu API, calculando lo que pide cada enunciado',
+      '     de abajo (no un cálculo genérico).',
+      '',
+      '  No hay tests automáticos para este examen — la corrección es manual (código + preview).',
+      '',
+      '## Preguntas',
+      '',
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+    ].join('\n');
+
+    const indexHtml = [
+      '<!DOCTYPE html>',
+      '<html lang="es">',
+      '<head>',
+      '  <meta charset="UTF-8">',
+      '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+      `  <title>Examen DOM — ${version.theme_name}</title>`,
+      '  <link rel="stylesheet" href="styles.css">',
+      '</head>',
+      '<body>',
+      '  <nav class="menu">',
+      '    <button onclick="mostrarSeccion(\'inicio\')">Inicio</button>',
+      '    <button onclick="mostrarSeccion(\'referencia\')">Referencia</button>',
+      `    <button onclick="mostrarSeccion('mi-crud')">${ClassName} (P1)</button>`,
+      '    <button onclick="mostrarSeccion(\'calculo1\')">Pregunta 2</button>',
+      '    <button onclick="mostrarSeccion(\'calculo2\')">Pregunta 3</button>',
+      '  </nav>',
+      '',
+      '  <section id="seccion-inicio" class="seccion">',
+      `    <h2>Examen HTML/CSS/JS — ${version.theme_name}</h2>`,
+      '    <p>Usá el menú de arriba para navegar entre las secciones del examen.</p>',
+      '  </section>',
+      '',
+      '  <section id="seccion-referencia" class="seccion" hidden>',
+      '    <h2>Referencia: Notas (CRUD resuelto, a propósito simple)</h2>',
+      '    <div class="formulario">',
+      '      <input type="text" id="ref-nombre" placeholder="Nombre">',
+      '      <input type="number" id="ref-duracion" placeholder="Duración (min)">',
+      '      <input type="number" id="ref-presupuesto" placeholder="Presupuesto">',
+      '      <label><input type="checkbox" id="ref-hecho"> Hecho</label>',
+      '      <button onclick="agregarNota()">Agregar</button>',
+      '    </div>',
+      '    <table>',
+      '      <thead><tr><th>Nombre</th><th>Duración</th><th>Presupuesto</th><th>Hecho</th><th>Acciones</th></tr></thead>',
+      '      <tbody id="refCuerpoTabla"></tbody>',
+      '    </table>',
+      '  </section>',
+      '',
+      `  <section id="seccion-mi-crud" class="seccion" hidden>`,
+      `    <h2>${ClassName} (Pregunta 1)</h2>`,
+      '    <div class="formulario">',
+      ...fields.map((f) =>
+        f.type === 'bool'
+          ? `      <label><input type="checkbox" id="mi-${f.key}"> ${f.label}</label>`
+          : `      <input type="${inputType(f.type)}" id="mi-${f.key}" placeholder="${f.label}">`,
+      ),
+      '      <button onclick="guardarMiItem()">Agregar</button>',
+      '      <button onclick="cancelarEdicionMi()">Cancelar</button>',
+      '    </div>',
+      '    <table>',
+      '      <thead><tr>' + fields.map((f) => `<th>${f.label}</th>`).join('') + '<th>Acciones</th></tr></thead>',
+      '      <tbody id="miCuerpoTabla"></tbody>',
+      '    </table>',
+      '  </section>',
+      '',
+      '  <section id="seccion-calculo1" class="seccion" hidden>',
+      '    <h2>Pregunta 2: cálculo propio</h2>',
+      '    <div id="calc1Resultado">TODO</div>',
+      '  </section>',
+      '',
+      '  <section id="seccion-calculo2" class="seccion" hidden>',
+      '    <h2>Pregunta 3: cálculo propio</h2>',
+      '    <div id="calc2Resultado">TODO</div>',
+      '  </section>',
+      '',
+      '  <script src="nav.js"></script>',
+      '  <script src="src/referencia.js"></script>',
+      '  <script src="src/mi-crud.js"></script>',
+      '  <script src="src/calculo1.js"></script>',
+      '  <script src="src/calculo2.js"></script>',
+      '</body>',
+      '</html>',
+      '',
+    ].join('\n');
+
+    const stylesCss = [
+      'body { font-family: Arial, sans-serif; margin: 30px; }',
+      '.menu { display: flex; gap: 8px; margin-bottom: 20px; }',
+      '.menu button { padding: 8px 14px; border: none; border-radius: 4px; background: #4a90d9; color: white; cursor: pointer; }',
+      '.formulario { background: #eef4fb; border: 1px solid #b0cfe8; padding: 12px; border-radius: 6px; margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }',
+      '.formulario input[type="text"], .formulario input[type="number"] { padding: 6px; }',
+      'table { border-collapse: collapse; width: 100%; }',
+      'th, td { border: 1px solid #aaa; padding: 6px 10px; text-align: left; }',
+      'th { background: #4a90d9; color: white; }',
+      'button { cursor: pointer; }',
+      '',
+    ].join('\n');
+
+    // ── Referencia (resuelta, a propósito simple): listar / crear / eliminar ─────────
+    const referenciaJs = [
+      `const REF_API_URL = '${todoEndpoint}';`,
+      '',
+      'function cargarNotas() {',
+      '  fetch(REF_API_URL)',
+      '    .then((res) => res.json())',
+      '    .then(renderNotas);',
+      '}',
+      '',
+      'function renderNotas(notas) {',
+      "  const tbody = document.getElementById('refCuerpoTabla');",
+      "  tbody.innerHTML = '';",
+      '  notas.forEach((n) => {',
+      "    const fila = document.createElement('tr');",
+      '    fila.innerHTML = `',
+      '      <td>${n.nombre}</td>',
+      '      <td>${n.duracion}</td>',
+      '      <td>${n.presupuesto}</td>',
+      "      <td>${n.hecho ? 'Sí' : 'No'}</td>",
+      '      <td><button onclick="eliminarNota(\'${n.id}\')">Eliminar</button></td>',
+      '    `;',
+      '    tbody.appendChild(fila);',
+      '  });',
+      '}',
+      '',
+      '// Create: crea la nota y vuelve a cargar la lista.',
+      'function agregarNota() {',
+      "  const nombre = document.getElementById('ref-nombre').value.trim();",
+      "  if (!nombre) return;",
+      '  const data = {',
+      '    nombre,',
+      "    duracion: Number(document.getElementById('ref-duracion').value) || 0,",
+      "    presupuesto: Number(document.getElementById('ref-presupuesto').value) || 0,",
+      "    hecho: document.getElementById('ref-hecho').checked,",
+      '  };',
+      '  fetch(REF_API_URL, {',
+      "    method: 'POST',",
+      "    headers: { 'Content-Type': 'application/json' },",
+      '    body: JSON.stringify(data),',
+      '  }).then(() => {',
+      "    document.getElementById('ref-nombre').value = '';",
+      "    document.getElementById('ref-duracion').value = '';",
+      "    document.getElementById('ref-presupuesto').value = '';",
+      "    document.getElementById('ref-hecho').checked = false;",
+      '    cargarNotas();',
+      '  });',
+      '}',
+      '',
+      '// Delete: sin confirmación ni manejo de error — esta referencia es a propósito simple.',
+      'function eliminarNota(id) {',
+      '  fetch(`${REF_API_URL}/${id}`, { method: \'DELETE\' }).then(cargarNotas);',
+      '}',
+      '',
+      'window.addEventListener(\'DOMContentLoaded\', cargarNotas);',
+      '',
+    ].join('\n');
+
+    // ── Tu trabajo: solo el listado viene resuelto, el resto son TODO ─────────────────
+    const miCrudJs = [
+      `// Endpoint de tu variante (\`${resource}\`): ${endpoint}`,
+      `const MI_API_URL = '${endpoint}';`,
+      'let miIdEditando = null;',
+      '',
+      '// Read: YA RESUELTO — trae la lista y la pinta en la tabla.',
+      'function cargarMisItems() {',
+      '  fetch(MI_API_URL)',
+      '    .then((res) => res.json())',
+      '    .then(renderMiTabla);',
+      '}',
+      '',
+      'function renderMiTabla(items) {',
+      "  const tbody = document.getElementById('miCuerpoTabla');",
+      "  tbody.innerHTML = '';",
+      '  items.forEach((item) => {',
+      "    const fila = document.createElement('tr');",
+      '    fila.innerHTML = `',
+      ...fields.map((f) => (f.type === 'bool' ? `      <td>\${item.${f.key} ? 'Sí' : 'No'}</td>` : `      <td>\${item.${f.key}}</td>`)),
+      '      <td>',
+      '        <button onclick="cargarEdicionMi(\'${item.id}\')">Editar</button>',
+      '        <button onclick="eliminarMiItem(\'${item.id}\')">Eliminar</button>',
+      '      </td>',
+      '    `;',
+      '    tbody.appendChild(fila);',
+      '  });',
+      '}',
+      '',
+      '// TODO — Create/Update: leer el formulario (ids `mi-<campo>`, ver index.html), armar el',
+      '// objeto `data` con los campos de tu variante y hacer POST (si `miIdEditando` es null) o',
+      '// PATCH `${MI_API_URL}/${miIdEditando}` (si estás editando). IMPORTANTE: revisá',
+      '// `response.ok`; si es `false`, leé `await response.json()` y mostrá `mensaje.message`',
+      '// (la regla de negocio de tu variante, ver ENUNCIADO.md) en vez de ignorarlo.',
+      'function guardarMiItem() {',
+      '  // TODO: completar (ver comentario de arriba).',
+      '}',
+      '',
+      '// TODO — completar edición: buscar el item por id (podés volver a pedir la lista o',
+      '// guardar el último `items` recibido) y precargar los inputs `mi-<campo>` con sus valores;',
+      '// guardar el id en `miIdEditando` para que `guardarMiItem` sepa que debe editar.',
+      'function cargarEdicionMi(id) {',
+      '  // TODO: completar (ver comentario de arriba).',
+      '}',
+      '',
+      '// TODO: limpiar `miIdEditando` y los inputs del formulario.',
+      'function cancelarEdicionMi() {',
+      '  // TODO: completar (ver comentario de arriba).',
+      '}',
+      '',
+      '// TODO — Delete: hacer DELETE `${MI_API_URL}/${id}`. Si la API responde con error (ver',
+      '// regla de negocio de tu variante en ENUNCIADO.md), mostrá el mensaje y NO quites la fila.',
+      'function eliminarMiItem(id) {',
+      '  // TODO: completar (ver comentario de arriba).',
+      '}',
+      '',
+      "window.addEventListener('DOMContentLoaded', cargarMisItems);",
+      '',
+    ].join('\n');
+
+    const calculo1Js = [
+      `// Pregunta 2 — ver el enunciado específico en ENUNCIADO.md. Datos de tu API: ${endpoint}`,
+      'function calcularPregunta2() {',
+      '  // TODO: pedí los datos con fetch y calculá lo que pide el enunciado de la Pregunta 2.',
+      "  // Mostrá el resultado con: document.getElementById('calc1Resultado').textContent = ...;",
+      '}',
+      '',
+      "window.addEventListener('DOMContentLoaded', calcularPregunta2);",
+      '',
+    ].join('\n');
+
+    const calculo2Js = [
+      `// Pregunta 3 — ver el enunciado específico en ENUNCIADO.md. Datos de tu API: ${endpoint}`,
+      'function calcularPregunta3() {',
+      '  // TODO: pedí los datos con fetch y calculá lo que pide el enunciado de la Pregunta 3.',
+      "  // Mostrá el resultado con: document.getElementById('calc2Resultado').textContent = ...;",
+      '}',
+      '',
+      "window.addEventListener('DOMContentLoaded', calcularPregunta3);",
+      '',
+    ].join('\n');
+
+    const navJs = [
+      'function mostrarSeccion(id) {',
+      "  document.querySelectorAll('.seccion').forEach((s) => { s.hidden = true; });",
+      "  document.getElementById('seccion-' + id).hidden = false;",
+      '}',
+      '',
+    ].join('\n');
+
+    return [
+      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      { name: 'index.html', path: '/index.html', content: indexHtml, is_folder: false },
+      { name: 'styles.css', path: '/styles.css', content: stylesCss, is_folder: false },
+      { name: 'nav.js', path: '/nav.js', content: navJs, is_folder: false },
+      { name: 'src', path: '/src', content: '', is_folder: true },
+      { name: 'referencia.js', path: '/src/referencia.js', content: referenciaJs, is_folder: false },
+      { name: 'mi-crud.js', path: '/src/mi-crud.js', content: miCrudJs, is_folder: false },
+      { name: 'calculo1.js', path: '/src/calculo1.js', content: calculo1Js, is_folder: false },
+      { name: 'calculo2.js', path: '/src/calculo2.js', content: calculo2Js, is_folder: false },
     ];
   }
 
