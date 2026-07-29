@@ -3884,13 +3884,13 @@ const { data: user } = useQuery({
     // variante de PRACTICE_VARIANTS) — solo se agregan variantes/preguntas nuevas, sin tocar código.
     const templateName = 'Programación IV — React Native, CRUD con reglas de negocio (API real)';
     const description =
-      'Examen de React Native (previsualizado con Expo Snack, un solo archivo `App.tsx`) con 2 ' +
-      'variantes temáticas (Vehículos, Restaurante), distintas de las de "React Native — CRUD y ' +
-      'pantallas de lógica". El proyecto trae una app "Tareas" de referencia YA RESUELTA (CRUD ' +
-      'completo + 2 pantallas de cálculo) contra otra API distinta a la asignada. El alumno debe ' +
-      'duplicar y adaptar ese mismo patrón en 3 pantallas propias (CRUD contra su API asignada + ' +
-      '2 pantallas de cálculo), manejando además el error de la regla de negocio de su variante. ' +
-      'No hay tests automáticos: la corrección es manual (código + preview).';
+      'Examen de React Native (proyecto organizado en `pages/`, `components/`, `api/` y `router/`) ' +
+      'con 2 variantes temáticas (Vehículos, Restaurante), distintas de las de "React Native — CRUD ' +
+      'y pantallas de lógica". El proyecto trae una app "Tareas" de referencia YA RESUELTA (CRUD ' +
+      'completo + 2 páginas de cálculo) contra otra API distinta a la asignada. El alumno debe ' +
+      'duplicar y adaptar ese mismo patrón en 3 páginas propias (CRUD contra su API asignada + ' +
+      '2 páginas de cálculo con porcentajes/fórmulas), manejando además el error de la regla de ' +
+      'negocio de su variante. No hay tests automáticos: la corrección es manual (código + preview).';
 
     const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
       {
@@ -3898,15 +3898,15 @@ const { data: user } = useQuery({
         questions: [
           {
             order: 1, points: 6, title: 'CRUD de vehículos contra tu API asignada',
-            statement: 'Completá la pantalla `MiAutosScreen` (en `App.tsx`) para que liste, cree, edite y elimine vehículos (marca, modelo, anio, precio, kilometraje, placa, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaScreen`. La API rechaza con error 409 la creación/edición de un vehículo con una `placa` ya usada por otro registro: tu pantalla debe mostrarle ese mensaje de error al usuario (por ejemplo con un `Alert.alert` o un texto de error en pantalla) en vez de fallar silenciosamente.',
+            statement: 'Completá `src/api/autosApi.ts` y la página `MiAutosPage` (`src/pages/MiAutos.tsx`) para que liste, cree, edite y elimine vehículos (marca, modelo, anio, precio, kilometraje, placa, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 409 la creación/edición de un vehículo con una `placa` ya usada por otro registro: tu página debe mostrarle ese mensaje de error al usuario (por ejemplo con un `Alert.alert` o un texto de error en pantalla) en vez de fallar silenciosamente.',
           },
           {
-            order: 2, points: 2, title: 'Vehículos disponibles y precio promedio',
-            statement: 'Completá `Pregunta2Screen` (siguiendo el patrón de `ReferenciaPromedioScreen`) para calcular y mostrar, sobre los vehículos con `disponible == true`: la cantidad total y el precio promedio.',
+            order: 2, points: 2, title: 'Porcentaje de vehículos disponibles y su valor total',
+            statement: 'Completá `Pregunta2Page` (`src/pages/Pregunta2.tsx`, siguiendo el patrón de `ReferenciaPromedioPage`) para calcular y mostrar: el porcentaje de vehículos con `disponible == true` respecto al total (redondeado a 1 decimal, fórmula: `disponibles / total * 100`) y la suma del `precio` de esos vehículos disponibles.',
           },
           {
-            order: 3, points: 2, title: 'Vehículo más caro y más barato',
-            statement: 'Completá `Pregunta3Screen` (siguiendo el patrón de `ReferenciaBusquedaScreen`) para encontrar, entre los vehículos con `disponible == true`, cuál es el más caro y cuál el más barato, mostrando marca, modelo y precio de cada uno.',
+            order: 3, points: 2, title: 'Descuento del 10% a vehículos por encima del precio promedio',
+            statement: 'Completá `Pregunta3Page` (`src/pages/Pregunta3.tsx`, siguiendo el patrón de `ReferenciaBusquedaPage`) para, primero, calcular el `precio` promedio de todos los vehículos; luego, a los vehículos cuyo `precio` sea mayor a ese promedio, aplicarles un descuento del 10% (fórmula: `precioConDescuento = precio * 0.9`) y mostrar marca, modelo, precio original y precio con descuento de cada uno, además del ahorro total acumulado (suma de `precio - precioConDescuento` de todos esos vehículos).',
           },
         ],
       },
@@ -3915,15 +3915,15 @@ const { data: user } = useQuery({
         questions: [
           {
             order: 1, points: 6, title: 'CRUD de platos de restaurante contra tu API asignada',
-            statement: 'Completá la pantalla `MiPlatosScreen` (en `App.tsx`) para que liste, cree, edite y elimine platos (plato, categoria, precio, tiempoPreparacion, ingredientePrincipal, destacado, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaScreen`. La API rechaza con error 400 el intento de eliminar un plato con `disponible == true` (debe marcarse primero como no disponible): tu pantalla debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
+            statement: 'Completá `src/api/platosApi.ts` y la página `MiPlatosPage` (`src/pages/MiPlatos.tsx`) para que liste, cree, edite y elimine platos (plato, categoria, precio, tiempoPreparacion, ingredientePrincipal, destacado, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 400 el intento de eliminar un plato con `disponible == true` (debe marcarse primero como no disponible): tu página debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
           },
           {
-            order: 2, points: 2, title: 'Platos destacados y precio promedio',
-            statement: 'Completá `Pregunta2Screen` (siguiendo el patrón de `ReferenciaPromedioScreen`) para calcular y mostrar: la cantidad de platos con `destacado == true` y el precio promedio de todo el menú.',
+            order: 2, points: 2, title: 'Porcentaje de platos disponibles y su valor total',
+            statement: 'Completá `Pregunta2Page` (`src/pages/Pregunta2.tsx`, siguiendo el patrón de `ReferenciaPromedioPage`) para calcular y mostrar: el porcentaje de platos con `disponible == true` respecto al total del menú (redondeado a 1 decimal, fórmula: `disponibles / total * 100`) y la suma del `precio` de esos platos disponibles.',
           },
           {
-            order: 3, points: 2, title: 'Tiempo total de preparación de platos disponibles',
-            statement: 'Completá `Pregunta3Screen` (siguiendo el patrón de `ReferenciaBusquedaScreen`) para calcular y mostrar la suma de `tiempoPreparacion` de todos los platos con `disponible == true`.',
+            order: 3, points: 2, title: 'Recargo del 15% a platos con mayor tiempo de preparación',
+            statement: 'Completá `Pregunta3Page` (`src/pages/Pregunta3.tsx`, siguiendo el patrón de `ReferenciaBusquedaPage`) para, primero, calcular el `tiempoPreparacion` promedio de todos los platos; luego, a los platos cuyo `tiempoPreparacion` sea mayor a ese promedio (por ser más laboriosos), aplicarles un recargo del 15% sobre el `precio` (fórmula: `precioConRecargo = precio * 1.15`) y mostrar plato, precio original y precio con recargo de cada uno, además del total del recargo acumulado (suma de `precioConRecargo - precio` de todos esos platos).',
           },
         ],
       },
@@ -3984,12 +3984,12 @@ const { data: user } = useQuery({
     const templateName =
       'Programación IV — React Native, CRUD con reglas de negocio (API real) (Ejercicio único)';
     const description =
-      'Examen de React Native (previsualizado con Expo Snack, un solo archivo `App.tsx`) de una ' +
-      'sola variante (Mascotas). El proyecto trae una app "Tareas" de referencia YA RESUELTA (CRUD ' +
-      'completo + 2 pantallas de cálculo) contra otra API distinta a la asignada. El alumno debe ' +
-      'duplicar y adaptar ese mismo patrón en 3 pantallas propias (CRUD contra su API asignada + ' +
-      '2 pantallas de cálculo), manejando además el error de la regla de negocio de su variante. ' +
-      'No hay tests automáticos: la corrección es manual (código + preview).';
+      'Examen de React Native (proyecto organizado en `pages/`, `components/`, `api/` y `router/`) ' +
+      'de una sola variante (Mascotas). El proyecto trae una app "Tareas" de referencia YA RESUELTA ' +
+      '(CRUD completo + 2 páginas de cálculo) contra otra API distinta a la asignada. El alumno debe ' +
+      'duplicar y adaptar ese mismo patrón en 3 páginas propias (CRUD contra su API asignada + ' +
+      '2 páginas de cálculo con porcentajes/fórmulas), manejando además el error de la regla de ' +
+      'negocio de su variante. No hay tests automáticos: la corrección es manual (código + preview).';
 
     const version: { theme_name: string; order_index: number; questions: ExamQuestion[] } = {
       theme_name: 'Mascotas',
@@ -3997,15 +3997,15 @@ const { data: user } = useQuery({
       questions: [
         {
           order: 1, points: 6, title: 'CRUD de mascotas contra tu API asignada',
-          statement: 'Completá la pantalla `MiMascotasScreen` (en `App.tsx`) para que liste, cree, edite y elimine mascotas en adopción (nombre, especie, raza, edad, peso, codigo, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaScreen`. La API rechaza con error 409 la creación/edición de una mascota con un `codigo` ya usado por otro registro: tu pantalla debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
+          statement: 'Completá `src/api/mascotasApi.ts` y la página `MiMascotasPage` (`src/pages/MiMascotas.tsx`) para que liste, cree, edite y elimine mascotas en adopción (nombre, especie, raza, edad, peso, codigo, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 409 la creación/edición de una mascota con un `codigo` ya usado por otro registro: tu página debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
         },
         {
-          order: 2, points: 2, title: 'Mascotas disponibles y edad promedio',
-          statement: 'Completá `Pregunta2Screen` (siguiendo el patrón de `ReferenciaPromedioScreen`) para calcular y mostrar, sobre las mascotas con `disponible == true`: la cantidad total y la edad promedio.',
+          order: 2, points: 2, title: 'Porcentaje de mascotas disponibles y su peso total',
+          statement: 'Completá `Pregunta2Page` (`src/pages/Pregunta2.tsx`, siguiendo el patrón de `ReferenciaPromedioPage`) para calcular y mostrar: el porcentaje de mascotas con `disponible == true` respecto al total (redondeado a 1 decimal, fórmula: `disponibles / total * 100`) y la suma del `peso` de esas mascotas disponibles.',
         },
         {
-          order: 3, points: 2, title: 'Peso total de mascotas no disponibles',
-          statement: 'Completá `Pregunta3Screen` (siguiendo el patrón de `ReferenciaBusquedaScreen`) para calcular y mostrar la suma de `peso` de todas las mascotas con `disponible == false`.',
+          order: 3, points: 2, title: 'Dosis estimada de alimento por peso',
+          statement: 'Completá `Pregunta3Page` (`src/pages/Pregunta3.tsx`, siguiendo el patrón de `ReferenciaBusquedaPage`) para, primero, calcular el `peso` promedio de todas las mascotas; luego, a las mascotas cuyo `peso` sea mayor a ese promedio, calcularles una "dosis estimada de alimento" aplicando la fórmula `dosis = peso * 0.05` (5% de su peso en kg), mostrando nombre, peso y dosis de cada una, además de la suma total de dosis de todas esas mascotas.',
         },
       ],
     };
