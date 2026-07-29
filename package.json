@@ -6,7 +6,8 @@
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "seed": "ts-node -r tsconfig-paths/register src/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register src/seed.ts",
+    "sanitize:practice-api": "ts-node -r tsconfig-paths/register src/scripts/sanitize-practice-items.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

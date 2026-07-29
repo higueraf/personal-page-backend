@@ -3898,7 +3898,7 @@ const { data: user } = useQuery({
         questions: [
           {
             order: 1, points: 6, title: 'CRUD de vehículos contra tu API asignada',
-            statement: 'Completá `src/api/autosApi.ts` y la página `MiAutosPage` (`src/pages/MiAutos.tsx`) para que liste, cree, edite y elimine vehículos (marca, modelo, anio, precio, kilometraje, placa, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 409 la creación/edición de un vehículo con una `placa` ya usada por otro registro: tu página debe mostrarle ese mensaje de error al usuario (por ejemplo con un `Alert.alert` o un texto de error en pantalla) en vez de fallar silenciosamente.',
+            statement: 'Completá `src/api/autosApi.ts` y la página `Pregunta1.tsx` (renombrala a `MiAutos.tsx` / función `MiAutosPage`, y actualizá el import + case en `AppRouter.tsx` y la etiqueta en `Menu.tsx`) para que liste, cree, edite y elimine vehículos (marca, modelo, anio, precio, kilometraje, placa, disponible) contra el endpoint de tu variante, con el formulario y la lista separados en sus propios componentes dentro de `src/components/`, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 409 la creación/edición de un vehículo con una `placa` ya usada por otro registro: tu página debe mostrarle ese mensaje de error al usuario (por ejemplo con un `Alert.alert` o un texto de error en pantalla) en vez de fallar silenciosamente.',
           },
           {
             order: 2, points: 2, title: 'Porcentaje de vehículos disponibles y su valor total',
@@ -3915,7 +3915,7 @@ const { data: user } = useQuery({
         questions: [
           {
             order: 1, points: 6, title: 'CRUD de platos de restaurante contra tu API asignada',
-            statement: 'Completá `src/api/platosApi.ts` y la página `MiPlatosPage` (`src/pages/MiPlatos.tsx`) para que liste, cree, edite y elimine platos (plato, categoria, precio, tiempoPreparacion, ingredientePrincipal, destacado, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 400 el intento de eliminar un plato con `disponible == true` (debe marcarse primero como no disponible): tu página debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
+            statement: 'Completá `src/api/platosApi.ts` y la página `Pregunta1.tsx` (renombrala a `MiPlatos.tsx` / función `MiPlatosPage`, y actualizá el import + case en `AppRouter.tsx` y la etiqueta en `Menu.tsx`) para que liste, cree, edite y elimine platos (plato, categoria, precio, tiempoPreparacion, ingredientePrincipal, destacado, disponible) contra el endpoint de tu variante, con el formulario y la lista separados en sus propios componentes dentro de `src/components/`, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 400 el intento de eliminar un plato con `disponible == true` (debe marcarse primero como no disponible): tu página debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
           },
           {
             order: 2, points: 2, title: 'Porcentaje de platos disponibles y su valor total',
@@ -3997,7 +3997,7 @@ const { data: user } = useQuery({
       questions: [
         {
           order: 1, points: 6, title: 'CRUD de mascotas contra tu API asignada',
-          statement: 'Completá `src/api/mascotasApi.ts` y la página `MiMascotasPage` (`src/pages/MiMascotas.tsx`) para que liste, cree, edite y elimine mascotas en adopción (nombre, especie, raza, edad, peso, codigo, disponible) contra el endpoint de tu variante, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 409 la creación/edición de una mascota con un `codigo` ya usado por otro registro: tu página debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
+          statement: 'Completá `src/api/mascotasApi.ts` y la página `Pregunta1.tsx` (renombrala a `MiMascotas.tsx` / función `MiMascotasPage`, y actualizá el import + case en `AppRouter.tsx` y la etiqueta en `Menu.tsx`) para que liste, cree, edite y elimine mascotas en adopción (nombre, especie, raza, edad, peso, codigo, disponible) contra el endpoint de tu variante, con el formulario y la lista separados en sus propios componentes dentro de `src/components/`, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 409 la creación/edición de una mascota con un `codigo` ya usado por otro registro: tu página debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
         },
         {
           order: 2, points: 2, title: 'Porcentaje de mascotas disponibles y su peso total',
