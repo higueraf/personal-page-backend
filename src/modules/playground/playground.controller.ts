@@ -72,7 +72,7 @@ export class PlaygroundController {
   async saveAllFiles(
     @Req() req: Request,
     @Param('id') id: string,
-    @Body('files') files: Array<{ id?: string; name: string; content: string; path: string }>,
+    @Body('files') files: Array<{ id?: string; name: string; content: string; path: string; is_folder?: boolean }>,
   ) {
     const user = req.user as any;
     return this.playgroundService.saveAllFiles(id, files ?? [], user.id);

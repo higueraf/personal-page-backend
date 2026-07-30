@@ -19,11 +19,15 @@ import { PlaygroundController } from './playground.controller';
 import { PlaygroundTemplateController } from './playground-template.controller';
 import { ExamTemplateController } from './exam-template.controller';
 import { MailModule } from '../mail/mail.module';
+import { PracticeApiModule } from '../practice-api/practice-api.module';
+import { TodoApiModule } from '../todo-api/todo-api.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([PlaygroundProject, PlaygroundFile, PlaygroundTemplate, ExamTemplate, ExamVersion, User]),
     MailModule,
+    PracticeApiModule,
+    TodoApiModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

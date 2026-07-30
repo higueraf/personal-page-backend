@@ -3320,7 +3320,9 @@ flutter:
       '    de la Referencia, separados en sus propios componentes reutilizables.',
       '  - `src/components/FloatingActionButton.tsx`: botón flotante ("+") reutilizable para navegar',
       '    a la pantalla de "nuevo registro".',
-      '  - `src/api/referenciaApi.ts`: API de referencia (`Todo`, fetch/create/update/delete).',
+      '  - `src/models/todo.ts`: modelo de referencia (interfaz `Todo`).',
+      '  - `src/api/referenciaApi.ts`: API de referencia (fetch/create/update/delete de `Todo`,',
+      '    importado desde `src/models/todo.ts`).',
       '  - `src/api/pregunta1Api.ts`: API de tu variante — a completar (nombre genérico:',
       '    DEBÉS renombrarlo de acuerdo a tu recurso).',
       '  - `src/models/pregunta1.ts`: acá vas a definir el modelo (interfaz) de tu variante —',
@@ -3396,14 +3398,19 @@ flutter:
       ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
     ].join('\n');
 
-    const referenciaApiTs = [
-      "export interface Todo {",
+    const referenciaModelTs = [
+      'export interface Todo {',
       '  id: string;',
       '  nombre: string;',
       '  hecho: boolean;',
       '  duracion: number;',
       '  presupuesto: number;',
       '}',
+      '',
+    ].join('\n');
+
+    const referenciaApiTs = [
+      "import { Todo } from '../models/todo';",
       '',
       `const TODO_API_URL = '${todoEndpoint}';`,
       '',
@@ -3611,7 +3618,7 @@ flutter:
 
     const tareaListTsx = [
       "import { View, Text, TouchableOpacity, FlatList } from 'react-native';",
-      "import { Todo } from '../api/referenciaApi';",
+      "import { Todo } from '../models/todo';",
       "import { styles } from '../styles';",
       '',
       '/**',
@@ -3659,7 +3666,8 @@ flutter:
     const referenciaTsx = [
       "import { useEffect, useState } from 'react';",
       "import { View, Text } from 'react-native';",
-      "import { Todo, fetchTodos, createTodo, updateTodo, deleteTodo } from '../api/referenciaApi';",
+      "import { Todo } from '../models/todo';",
+      "import { fetchTodos, createTodo, updateTodo, deleteTodo } from '../api/referenciaApi';",
       "import { styles } from '../styles';",
       "import { TareaForm } from '../components/TareaForm';",
       "import { TareaList } from '../components/TareaList';",
@@ -3760,7 +3768,8 @@ flutter:
     const referenciaPromedioTsx = [
       "import { useEffect, useState } from 'react';",
       "import { View, Text } from 'react-native';",
-      "import { Todo, fetchTodos } from '../api/referenciaApi';",
+      "import { Todo } from '../models/todo';",
+      "import { fetchTodos } from '../api/referenciaApi';",
       "import { styles } from '../styles';",
       '',
       '/** Ejemplo de página de cálculo (referencia): promedio de duración de las tareas. */',
@@ -3789,7 +3798,8 @@ flutter:
     const referenciaBusquedaTsx = [
       "import { useEffect, useState } from 'react';",
       "import { View, Text, TextInput } from 'react-native';",
-      "import { Todo, fetchTodos } from '../api/referenciaApi';",
+      "import { Todo } from '../models/todo';",
+      "import { fetchTodos } from '../api/referenciaApi';",
       "import { styles } from '../styles';",
       '',
       '/** Ejemplo de página de cálculo (referencia): búsqueda de tareas por nombre. */',
@@ -4003,6 +4013,7 @@ flutter:
       { name: 'referenciaApi.ts', path: '/src/api/referenciaApi.ts', content: referenciaApiTs, is_folder: false },
       { name: 'pregunta1Api.ts', path: '/src/api/pregunta1Api.ts', content: pregunta1ApiTs, is_folder: false },
       { name: 'models', path: '/src/models', content: '', is_folder: true },
+      { name: 'todo.ts', path: '/src/models/todo.ts', content: referenciaModelTs, is_folder: false },
       { name: 'pregunta1.ts', path: '/src/models/pregunta1.ts', content: pregunta1ModelTs, is_folder: false },
       { name: 'components', path: '/src/components', content: '', is_folder: true },
       { name: 'Menu.tsx', path: '/src/components/Menu.tsx', content: menuTsx, is_folder: false },
@@ -4799,13 +4810,20 @@ flutter:
   }
 
   /**
-   * Batch-upsert all files for a project.
+   * Batch-upsert all files (and folders) for a project.
    * Lookup priority: DB UUID (if provided) → name+path → create new.
    * This avoids URL-encoding issues with special chars in file names.
+   *
+   * Also deletes any file/folder that exists in the DB for this project but
+   * is NOT present in the incoming `files` array. Without this, deleting a
+   * file/folder in the editor only removed it from the frontend store — the
+   * DB record survived and reappeared as a "ghost" file when an admin opened
+   * the project for review, causing execution errors there even though the
+   * student's own session (using the local store) worked fine.
    */
   async saveAllFiles(
     projectId: string,
-    files: { id?: string; name: string; content: string; path: string }[],
+    files: { id?: string; name: string; content: string; path: string; is_folder?: boolean }[],
     userId: string,
   ) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
@@ -4814,33 +4832,44 @@ flutter:
       throw new ForbiddenException('Este examen ya fue entregado y no se puede modificar.');
     }
 
+    const existingFiles = await this.fileRepo.find({ where: { project_id: projectId } });
+    const keptIds = new Set<string>();
+
     for (const f of files) {
-      let file: PlaygroundFile | null = null;
+      let file: PlaygroundFile | undefined;
 
       // Primary: find by DB UUID (works after renames since the record moves)
       if (f.id && !f.id.startsWith('local-')) {
-        file = await this.fileRepo.findOne({ where: { id: f.id, project_id: projectId } });
+        file = existingFiles.find((e) => e.id === f.id);
       }
 
       // Fallback: find by name + path
       if (!file) {
-        file = await this.fileRepo.findOne({ where: { project_id: projectId, name: f.name, path: f.path } });
+        file = existingFiles.find((e) => e.name === f.name && e.path === f.path);
       }
 
       if (file) {
-        file.content = f.content;
+        file.content = f.is_folder ? '' : f.content;
         file.name    = f.name;
         file.path    = f.path;
+        await this.fileRepo.save(file);
+        keptIds.add(file.id);
       } else {
-        file = this.fileRepo.create({
+        const created = this.fileRepo.create({
           project_id: projectId,
           name: f.name,
-          content: f.content,
-          is_folder: false,
+          content: f.is_folder ? '' : f.content,
+          is_folder: f.is_folder ?? false,
           path: f.path,
         });
+        const saved = await this.fileRepo.save(created);
+        keptIds.add(saved.id);
       }
-      await this.fileRepo.save(file);
+    }
+
+    const toDelete = existingFiles.filter((e) => !keptIds.has(e.id));
+    if (toDelete.length) {
+      await this.fileRepo.remove(toDelete);
     }
 
     return { status: 'saved', count: files.length };

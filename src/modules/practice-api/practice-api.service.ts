@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PracticeItem } from '../../entities/practice-item.entity';
-import { DartFieldType, getVariantConfig } from './practice-variants.config';
+import { DartFieldType, getVariantConfig, PRACTICE_VARIANTS } from './practice-variants.config';
 
 function toResponse(item: PracticeItem) {
   return { id: item.id, ...item.data };
@@ -134,6 +134,13 @@ export class PracticeApiService {
     await this.itemRepo.delete({ type });
     await this.ensureSeeded(type);
     return this.list(type);
+  }
+
+  /** Restablece TODAS las variantes de practice-api a sus datos semilla. */
+  async resetAll() {
+    for (const type of Object.keys(PRACTICE_VARIANTS)) {
+      await this.reset(type);
+    }
   }
 
   /** Filtra los registros con `disponible === true` (variantes `vehiculos`/`mascotas`). */

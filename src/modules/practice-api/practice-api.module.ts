@@ -8,5 +8,6 @@ import { PracticeApiService } from './practice-api.service';
   imports: [TypeOrmModule.forFeature([PracticeItem])],
   controllers: [PracticeApiController],
   providers: [PracticeApiService],
+  exports: [PracticeApiService],
 })
 export class PracticeApiModule {}

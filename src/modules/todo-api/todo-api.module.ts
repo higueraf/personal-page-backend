@@ -8,5 +8,6 @@ import { TodoApiService } from './todo-api.service';
   imports: [TypeOrmModule.forFeature([TodoItem])],
   controllers: [TodoApiController],
   providers: [TodoApiService],
+  exports: [TodoApiService],
 })
 export class TodoApiModule {}
