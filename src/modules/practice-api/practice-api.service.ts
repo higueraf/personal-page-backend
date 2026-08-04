@@ -69,6 +69,7 @@ export function sanitizeData(
 const UNIQUE_FIELD_BY_VARIANT: Record<string, string> = {
   vehiculos: 'placa',
   mascotas: 'codigo',
+  papeleria: 'codigo',
 };
 
 @Injectable()
@@ -124,6 +125,11 @@ export class PracticeApiService {
     if (type === 'restaurante' && existing.data?.disponible === true) {
       throw new BadRequestException(
         'No se puede eliminar un plato disponible; márcalo como no disponible primero.',
+      );
+    }
+    if (type === 'nomina' && existing.data?.activo === true) {
+      throw new BadRequestException(
+        'No se puede eliminar un empleado activo; desactívalo primero.',
       );
     }
     await this.itemRepo.delete(id);

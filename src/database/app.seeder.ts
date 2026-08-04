@@ -2421,9 +2421,9 @@ const { data: user } = useQuery({
     }
   }
 
-  // ── Examen con variantes temáticas (Programación IV — TypeScript) ────────────
+  // ── Examen con variantes temáticas (TypeScript) ────────────
   private async seedExamTemplates(admin: User) {
-    const templateName = 'Programación IV — Estructuras de Control, Ciclos y Switch';
+    const templateName = 'Estructuras de Control, Ciclos y Switch';
     const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
     if (exists) return;
 
@@ -2541,7 +2541,7 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateTypeScriptV2(admin: User) {
-    const templateName = 'Programación IV — Estructuras de Control, Ciclos y Switch (Variante 2)';
+    const templateName = 'Estructuras de Control, Ciclos y Switch (Variante 2)';
     const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
     if (exists) return;
 
@@ -2659,7 +2659,7 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateFlutter(admin: User) {
-    const templateName = 'Programación IV — Flutter, CRUD contra API';
+    const templateName = 'Flutter, CRUD contra API';
     const description =
       'Examen de Flutter con 4 variantes temáticas: pantalla principal con menú + 3 botones — ' +
       'CRUD contra la API de práctica (7 pts) y 2 pantallas de cálculo (1.5 pts c/u) — más un ejemplo ' +
@@ -2798,7 +2798,7 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateFlutterSingle(admin: User) {
-    const templateName = 'Programación IV — Flutter, CRUD contra API (Ejercicio único)';
+    const templateName = 'Flutter, CRUD contra API (Ejercicio único)';
     const description =
       'Examen de Flutter de una sola variante (Papelería), partiendo del ejemplo de referencia ToDo ' +
       '(ver ENUNCIADO.md): CRUD completo contra la API de práctica (7 pts) y 2 pantallas de cálculo ' +
@@ -3082,9 +3082,9 @@ const { data: user } = useQuery({
     }
   }
 
-  // ── Examen con variantes temáticas (Programación IV — NestJS, CRUD + Jest) ──
+  // ── Examen con variantes temáticas (NestJS, CRUD + Jest) ──
   private async seedExamTemplateNestJS(admin: User) {
-    const templateName = 'Programación IV — NestJS, CRUD y Tests con Jest';
+    const templateName = 'NestJS, CRUD y Tests con Jest';
     const description =
       'Examen de NestJS con 5 variantes temáticas. Cada proyecto trae un módulo CRUD de referencia ' +
       'YA RESUELTO (servicio + controlador + 2 archivos de test) y dos módulos más (Categorías y ' +
@@ -3181,7 +3181,7 @@ const { data: user } = useQuery({
     // pero con una sola variante. Usa "Nómina" porque las otras 5 (Ropa/Libros/Farmacia/Tareas/
     // Papelería) ya están todas asignadas al template de 5 variantes — así ambos quedan con
     // variantes totalmente distintas entre sí (mismo criterio que React RealApi/Single).
-    const templateName = 'Programación IV — NestJS, CRUD y Tests con Jest (Ejercicio único)';
+    const templateName = 'NestJS, CRUD y Tests con Jest (Ejercicio único)';
     const description =
       'Examen de NestJS de una sola variante (Nómina): módulo CRUD de referencia YA RESUELTO ' +
       '(servicio + controlador + 2 archivos de test) y dos módulos más (Categorías y ' +
@@ -3252,9 +3252,9 @@ const { data: user } = useQuery({
     }
   }
 
-  // ── Examen con variantes temáticas (Programación IV — React, componentes + Vitest) ──
+  // ── Examen con variantes temáticas (React, componentes + Vitest) ──
   private async seedExamTemplateReact(admin: User) {
-    const templateName = 'Programación IV — React, componentes y Tests con Vitest';
+    const templateName = 'React, componentes y Tests con Vitest';
     const description =
       'Examen de React + TypeScript con 4 variantes temáticas. Cada proyecto trae un componente y ' +
       'una página de referencia YA RESUELTOS que consultan la API real de la variante con `fetch` ' +
@@ -3348,7 +3348,7 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateReactSingle(admin: User) {
-    const templateName = 'Programación IV — React, componentes y Tests con Vitest (Ejercicio único)';
+    const templateName = 'React, componentes y Tests con Vitest (Ejercicio único)';
     const description =
       'Examen de React + TypeScript de una sola variante (Papelería): componente y página de ' +
       'referencia YA RESUELTOS que consultan la API real de la variante con `fetch` (junto con ' +
@@ -3423,8 +3423,6 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateReactNative(admin: User) {
-    // Sin prefijo "Programación IV —" a pedido: este template es nuevo, distinto de los 8
-    // templates ya existentes (esos sí mantienen el prefijo, no se tocan).
     const templateName = 'React Native — CRUD y pantallas de lógica (Expo Snack)';
     const description =
       'Examen de React Native (previsualizado con Expo Snack, un solo archivo `App.tsx`) con 4 ' +
@@ -3512,7 +3510,6 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateReactNativeSingle(admin: User) {
-    // Sin prefijo "Programación IV —", igual criterio que seedExamTemplateReactNative.
     // Variante única (Papelería) — la misma que usan los "Ejercicio único" de Flutter/React.
     const templateName = 'React Native — CRUD y pantallas de lógica (Expo Snack) (Ejercicio único)';
     const description =
@@ -3591,7 +3588,7 @@ const { data: user } = useQuery({
 
   // ── Examen HTML/CSS/JS — manipulación del DOM (API real, con reglas de negocio) ──
   private async seedExamTemplateDom(admin: User) {
-    const templateName = 'Programación IV — HTML/CSS/JS, manipulación del DOM (API real)';
+    const templateName = 'HTML/CSS/JS, manipulación del DOM (API real)';
     const description =
       'Examen de HTML/CSS/JS puro (sin frameworks) con 2 variantes temáticas (Vehículos, ' +
       'Restaurante). El proyecto trae un ejemplo de referencia ("Notas") YA RESUELTO pero ' +
@@ -3690,8 +3687,7 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateDomSingle(admin: User) {
-    const templateName =
-      'Programación IV — HTML/CSS/JS, manipulación del DOM (API real) (Ejercicio único)';
+    const templateName = 'HTML/CSS/JS, manipulación del DOM (API real) (Ejercicio único)';
     const description =
       'Examen de HTML/CSS/JS puro (sin frameworks) de una sola variante (Mascotas). El proyecto ' +
       'trae un ejemplo de referencia ("Notas") YA RESUELTO pero deliberadamente simple (listar/' +
@@ -3768,8 +3764,7 @@ const { data: user } = useQuery({
 
   // ── Examen HTML/CSS/JS — manipulación del DOM (arreglo en memoria, SIN API) ──
   private async seedExamTemplateHtmlArray(admin: User) {
-    const templateName =
-      'Programación IV — HTML/CSS/JS, manipulación del DOM (arreglo, sin API)';
+    const templateName = 'HTML/CSS/JS, manipulación del DOM (arreglo, sin API)';
     const description =
       'Examen de HTML/CSS/JS puro (sin frameworks) con 4 variantes temáticas (Ropa, Libros, ' +
       'Farmacia, Nómina), SIN conexión a ninguna API: todos los datos viven en arreglos de ' +
@@ -3905,7 +3900,7 @@ const { data: user } = useQuery({
 
   private async seedExamTemplateHtmlArraySingle(admin: User) {
     const templateName =
-      'Programación IV — HTML/CSS/JS, manipulación del DOM (arreglo, sin API) (Ejercicio único)';
+      'HTML/CSS/JS, manipulación del DOM (arreglo, sin API) (Ejercicio único)';
     const description =
       'Examen de HTML/CSS/JS puro (sin frameworks) de una sola variante (Papelería), SIN conexión ' +
       'a ninguna API: todos los datos viven en un arreglo de JavaScript en memoria. El proyecto ' +
@@ -3985,10 +3980,10 @@ const { data: user } = useQuery({
   private async seedExamTemplateReactNativeBusinessRules(admin: User) {
     // Reutiliza el generador ya existente `buildReactNativeExamFiles` (genérico sobre cualquier
     // variante de PRACTICE_VARIANTS) — solo se agregan variantes/preguntas nuevas, sin tocar código.
-    const templateName = 'Programación IV — React Native, CRUD con reglas de negocio (API real)';
+    const templateName = 'React Native, CRUD con reglas de negocio (API real)';
     const description =
       'Examen de React Native (proyecto organizado en `pages/`, `components/`, `api/` y `router/`) ' +
-      'con 2 variantes temáticas (Vehículos, Restaurante), distintas de las de "React Native — CRUD ' +
+      'con 4 variantes temáticas (Vehículos, Restaurante, Papelería, Nómina), distintas de las de "React Native — CRUD ' +
       'y pantallas de lógica". El proyecto trae una app "Tareas" de referencia YA RESUELTA (CRUD ' +
       'completo + 2 páginas de cálculo) contra otra API distinta a la asignada. El alumno debe ' +
       'duplicar y adaptar ese mismo patrón en 3 páginas propias (CRUD contra su API asignada + ' +
@@ -4027,6 +4022,40 @@ const { data: user } = useQuery({
           {
             order: 3, points: 2, title: 'Recargo del 15% a platos con mayor tiempo de preparación',
             statement: 'Completá `Pregunta3Page` (`src/pages/Pregunta3.tsx`, siguiendo el patrón de `ReferenciaBusquedaPage`) para, primero, calcular el `tiempoPreparacion` promedio de todos los platos; luego, a los platos cuyo `tiempoPreparacion` sea mayor a ese promedio (por ser más laboriosos), aplicarles un recargo del 15% sobre el `precio` (fórmula: `precioConRecargo = precio * 1.15`) y mostrar plato, precio original y precio con recargo de cada uno, además del total del recargo acumulado (suma de `precioConRecargo - precio` de todos esos platos).',
+          },
+        ],
+      },
+      {
+        theme_name: 'Papelería', order_index: 2,
+        questions: [
+          {
+            order: 1, points: 6, title: 'CRUD de productos de papelería contra tu API asignada',
+            statement: 'Completá `src/api/productosApi.ts` y la página `Pregunta1.tsx` (renombrala a `MiProductos.tsx` / función `MiProductosPage`, y actualizá el import + case en `AppRouter.tsx` y la etiqueta en `Menu.tsx`) para que liste, cree, edite y elimine productos (producto, marca, categoria, precio, stock, codigo, disponible) contra el endpoint de tu variante, con el formulario y la lista separados en sus propios componentes dentro de `src/components/`, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 409 la creación/edición de un producto con un `codigo` ya usado por otro registro: tu página debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
+          },
+          {
+            order: 2, points: 2, title: 'Porcentaje de productos disponibles y su stock total',
+            statement: 'Completá `Pregunta2Page` (`src/pages/Pregunta2.tsx`, siguiendo el patrón de `ReferenciaPromedioPage`) para calcular y mostrar: el porcentaje de productos con `disponible == true` respecto al total (redondeado a 1 decimal, fórmula: `disponibles / total * 100`) y la suma del `stock` de esos productos disponibles.',
+          },
+          {
+            order: 3, points: 2, title: 'Liquidación del 20% a productos con stock por encima del promedio',
+            statement: 'Completá `Pregunta3Page` (`src/pages/Pregunta3.tsx`, siguiendo el patrón de `ReferenciaBusquedaPage`) para, primero, calcular el `stock` promedio de todos los productos; luego, a los productos cuyo `stock` sea mayor a ese promedio, aplicarles un descuento de liquidación del 20% (fórmula: `precioConDescuento = precio * 0.8`) y mostrar producto, precio original y precio con descuento de cada uno, además del ahorro total acumulado (suma de `precio - precioConDescuento` de todos esos productos).',
+          },
+        ],
+      },
+      {
+        theme_name: 'Nómina', order_index: 3,
+        questions: [
+          {
+            order: 1, points: 6, title: 'CRUD de empleados contra tu API asignada',
+            statement: 'Completá `src/api/empleadosApi.ts` y la página `Pregunta1.tsx` (renombrala a `MiEmpleados.tsx` / función `MiEmpleadosPage`, y actualizá el import + case en `AppRouter.tsx` y la etiqueta en `Menu.tsx`) para que liste, cree, edite y elimine empleados (nombre, cargo, departamento, salarioBase, antiguedad, codigoEmpleado, activo) contra el endpoint de tu variante, con el formulario y la lista separados en sus propios componentes dentro de `src/components/`, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 400 el intento de eliminar un empleado con `activo == true` (debe desactivarse primero): tu página debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente.',
+          },
+          {
+            order: 2, points: 2, title: 'Porcentaje de empleados activos y su salario total',
+            statement: 'Completá `Pregunta2Page` (`src/pages/Pregunta2.tsx`, siguiendo el patrón de `ReferenciaPromedioPage`) para calcular y mostrar: el porcentaje de empleados con `activo == true` respecto al total de la nómina (redondeado a 1 decimal, fórmula: `activos / total * 100`) y la suma del `salarioBase` de esos empleados activos.',
+          },
+          {
+            order: 3, points: 2, title: 'Bono de antigüedad del 8% para empleados con mayor antigüedad',
+            statement: 'Completá `Pregunta3Page` (`src/pages/Pregunta3.tsx`, siguiendo el patrón de `ReferenciaBusquedaPage`) para, primero, calcular la `antiguedad` promedio de todos los empleados; luego, a los empleados cuya `antiguedad` sea mayor a ese promedio, calcularles un bono de antigüedad aplicando la fórmula `bono = salarioBase * 0.08` (8% de su salario base), mostrando nombre, antigüedad y bono de cada uno, además de la suma total de bonos de todos esos empleados.',
           },
         ],
       },
@@ -4085,7 +4114,7 @@ const { data: user } = useQuery({
 
   private async seedExamTemplateReactNativeBusinessRulesSingle(admin: User) {
     const templateName =
-      'Programación IV — React Native, CRUD con reglas de negocio (API real) (Ejercicio único)';
+      'React Native, CRUD con reglas de negocio (API real) (Ejercicio único)';
     const description =
       'Examen de React Native (proyecto organizado en `pages/`, `components/`, `api/` y `router/`) ' +
       'de una sola variante (Mascotas). El proyecto trae una app "Tareas" de referencia YA RESUELTA ' +
@@ -4160,8 +4189,7 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateReactRealApi(admin: User) {
-    // Sin prefijo "Programación IV —" (a pedido): template nuevo y separado de
-    // "Programación IV — React, componentes y Tests con Vitest" (que se mantiene sin tocar).
+    // Template separado de "React, componentes y Tests con Vitest" (que se mantiene sin tocar).
     // Reutiliza el mismo generador (`buildReactExamFiles`, ya actualizado para consumir la API
     // real de la variante vía `fetch`) — mismas 4 variantes y preguntas.
     const templateName = 'React — CRUD y Tests con Vitest (API real)';
@@ -4261,7 +4289,6 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateReactRealApiSingle(admin: User) {
-    // Sin prefijo "Programación IV —", igual criterio que seedExamTemplateReactRealApi.
     // Variante única (Papelería) — la misma que usan los "Ejercicio único" de Flutter/React/RN.
     const templateName = 'React — CRUD y Tests con Vitest (API real) (Ejercicio único)';
     const description =
@@ -4539,7 +4566,6 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateReactCypress(admin: User) {
-    // Sin prefijo "Programación IV —", mismo criterio que seedExamTemplateReactRealApi.
     // Usa `buildReactCypressExamFiles`: mismo proyecto base (React + Vite) que el examen
     // Vitest, pero con `cypress.config.ts`/`package.json`/`index.html` para correrse LOCAL
     // (este playground no ejecuta Cypress en vivo) — corrección manual, mismas 4 variantes.
@@ -4632,7 +4658,6 @@ const { data: user } = useQuery({
   }
 
   private async seedExamTemplateReactCypressSingle(admin: User) {
-    // Sin prefijo "Programación IV —", igual criterio que seedExamTemplateReactCypress.
     // Variante única (Papelería) — la misma que usan los "Ejercicio único" de Flutter/React/RN.
     const templateName = 'React — CRUD y Tests E2E con Cypress (API real) (Ejercicio único)';
     const description =

@@ -75,6 +75,32 @@ export class PlaygroundService {
     private mailService: MailService,
   ) {}
 
+  /** Explicación general de la rúbrica (60/20/20), insertada una vez en cada ENUNCIADO.md. */
+  private static readonly RUBRIC_EXPLICATION = `## Rúbrica de evaluación
+
+Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exacto de su puntaje:
+
+- **Funcional (60%):** el código corre sin errores y se puede usar/navegar en el preview.
+- **Lógica implementada (20%):** los cálculos y las reglas de negocio (incluyendo el manejo de
+  errores de negocio, ej. mensajes de conflicto) dan el resultado correcto.
+- **Codificación (20%):** nombres y organización según lo pedido (ej. renombrado de
+  archivos/funciones), separación en componentes, estilo, y que se siga el patrón solicitado en
+  el enunciado.
+`;
+
+  /** Desglose numérico (60/20/20 exacto, sin redondear) del puntaje de una pregunta. */
+  private buildRubricBreakdown(points: number): string {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const fmt = (n: number) => {
+      const r = round2(n);
+      return Number.isInteger(r) ? `${r}` : `${r}`.replace(/0+$/, '').replace(/\.$/, '');
+    };
+    const funcional = fmt(points * 0.6);
+    const logica = fmt(points * 0.2);
+    const codificacion = fmt(points * 0.2);
+    return `${funcional} funcional / ${logica} lógica / ${codificacion} codificación`;
+  }
+
   /** Builds blank exam files with only the question statement as a top comment, per the requested file mode. */
   private buildExamVersionFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion', language?: string) {
     // Dispatch is purely by ExamTemplate.language — no name-string matching. Each React variant
@@ -145,6 +171,8 @@ export class PlaygroundService {
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
+      PlaygroundService.RUBRIC_EXPLICATION,
+      '',
       '## Tu API (variante asignada)',
       '',
       `> \`GET/POST ${endpoint}\` y \`GET/PATCH/DELETE ${endpoint}/:id\`.`,
@@ -185,7 +213,7 @@ export class PlaygroundService {
       '',
       '## Preguntas',
       '',
-      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n\n${q.statement}\n`),
     ].join('\n');
 
     return [
@@ -779,6 +807,8 @@ flutter:
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
+      PlaygroundService.RUBRIC_EXPLICATION,
+      '',
       '## Tu recurso de referencia (variante asignada)',
       '',
       `> El módulo \`src/${resource}/\` YA VIENE RESUELTO como ejemplo: un CRUD completo`,
@@ -843,7 +873,7 @@ flutter:
       '',
       '## Preguntas',
       '',
-      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n\n${q.statement}\n`),
     ].join('\n');
 
     const samplePayload = JSON.stringify(seeds[0] ?? {});
@@ -1263,6 +1293,8 @@ flutter:
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
+      PlaygroundService.RUBRIC_EXPLICATION,
+      '',
       '## Tu API (variante asignada)',
       '',
       `> \`GET/POST ${endpoint}\` y \`GET/PATCH/DELETE ${endpoint}/:id\`.`,
@@ -1310,7 +1342,7 @@ flutter:
       '',
       '## Preguntas',
       '',
-      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n\n${q.statement}\n`),
     ].join('\n');
 
     const hashRouterTsx = [
@@ -1840,6 +1872,8 @@ flutter:
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
+      PlaygroundService.RUBRIC_EXPLICATION,
+      '',
       '## Tu recurso de referencia (variante asignada)',
       '',
       `> \`src/components/${ClassName}Card.tsx\` y \`src/pages/${ClassName}ListaPage.tsx\` YA VIENEN RESUELTOS`,
@@ -1899,7 +1933,7 @@ flutter:
       '',
       '## Preguntas',
       '',
-      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n\n${q.statement}\n`),
     ].join('\n');
 
     const cardTsx = [
@@ -2587,6 +2621,8 @@ flutter:
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
+      PlaygroundService.RUBRIC_EXPLICATION,
+      '',
       '## Tu recurso de referencia (variante asignada)',
       '',
       `> \`src/components/${ClassName}Card.tsx\` y \`src/pages/${ClassName}ListaPage.tsx\` YA VIENEN`,
@@ -2659,7 +2695,7 @@ flutter:
       '',
       '## Preguntas',
       '',
-      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n\n${q.statement}\n`),
     ].join('\n');
 
     const cardTsx = [
@@ -3297,6 +3333,8 @@ flutter:
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
+      PlaygroundService.RUBRIC_EXPLICATION,
+      '',
       '## Tu API (variante asignada)',
       '',
       `> \`GET/POST ${endpoint}\` y \`GET/PATCH/DELETE ${endpoint}/:id\`.`,
@@ -3395,7 +3433,7 @@ flutter:
       '',
       '## Preguntas',
       '',
-      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n\n${q.statement}\n`),
     ].join('\n');
 
     const referenciaModelTs = [
@@ -4083,6 +4121,8 @@ flutter:
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
+      PlaygroundService.RUBRIC_EXPLICATION,
+      '',
       '## Tu API (variante asignada)',
       '',
       `> \`GET/POST ${endpoint}\` y \`GET/PATCH/DELETE ${endpoint}/:id\`.`,
@@ -4122,7 +4162,7 @@ flutter:
       '',
       '## Preguntas',
       '',
-      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n\n${q.statement}\n`),
     ].join('\n');
 
     const indexHtml = [
@@ -4411,6 +4451,8 @@ flutter:
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
+      PlaygroundService.RUBRIC_EXPLICATION,
+      '',
       '## Tus datos (arreglo en memoria, SIN API)',
       '',
       '  Este examen NO usa `fetch` ni ninguna API: los datos ya vienen cargados como un arreglo',
@@ -4455,7 +4497,7 @@ flutter:
       '',
       '## Preguntas',
       '',
-      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts)\n\n${q.statement}\n`),
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n\n${q.statement}\n`),
     ].join('\n');
 
     const indexHtml = [
