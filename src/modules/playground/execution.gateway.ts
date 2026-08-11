@@ -14,7 +14,10 @@ import { join, dirname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ExecutionService } from './execution.service';
+import { PlaygroundProject } from '../../entities/playground-project.entity';
 
 interface RunningSession {
   process: ChildProcessWithoutNullStreams;
@@ -169,6 +172,8 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   constructor(
     private readonly jwtService: JwtService,
     private readonly executionService: ExecutionService,
+    @InjectRepository(PlaygroundProject)
+    private readonly projectRepo: Repository<PlaygroundProject>,
   ) {
     fs.mkdir(this.KOTLIN_CACHE_DIR, { recursive: true }).catch(() => {});
     // Pre-warm the kotlinc daemon so the first student compile doesn't pay cold-start
@@ -196,13 +201,32 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.killSession(client.id);
   }
 
+  /** Blocks execution when the project was auto-locked after too many real
+   *  security incidents (see `logCheat` in playground.service.ts). Returns
+   *  `true` if execution should be blocked (and already emitted the error). */
+  private async isBlockedBySecurityLock(client: Socket, projectId?: string): Promise<boolean> {
+    if (!projectId) return false;
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (project?.security_locked) {
+      client.emit(
+        'terminal_output',
+        `\x1b[31mEditor bloqueado por múltiples incidentes de seguridad. Contacta a tu profesor.\x1b[0m\r\n`,
+      );
+      client.emit('execution_done', { code: 1 });
+      return true;
+    }
+    return false;
+  }
+
   // ── start_execution ────────────────────────────────────────────────────────
 
   @SubscribeMessage('start_execution')
   async handleStartExecution(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { language: string; files: { name: string; path?: string; content: string }[]; targetFile?: string },
+    @MessageBody() payload: { language: string; files: { name: string; path?: string; content: string }[]; targetFile?: string; projectId?: string },
   ) {
+    if (await this.isBlockedBySecurityLock(client, payload?.projectId)) return;
+
     // Kill any existing session for this client before starting a new one
     this.killSession(client.id);
 
@@ -308,8 +332,10 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   @SubscribeMessage('start_test_execution')
   async handleStartTestExecution(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { files: { name: string; path?: string; content: string }[]; language?: string },
+    @MessageBody() payload: { files: { name: string; path?: string; content: string }[]; language?: string; projectId?: string },
   ) {
+    if (await this.isBlockedBySecurityLock(client, payload?.projectId)) return;
+
     this.killSession(client.id);
 
     const language = (payload?.language ?? 'react').toLowerCase();

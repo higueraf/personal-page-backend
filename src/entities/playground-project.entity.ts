@@ -67,6 +67,12 @@ export class PlaygroundProject {
   @Column({ type: 'jsonb', default: [] })
   cheating_logs: Array<{ timestamp: string; action: string; details?: string }>;
 
+  /** Se activa automáticamente cuando se acumulan demasiados incidentes reales de seguridad
+   *  (ver `logCheat` en playground.service.ts). Mientras esté en `true`, el examen queda en
+   *  solo lectura (no se puede guardar/ejecutar) hasta que un admin/profesor lo reactive. */
+  @Column({ default: false })
+  security_locked: boolean;
+
   /** Groups all PlaygroundProjects created from the same assignment batch */
   @Column({ nullable: true })
   exam_group_id: string;

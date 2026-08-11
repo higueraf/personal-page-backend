@@ -14,6 +14,13 @@ export class PlaygroundController {
     private examTemplateService: ExamTemplateService,
   ) {}
 
+  /** Presencia (no validación criptográfica) del header que SEB real envía cuando
+   *  `sendBrowserExamKey` está habilitado en el .seb — ver `assertSebHeader` en el service. */
+  private hasSebHeader(req: Request): boolean {
+    const header = req.headers['x-safeexambrowser-configkeyhash'];
+    return typeof header === 'string' && header.length > 0;
+  }
+
   @Get()
   async getProjects(@Req() req: Request) {
     const user = req.user as any;
@@ -75,7 +82,7 @@ export class PlaygroundController {
     @Body('files') files: Array<{ id?: string; name: string; content: string; path: string; is_folder?: boolean }>,
   ) {
     const user = req.user as any;
-    return this.playgroundService.saveAllFiles(id, files ?? [], user.id);
+    return this.playgroundService.saveAllFiles(id, files ?? [], user.id, this.hasSebHeader(req));
   }
 
   /**
@@ -90,7 +97,7 @@ export class PlaygroundController {
     @Body('name') newName: string,
   ) {
     const user = req.user as any;
-    return this.playgroundService.renameFile(id, fileId, newName, user.id);
+    return this.playgroundService.renameFile(id, fileId, newName, user.id, this.hasSebHeader(req));
   }
 
   @Put(':id/files/:name')
@@ -103,7 +110,7 @@ export class PlaygroundController {
     @Body('path') path: string,
   ) {
     const user = req.user as any;
-    return this.playgroundService.updateFile(id, name, content, user.id, is_folder, path);
+    return this.playgroundService.updateFile(id, name, content, user.id, is_folder, path, this.hasSebHeader(req));
   }
 
   @Delete(':id/files/:fileId')
@@ -113,7 +120,7 @@ export class PlaygroundController {
     @Param('fileId') fileId: string,
   ) {
     const user = req.user as any;
-    return this.playgroundService.deleteFile(id, fileId, user.id);
+    return this.playgroundService.deleteFile(id, fileId, user.id, this.hasSebHeader(req));
   }
 
   @Delete(':id')
@@ -379,7 +386,7 @@ export class PlaygroundController {
   <key>startURL</key>
   <string>${startUrl}</string>
   <key>sendBrowserExamKey</key>
-  <false/>
+  <true/>
   <key>allowQuit</key>
   <false/>
   <key>ignoreExitKey</key>
@@ -474,5 +481,50 @@ export class PlaygroundController {
       throw new ForbiddenException('Solo administradores o profesores pueden ver el prompt de corrección.');
     }
     return this.playgroundService.buildGradingPrompt(id);
+  }
+
+  /**
+   * Admin/Teacher: lightweight timeline of snapshots (id + created_at + file_count)
+   * taken automatically on every save of an exam project.
+   */
+  @Get('admin/projects/:projectId/history')
+  async getProjectHistory(@Req() req: Request, @Param('projectId') projectId: string) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden ver el historial.');
+    }
+    return { data: await this.playgroundService.getSnapshots(projectId) };
+  }
+
+  /**
+   * Admin/Teacher: full file contents of a single snapshot in a project's history.
+   */
+  @Get('admin/projects/:projectId/history/:snapshotId')
+  async getProjectSnapshot(
+    @Req() req: Request,
+    @Param('projectId') projectId: string,
+    @Param('snapshotId') snapshotId: string,
+  ) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden ver el historial.');
+    }
+    return this.playgroundService.getSnapshot(projectId, snapshotId);
+  }
+
+  /**
+   * Admin/Teacher: reactivate a project that was auto-locked after accumulating
+   * too many real security incidents (see `logCheat` in playground.service.ts).
+   */
+  @Post('admin/projects/:id/unlock')
+  async unlockProject(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as any;
+    const allowedRoles = ['admin', 'teacher'];
+    if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
+      throw new ForbiddenException('Solo administradores o profesores pueden reactivar exámenes.');
+    }
+    return this.playgroundService.unlockProject(id);
   }
 }

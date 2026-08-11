@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { PlaygroundProject } from '../../entities/playground-project.entity';
 import { PlaygroundFile } from '../../entities/playground-file.entity';
+import { PlaygroundSnapshot } from '../../entities/playground-snapshot.entity';
 import { PlaygroundTemplate } from '../../entities/playground-template.entity';
 import { ExamTemplate } from '../../entities/exam-template.entity';
 import { ExamVersion } from '../../entities/exam-version.entity';
@@ -24,7 +25,7 @@ import { TodoApiModule } from '../todo-api/todo-api.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PlaygroundProject, PlaygroundFile, PlaygroundTemplate, ExamTemplate, ExamVersion, User]),
+    TypeOrmModule.forFeature([PlaygroundProject, PlaygroundFile, PlaygroundSnapshot, PlaygroundTemplate, ExamTemplate, ExamVersion, User]),
     MailModule,
     PracticeApiModule,
     TodoApiModule,

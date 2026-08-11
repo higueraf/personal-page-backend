@@ -4,6 +4,7 @@ import { Repository, Not, IsNull } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { PlaygroundProject, ProjectStatus } from '../../entities/playground-project.entity';
 import { PlaygroundFile } from '../../entities/playground-file.entity';
+import { PlaygroundSnapshot } from '../../entities/playground-snapshot.entity';
 import { PlaygroundTemplate } from '../../entities/playground-template.entity';
 import { ExamVersion, ExamQuestion } from '../../entities/exam-version.entity';
 import { User } from '../../entities/user.entity';
@@ -66,6 +67,8 @@ export class PlaygroundService {
     private projectRepo: Repository<PlaygroundProject>,
     @InjectRepository(PlaygroundFile)
     private fileRepo: Repository<PlaygroundFile>,
+    @InjectRepository(PlaygroundSnapshot)
+    private snapshotRepo: Repository<PlaygroundSnapshot>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
     @InjectRepository(PlaygroundTemplate)
@@ -4867,12 +4870,17 @@ flutter:
     projectId: string,
     files: { id?: string; name: string; content: string; path: string; is_folder?: boolean }[],
     userId: string,
+    sebHeaderPresent = false,
   ) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();
     if (project.is_exam && project.status !== ProjectStatus.PENDING) {
       throw new ForbiddenException('Este examen ya fue entregado y no se puede modificar.');
     }
+    if (project.security_locked) {
+      throw new ForbiddenException('Editor bloqueado por múltiples incidentes de seguridad. Contacta a tu profesor.');
+    }
+    this.assertSebHeader(project, sebHeaderPresent);
 
     const existingFiles = await this.fileRepo.find({ where: { project_id: projectId } });
     const keptIds = new Set<string>();
@@ -4914,16 +4922,66 @@ flutter:
       await this.fileRepo.remove(toDelete);
     }
 
+    // Historial: guarda una copia completa de los archivos en cada guardado de un examen
+    // (auto-save cada 5 min o guardado manual) para que el admin pueda ver cómo fue avanzando
+    // el alumno. No afecta al proyecto real — es una tabla aparte, solo de lectura.
+    if (project.is_exam) {
+      await this.snapshotRepo.save(
+        this.snapshotRepo.create({
+          project_id: projectId,
+          files: files.map((f) => ({
+            name: f.name,
+            path: f.path,
+            content: f.is_folder ? '' : f.content,
+            is_folder: f.is_folder ?? false,
+          })),
+        }),
+      );
+    }
+
     return { status: 'saved', count: files.length };
   }
 
+  /** Lista liviana de snapshots (sin contenido) para la línea de tiempo del admin. */
+  async getSnapshots(projectId: string) {
+    const snapshots = await this.snapshotRepo.find({
+      where: { project_id: projectId },
+      order: { created_at: 'ASC' },
+    });
+    return snapshots.map((s) => ({
+      id: s.id,
+      created_at: s.created_at,
+      file_count: s.files?.length ?? 0,
+    }));
+  }
+
+  /** Contenido completo de un snapshot puntual (para mostrarlo en el visor de solo lectura). */
+  async getSnapshot(projectId: string, snapshotId: string) {
+    const snapshot = await this.snapshotRepo.findOne({ where: { id: snapshotId, project_id: projectId } });
+    if (!snapshot) throw new NotFoundException('Snapshot no encontrado');
+    return snapshot;
+  }
+
+  /** Admin/Teacher: reactiva un examen bloqueado por incidentes de seguridad. */
+  async unlockProject(projectId: string) {
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Proyecto no encontrado');
+    project.security_locked = false;
+    await this.projectRepo.save(project);
+    return { status: 'unlocked' };
+  }
+
   /** Rename a file or folder by its DB UUID. Updates child paths for folders. */
-  async renameFile(projectId: string, fileId: string, newName: string, userId: string) {
+  async renameFile(projectId: string, fileId: string, newName: string, userId: string, sebHeaderPresent = false) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();
     if (project.is_exam && project.status !== ProjectStatus.PENDING) {
       throw new ForbiddenException('Este examen ya fue entregado y no se puede modificar.');
     }
+    if (project.security_locked) {
+      throw new ForbiddenException('Editor bloqueado por múltiples incidentes de seguridad. Contacta a tu profesor.');
+    }
+    this.assertSebHeader(project, sebHeaderPresent);
 
     const file = await this.fileRepo.findOne({ where: { id: fileId, project_id: projectId } });
     if (!file) throw new NotFoundException('File not found');
@@ -4949,12 +5007,16 @@ flutter:
     return this.fileRepo.save(file);
   }
 
-  async updateFile(projectId: string, fileName: string, content: string, userId: string, isFolder: boolean = false, path: string = '') {
+  async updateFile(projectId: string, fileName: string, content: string, userId: string, isFolder: boolean = false, path: string = '', sebHeaderPresent = false) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();
     if (project.is_exam && project.status !== ProjectStatus.PENDING) {
       throw new ForbiddenException('Este examen ya fue entregado y no se puede modificar.');
     }
+    if (project.security_locked) {
+      throw new ForbiddenException('Editor bloqueado por múltiples incidentes de seguridad. Contacta a tu profesor.');
+    }
+    this.assertSebHeader(project, sebHeaderPresent);
 
     let file = await this.fileRepo.findOne({ where: { project_id: projectId, name: fileName, path } });
     if (file) {
@@ -4966,12 +5028,16 @@ flutter:
     return this.fileRepo.save(file);
   }
 
-  async deleteFile(projectId: string, fileId: string, userId: string) {
+  async deleteFile(projectId: string, fileId: string, userId: string, sebHeaderPresent = false) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();
     if (project.is_exam && project.status !== ProjectStatus.PENDING) {
       throw new ForbiddenException('Este examen ya fue entregado y no se puede modificar.');
     }
+    if (project.security_locked) {
+      throw new ForbiddenException('Editor bloqueado por múltiples incidentes de seguridad. Contacta a tu profesor.');
+    }
+    this.assertSebHeader(project, sebHeaderPresent);
 
     const file = await this.fileRepo.findOne({ where: { id: fileId, project_id: projectId } });
     if (!file) throw new NotFoundException('File not found');
@@ -4995,6 +5061,40 @@ flutter:
   // que llegue a menos de este umbral del último evento ya logueado, sin importar el `action`.
   private static readonly CHEAT_LOG_DEDUPE_WINDOW_MS = 2000;
 
+  // Umbral de incidentes reales (ya agrupados, no eventos crudos) a partir del cual el editor
+  // se bloquea automáticamente en solo lectura hasta que un admin/profesor lo reactive.
+  private static readonly SECURITY_LOCK_THRESHOLD = 5;
+
+  /** Defensa adicional server-side para exámenes con `require_seb`: exige que el request traiga
+   *  el header que un SEB real (con `sendBrowserExamKey` habilitado) siempre envía. No es una
+   *  validación criptográfica del hash (SEB firma la URL completa con la config real, lo cual es
+   *  frágil de reproducir acá) — solo cierra el hueco actual de que cualquier navegador normal con
+   *  un user-agent falsificado pase el check hoy 100% client-side sin tener SEB instalado. */
+  private assertSebHeader(project: PlaygroundProject, sebHeaderPresent: boolean) {
+    if (project.require_seb && !sebHeaderPresent) {
+      throw new ForbiddenException('Esta acción requiere Safe Exam Browser.');
+    }
+  }
+
+  /** Agrupa logs crudos en "incidentes reales": los mismos 2000ms de deduplicación que ya se
+   *  aplican al insertar, mantenido acá también por si alguna vez hay logs históricos con
+   *  eventos más juntos que ese umbral (ej. datos previos a que existiera la deduplicación). */
+  private groupCheatingIncidents(
+    logs: Array<{ timestamp: string; action: string; details?: string }>,
+  ): number {
+    if (!logs || logs.length === 0) return 0;
+    const sorted = [...logs].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
+    let groups = 1;
+    for (let i = 1; i < sorted.length; i++) {
+      const prevTs = new Date(sorted[i - 1].timestamp).getTime();
+      const currTs = new Date(sorted[i].timestamp).getTime();
+      if (currTs - prevTs >= PlaygroundService.CHEAT_LOG_DEDUPE_WINDOW_MS) groups++;
+    }
+    return groups;
+  }
+
   async logCheat(projectId: string, userId: string, action: string, details?: string) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project || project.user_id !== userId) throw new ForbiddenException();
@@ -5007,15 +5107,22 @@ flutter:
       const lastTs = new Date(lastLog.timestamp).getTime();
       if (now.getTime() - lastTs < PlaygroundService.CHEAT_LOG_DEDUPE_WINDOW_MS) {
         // Mismo incidente real ya registrado por otro listener hace instantes: no duplicar.
-        return { status: 'deduped' };
+        return { status: 'deduped', security_locked: project.security_locked };
       }
     }
 
     currentLogs.push({ timestamp: now.toISOString(), action, details });
     project.cheating_logs = currentLogs;
 
+    if (!project.security_locked) {
+      const incidentCount = this.groupCheatingIncidents(currentLogs);
+      if (incidentCount >= PlaygroundService.SECURITY_LOCK_THRESHOLD) {
+        project.security_locked = true;
+      }
+    }
+
     await this.projectRepo.save(project);
-    return { status: 'logged' };
+    return { status: 'logged', security_locked: project.security_locked };
   }
 
   async submitExam(id: string, userId: string) {
