@@ -90,6 +90,7 @@ export class AppSeeder {
     await this.seedExamTemplateHtmlArraySingle(adminUser);
     await this.seedExamTemplateReactNativeBusinessRules(adminUser);
     await this.seedExamTemplateReactNativeBusinessRulesSingle(adminUser);
+    await this.seedExamTemplateReactNativeSeguroMedico(adminUser);
 
     return { ok: true };
   }
@@ -4138,6 +4139,84 @@ const { data: user } = useQuery({
         {
           order: 3, points: 2, title: 'Dosis estimada de alimento por peso',
           statement: 'Completá `Pregunta3Page` (`src/pages/Pregunta3.tsx`, siguiendo el patrón de `ReferenciaBusquedaPage`) para, primero, calcular el `peso` promedio de todas las mascotas; luego, a las mascotas cuyo `peso` sea mayor a ese promedio, calcularles una "dosis estimada de alimento" aplicando la fórmula `dosis = peso * 0.05` (5% de su peso en kg), mostrando nombre, peso y dosis de cada una, además de la suma total de dosis de todas esas mascotas.',
+        },
+      ],
+    };
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'react-native',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions: version.questions,
+        }),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'react-native';
+    await this.examTemplatesRepo.save(template);
+
+    const existing = (template.versions ?? []).find((v) => v.theme_name === version.theme_name);
+    if (existing) {
+      existing.order_index = version.order_index;
+      existing.questions = version.questions;
+      await this.examVersionsRepo.save(existing);
+    } else {
+      await this.examVersionsRepo.save(
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: version.theme_name,
+          order_index: version.order_index,
+          questions: version.questions,
+        }),
+      );
+    }
+  }
+
+  // ── Examen React Native — CRUD con reglas de negocio, variante única (Seguro Médico) ──
+  private async seedExamTemplateReactNativeSeguroMedico(admin: User) {
+    // Reutiliza el mismo generador genérico `buildReactNativeExamFiles` — solo se agrega la
+    // variante `seguromedico` (ver `practice-variants.config.ts`) y sus preguntas, sin tocar código.
+    const templateName = 'React Native, CRUD con reglas de negocio — Seguro Médico (API real)';
+    const description =
+      'Examen de React Native (proyecto organizado en `pages/`, `components/`, `api/` y `router/`) ' +
+      'de una sola variante (Seguro Médico). El proyecto trae una app "Tareas" de referencia YA ' +
+      'RESUELTA (CRUD completo + 2 páginas de cálculo) contra otra API distinta a la asignada. El ' +
+      'alumno debe duplicar y adaptar ese mismo patrón en 3 páginas propias (CRUD contra su API ' +
+      'asignada + 2 páginas de cálculo), manejando además el error de la regla de negocio de la ' +
+      'variante (número de póliza único). No hay tests automáticos: la corrección es manual (código + preview).';
+
+    const version: { theme_name: string; order_index: number; questions: ExamQuestion[] } = {
+      theme_name: 'Seguro Médico',
+      order_index: 0,
+      questions: [
+        {
+          order: 1, points: 6, title: 'CRUD de pólizas de seguro médico contra tu API asignada',
+          statement: 'Completá `src/api/polizasApi.ts` y la página `Pregunta1.tsx` (renombrala a `MisPolizas.tsx` / función `MisPolizasPage`, y actualizá el import + case en `AppRouter.tsx` y la etiqueta en `Menu.tsx`) para que liste, cree, edite y elimine pólizas de seguro médico (numeroPoliza, asegurado, tipoPlan, primaMensual, cobertura, fechaVencimiento, activa) contra el endpoint de tu variante, con el formulario y la lista separados en sus propios componentes dentro de `src/components/`, siguiendo el mismo patrón (fetch → estado → render) que `ReferenciaPage`. La API rechaza con error 409 la creación/edición de una póliza con un `numeroPoliza` ya usado por otro registro: tu página debe mostrarle ese mensaje de error al usuario (por ejemplo con un `Alert.alert` o un texto de error en pantalla) en vez de fallar silenciosamente.',
+        },
+        {
+          order: 2, points: 2, title: 'Total recaudado por pólizas activas',
+          statement: 'Completá `Pregunta2Page` (`src/pages/Pregunta2.tsx`, siguiendo el patrón de `ReferenciaPromedioPage`) para calcular y mostrar: el total mensual recaudado por pólizas con `activa == true` (suma de `primaMensual` de esas pólizas), el total anual proyectado (ese total mensual multiplicado por 12) y la cantidad de pólizas activas.',
+        },
+        {
+          order: 3, points: 2, title: 'Recargo del 12% a pólizas con cobertura por encima del promedio',
+          statement: 'Completá `Pregunta3Page` (`src/pages/Pregunta3.tsx`, siguiendo el patrón de `ReferenciaBusquedaPage`) para, primero, calcular la `cobertura` promedio de todas las pólizas; luego, a las pólizas cuya `cobertura` sea mayor a ese promedio (por representar mayor riesgo), aplicarles un recargo del 12% sobre la `primaMensual` (fórmula: `primaConRecargo = primaMensual * 1.12`) y mostrar número de póliza, asegurado, prima original y prima con recargo de cada una, además del total del recargo acumulado (suma de `primaConRecargo - primaMensual` de todas esas pólizas).',
         },
       ],
     };

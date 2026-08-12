@@ -180,6 +180,25 @@ export const PRACTICE_VARIANTS: Record<string, VariantConfig> = {
       { plato: 'Torta de chocolate', categoria: 'Postre', precio: 3.5, tiempoPreparacion: 5, ingredientePrincipal: 'Chocolate', destacado: true, disponible: true },
     ],
   },
+  seguromedico: {
+    resource: 'polizas',
+    fields: [
+      { key: 'numeroPoliza', type: 'string', label: 'Número de póliza' },
+      { key: 'asegurado', type: 'string', label: 'Asegurado' },
+      { key: 'tipoPlan', type: 'string', label: 'Tipo de plan' },
+      { key: 'primaMensual', type: 'double', label: 'Prima mensual' },
+      { key: 'cobertura', type: 'double', label: 'Cobertura' },
+      { key: 'fechaVencimiento', type: 'string', label: 'Fecha de vencimiento' },
+      { key: 'activa', type: 'bool', label: 'Activa' },
+    ],
+    seeds: [
+      { numeroPoliza: 'POL-1001', asegurado: 'Carlos Andrade', tipoPlan: 'Premium', primaMensual: 85.0, cobertura: 50000, fechaVencimiento: '2027-01-15', activa: true },
+      { numeroPoliza: 'POL-1002', asegurado: 'Lucía Fernández', tipoPlan: 'Básico', primaMensual: 35.0, cobertura: 15000, fechaVencimiento: '2026-11-30', activa: true },
+      { numeroPoliza: 'POL-1003', asegurado: 'Mateo Salazar', tipoPlan: 'Intermedio', primaMensual: 55.0, cobertura: 30000, fechaVencimiento: '2026-09-10', activa: false },
+      { numeroPoliza: 'POL-1004', asegurado: 'Valentina Ortiz', tipoPlan: 'Premium', primaMensual: 90.0, cobertura: 60000, fechaVencimiento: '2027-03-22', activa: true },
+      { numeroPoliza: 'POL-1005', asegurado: 'Andrés Vega', tipoPlan: 'Básico', primaMensual: 30.0, cobertura: 10000, fechaVencimiento: '2026-08-05', activa: false },
+    ],
+  },
   mascotas: {
     resource: 'mascotas',
     fields: [

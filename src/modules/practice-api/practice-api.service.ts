@@ -70,6 +70,13 @@ const UNIQUE_FIELD_BY_VARIANT: Record<string, string> = {
   vehiculos: 'placa',
   mascotas: 'codigo',
   papeleria: 'codigo',
+  seguromedico: 'numeroPoliza',
+};
+
+const UNIQUE_FIELD_LABEL: Record<string, string> = {
+  placa: 'esa placa',
+  codigo: 'ese código',
+  numeroPoliza: 'ese número de póliza',
 };
 
 @Injectable()
@@ -177,7 +184,7 @@ export class PracticeApiService {
         String(s.data?.[field]).toLowerCase() === String(data[field]).toLowerCase(),
     );
     if (duplicate) {
-      const label = field === 'placa' ? 'esa placa' : 'ese código';
+      const label = UNIQUE_FIELD_LABEL[field] ?? 'ese valor';
       throw new ConflictException(`Ya existe un registro con ${label}.`);
     }
   }
