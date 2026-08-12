@@ -51,6 +51,12 @@ export class PlaygroundProject {
   @Column({ default: false })
   require_seb: boolean;
 
+  /** Minutes offset from UTC used to interpret/display this exam's start/end times
+   *  (e.g. -300 for UTC-5 / Ecuador, which is the platform-wide default). Stored per
+   *  exam/assignment batch so admins can schedule exams for students in other timezones. */
+  @Column({ type: 'int', default: -300 })
+  timezone_offset_minutes: number;
+
   @Column({
     type: 'enum',
     enum: ProjectStatus,

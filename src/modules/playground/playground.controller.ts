@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlaygroundService } from './playground.service';
 import { ExecutionService } from './execution.service';
 import { ExamTemplateService } from './exam-template.service';
+import { DEFAULT_TIMEZONE_OFFSET_MINUTES, TIMEZONE_OPTIONS } from './timezone.constants';
 import { Request, Response } from 'express';
 
 @Controller('playground')
@@ -43,6 +44,25 @@ export class PlaygroundController {
   @Get('server-time')
   getServerTime() {
     return { serverTime: new Date().toISOString() };
+  }
+
+  /**
+   * Public (auth-only): list available timezone options for exam scheduling.
+   */
+  @Get('timezone-options')
+  async getTimezoneOptions() {
+    return { data: TIMEZONE_OPTIONS, default: DEFAULT_TIMEZONE_OFFSET_MINUTES };
+  }
+
+  /**
+   * Student-facing: returns the current user's active (not-yet-submitted) exam,
+   * if any. Used right after login to redirect directly into the exam (SEB flow)
+   * and to lock the student's navigation to that route while it's active.
+   */
+  @Get('my-active-exam')
+  async getMyActiveExam(@Req() req: Request) {
+    const user = req.user as any;
+    return this.playgroundService.findMyActiveExam(user.id);
   }
 
   @Post()
@@ -229,6 +249,7 @@ export class PlaygroundController {
           fileMode:         data.fileMode,
           exam_group_id,
           is_exam:          !isPractice,
+          timezone_offset_minutes: data.timezone_offset_minutes ?? DEFAULT_TIMEZONE_OFFSET_MINUTES,
         }),
       ),
     );
@@ -344,6 +365,7 @@ export class PlaygroundController {
       end_time:        body.end_time   ? new Date(body.end_time)   : body.end_time,
       allow_copy_paste: body.allow_copy_paste,
       require_seb:      body.require_seb,
+      timezone_offset_minutes: body.timezone_offset_minutes,
     });
   }
 

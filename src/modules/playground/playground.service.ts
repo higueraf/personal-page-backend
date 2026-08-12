@@ -4775,6 +4775,26 @@ flutter:
     return project;
   }
 
+  /**
+   * Returns the current student's active (not-yet-submitted) exam project, if any.
+   * Used by the frontend right after login/bootstrap to force a direct redirect
+   * into the exam and to lock navigation to every other platform route while it
+   * remains active (see `require_seb` / SEB lockdown flow).
+   */
+  async findMyActiveExam(userId: string) {
+    const project = await this.projectRepo.findOne({
+      where: { user_id: userId, is_exam: true, status: ProjectStatus.PENDING },
+      order: { created_at: 'DESC' },
+    });
+    if (!project) return null;
+    return {
+      id: project.id,
+      require_seb: project.require_seb,
+      start_time: project.start_time,
+      end_time: project.end_time,
+    };
+  }
+
   async findOne(id: string, userId: string, userRole?: string) {
     const project = await this.projectRepo.findOne({
       where: { id },
@@ -5336,6 +5356,7 @@ flutter:
         end_time:        first.end_time,
         allow_copy_paste: first.allow_copy_paste,
         require_seb:      first.require_seb,
+        timezone_offset_minutes: first.timezone_offset_minutes,
         created_at:      first.created_at,
         total_count:     projects.length,
         submitted_count: projects.filter(p => p.status === ProjectStatus.SUBMITTED || p.status === ProjectStatus.GRADED).length,
@@ -5376,7 +5397,7 @@ flutter:
   /** Updates metadata on all student projects in an exam/practice group */
   async updateAdminExamGroup(
     groupId: string,
-    data: { name?: string; start_time?: Date | null; end_time?: Date | null; allow_copy_paste?: boolean; require_seb?: boolean },
+    data: { name?: string; start_time?: Date | null; end_time?: Date | null; allow_copy_paste?: boolean; require_seb?: boolean; timezone_offset_minutes?: number },
   ) {
     const projects = await this.projectRepo.find({ where: { exam_group_id: groupId } });
     if (projects.length === 0) {
@@ -5414,7 +5435,7 @@ flutter:
 
   async updateAdminExam(
     id: string,
-    data: { name?: string; start_time?: Date | null; end_time?: Date | null; allow_copy_paste?: boolean },
+    data: { name?: string; start_time?: Date | null; end_time?: Date | null; allow_copy_paste?: boolean; timezone_offset_minutes?: number },
   ) {
     const project = await this.projectRepo.findOne({ where: { id } });
     if (!project) throw new NotFoundException('Project not found');
