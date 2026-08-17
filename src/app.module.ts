@@ -6,6 +6,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { MailModule } from './modules/mail/mail.module';
 import { TutorialsModule } from './modules/tutorials/tutorials.module';
 import { VideoCoursesModule } from './modules/video-courses/video-courses.module';
+import { LmsModule } from './modules/lms/lms.module';
 import { UsersModule } from './modules/users/users.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { ProfileModule } from './modules/profile/profile.module';
@@ -40,6 +41,18 @@ import { PracticeItem } from './entities/practice-item.entity';
 import { TodoItem } from './entities/todo-item.entity';
 import { Institution } from './entities/institution.entity';
 import { StudyCourse } from './entities/study-course.entity';
+import { LmsCourse } from './entities/lms-course.entity';
+import { LmsCourseUnit } from './entities/lms-course-unit.entity';
+import { LmsActivity } from './entities/lms-activity.entity';
+import { LmsForumThread } from './entities/lms-forum-thread.entity';
+import { LmsForumPost } from './entities/lms-forum-post.entity';
+import { LmsSubmission } from './entities/lms-submission.entity';
+import { LmsQuizQuestion } from './entities/lms-quiz-question.entity';
+import { LmsQuizOption } from './entities/lms-quiz-option.entity';
+import { LmsQuizAttempt } from './entities/lms-quiz-attempt.entity';
+import { LmsQuizAnswer } from './entities/lms-quiz-answer.entity';
+import { LmsEnrollment } from './entities/lms-enrollment.entity';
+import { LmsActivityProgress } from './entities/lms-activity-progress.entity';
 
 const ALL_ENTITIES = [
   Role, User,
@@ -53,6 +66,11 @@ const ALL_ENTITIES = [
   PlaygroundProject, PlaygroundFile, PlaygroundTemplate, ExamTemplate, ExamVersion,
   PracticeItem,
   TodoItem,
+  LmsCourse, LmsCourseUnit, LmsActivity,
+  LmsForumThread, LmsForumPost,
+  LmsSubmission,
+  LmsQuizQuestion, LmsQuizOption, LmsQuizAttempt, LmsQuizAnswer,
+  LmsEnrollment, LmsActivityProgress,
 ];
 
 @Module({
@@ -74,6 +92,7 @@ const ALL_ENTITIES = [
     AuthModule,
     TutorialsModule,
     VideoCoursesModule,
+    LmsModule,
     UsersModule,
     ProjectsModule,
     ProfileModule,
