@@ -165,7 +165,7 @@ export class LmsCoursesService {
   async publicDetail(slug: string) {
     const course = await this.coursesRepo.findOne({
       where: { slug, status: LmsCourseStatus.PUBLISHED },
-      relations: ['study_courses'],
+      relations: ['study_courses', 'teacher'],
     });
     if (!course) throw new NotFoundException('Curso no encontrado');
     const units = await this.unitsRepo.find({

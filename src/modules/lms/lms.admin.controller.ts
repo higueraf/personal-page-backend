@@ -79,6 +79,9 @@ export class LmsAdminController {
   }
 
   // ── Foro (moderación) ────────────────────────────────────────────────────
+  @Get('activities/:id/forum-threads') listThreads(@Param('id') id: string, @Req() req: AuthedRequest) {
+    return this.forumService.listThreads(id, req.user);
+  }
   @Put('forum-threads/:id/moderate') moderateThread(
     @Param('id') id: string,
     @Body() patch: { is_pinned?: boolean; is_locked?: boolean },
