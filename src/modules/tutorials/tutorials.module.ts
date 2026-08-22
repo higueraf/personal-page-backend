@@ -10,10 +10,11 @@ import { User } from '../../entities/user.entity';
 import { TutorialsAdminController } from './tutorials.admin.controller';
 import { TutorialsPublicController } from './tutorials.public.controller';
 import { TutorialsService } from './tutorials.service';
+import { TutorialsImportService } from './tutorials-import.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Course, CourseSection, Lesson, LessonPage, ContentBlock, StudyCourse, User])],
-  providers: [TutorialsService],
+  providers: [TutorialsService, TutorialsImportService],
   controllers: [TutorialsAdminController, TutorialsPublicController],
 })
 export class TutorialsModule {}

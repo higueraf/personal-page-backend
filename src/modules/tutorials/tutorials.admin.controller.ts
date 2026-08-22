@@ -1,14 +1,21 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards, HttpCode } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TutorialsService } from './tutorials.service';
+import { TutorialsImportService } from './tutorials-import.service';
 import { UpsertBlockDto, UpsertCourseDto, UpsertLessonDto, UpsertPageDto, UpsertSectionDto, ReorderLessonsDto } from './dto/tutorial.dto';
+import { ImportTutorialDto } from './dto/import-tutorial.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller()
 export class TutorialsAdminController {
-  constructor(private readonly service: TutorialsService) {}
+  constructor(
+    private readonly service: TutorialsService,
+    private readonly importService: TutorialsImportService,
+  ) {}
 
   @Post('lessons/reorder') reorderLessons(@Body() dto: ReorderLessonsDto) { return this.service.reorderLessons(dto); }
+
+  @Post('courses/import') importCourse(@Body() dto: ImportTutorialDto) { return this.importService.importCourse(dto); }
 
   @Get('courses') listCourses(@Query() q: any) { return this.service.listCourses(q); }
   @Get('courses/:id') getCourse(@Param('id') id: string) { return this.service.getCourse(id); }
