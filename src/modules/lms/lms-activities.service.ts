@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LmsActivity } from '../../entities/lms-activity.entity';
@@ -89,6 +89,25 @@ export class LmsActivitiesService {
     }
     progress = await this.progressRepo.save(progress);
     return { activity, progress, course_id: activity.unit.course_id };
+  }
+
+  /**
+   * Completado manual para actividades sin una entrega/calificación propia
+   * (presentaciones, o un examen que redirige a un playground externo). El
+   * resto de tipos (foro, tarea, quiz, examen resuelto en la plataforma)
+   * se completan a través de su propio flujo — este endpoint no los reemplaza.
+   */
+  async markViewedComplete(activityId: string, student: User) {
+    const activity = await this.activitiesRepo.findOne({ where: { id: activityId }, relations: ['unit'] });
+    if (!activity || activity.status !== 'PUBLISHED') throw new NotFoundException('Actividad no encontrada');
+    await this.coursesService.assertEnrolled(activity.unit.course_id, student);
+
+    const allowed = activity.type === 'presentation' || (activity.type === 'exam' && activity.config?.mode === 'external');
+    if (!allowed) {
+      throw new ForbiddenException('Esta actividad se completa entregando la tarea, el quiz o participando en el foro');
+    }
+    await this.markCompleted(activity.id, activity.unit.course_id, student.id);
+    return this.progressRepo.findOne({ where: { activity_id: activityId, student_id: student.id } });
   }
 
   /** Usado por foro/tareas/quizzes al completar una actividad; recalcula el progreso agregado del curso. */

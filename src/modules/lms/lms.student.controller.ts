@@ -33,6 +33,9 @@ export class LmsStudentController {
   @Get('activities/:id') getActivity(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.activitiesService.studentView(id, req.user);
   }
+  @Post('activities/:id/complete') markComplete(@Param('id') id: string, @Req() req: AuthedRequest) {
+    return this.activitiesService.markViewedComplete(id, req.user);
+  }
 
   // ── Foro ─────────────────────────────────────────────────────────────────
   @Get('activities/:id/forum-threads') listThreads(@Param('id') id: string, @Req() req: AuthedRequest) {
