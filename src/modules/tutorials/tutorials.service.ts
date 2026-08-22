@@ -111,6 +111,32 @@ export class TutorialsService {
 
   async deleteSection(id: string) { await this.sectionsRepo.delete(id); }
 
+  /**
+   * TutorialEditor.tsx solo lee la primera CourseSection de un curso. Cursos
+   * importados antes de que el importador aplanara todo a una sola sección
+   * pueden tener lecciones "atrapadas" en secciones adicionales, invisibles
+   * en el editor. Este método las mueve a la primera sección y borra las
+   * secciones que quedan vacías.
+   */
+  async consolidateSections(courseId: string) {
+    await this.must(this.coursesRepo, courseId);
+    const sections = await this.sectionsRepo.find({ where: { course: { id: courseId } }, order: { order: 'ASC' } });
+    if (sections.length <= 1) return { data: { sections_removed: 0, lessons_moved: 0 } };
+
+    const [primary, ...rest] = sections;
+    let lessonsMoved = 0;
+    for (const extra of rest) {
+      const lessons = await this.lessonsRepo.find({ where: { section: { id: extra.id } } });
+      for (const lesson of lessons) {
+        lesson.section = primary;
+        await this.lessonsRepo.save(lesson);
+        lessonsMoved++;
+      }
+      await this.sectionsRepo.delete(extra.id);
+    }
+    return { data: { sections_removed: rest.length, lessons_moved: lessonsMoved } };
+  }
+
   async listLessons(params: any) {
     const where: any = {};
     if (params?.section_id) where.section = { id: params.section_id };

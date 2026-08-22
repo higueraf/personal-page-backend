@@ -23,11 +23,13 @@ export class TutorialsImportService {
       const course = await this.resolveCourse(manager, dto);
       const counts: ImportCounts = { sections: { created: 0, updated: 0 }, lessons: { created: 0, updated: 0 } };
 
-      for (const sectionDto of dto.sections) {
-        const section = await this.upsertSection(manager, course, sectionDto, counts);
-        for (const lessonDto of sectionDto.lessons) {
-          await this.upsertLesson(manager, section, lessonDto, counts);
-        }
+      // TutorialEditor.tsx solo lee la primera CourseSection de un curso (asume
+      // "1 curso = 1 sección"). Los .md se agrupan por módulo únicamente para
+      // la vista previa del importador; aquí se aplanan todas las lecciones
+      // sobre esa única sección para que el editor las pueda ver y editar.
+      const section = await this.resolveSingleSection(manager, course, counts);
+      for (const lessonDto of dto.sections.flatMap((s) => s.lessons)) {
+        await this.upsertLesson(manager, section, lessonDto, counts);
       }
 
       return { data: { courseId: course.id, ...counts } };
@@ -50,24 +52,23 @@ export class TutorialsImportService {
     return manager.save(created);
   }
 
-  private async upsertSection(
+  private async resolveSingleSection(
     manager: EntityManager,
     course: Course,
-    sectionDto: ImportTutorialDto['sections'][number],
     counts: ImportCounts,
   ): Promise<CourseSection> {
-    const existing = await manager.findOne(CourseSection, {
-      where: { course: { id: course.id }, order: sectionDto.order },
+    const existing = await manager.find(CourseSection, {
+      where: { course: { id: course.id } },
+      order: { order: 'ASC' },
     });
-    if (existing) {
-      existing.title = sectionDto.title;
+    if (existing.length > 0) {
       counts.sections.updated++;
-      return manager.save(existing);
+      return existing[0];
     }
     const created = manager.create(CourseSection, {
       course,
-      title: sectionDto.title,
-      order: sectionDto.order,
+      title: 'Contenido',
+      order: 1,
       status: 'PUBLISHED',
     });
     counts.sections.created++;

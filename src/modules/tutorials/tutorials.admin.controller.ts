@@ -16,6 +16,7 @@ export class TutorialsAdminController {
   @Post('lessons/reorder') reorderLessons(@Body() dto: ReorderLessonsDto) { return this.service.reorderLessons(dto); }
 
   @Post('courses/import') importCourse(@Body() dto: ImportTutorialDto) { return this.importService.importCourse(dto); }
+  @Post('courses/:id/consolidate-sections') consolidateSections(@Param('id') id: string) { return this.service.consolidateSections(id); }
 
   @Get('courses') listCourses(@Query() q: any) { return this.service.listCourses(q); }
   @Get('courses/:id') getCourse(@Param('id') id: string) { return this.service.getCourse(id); }
