@@ -15,6 +15,16 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // El límite default de Express/Nest para bodies JSON es 100kb. El playground
+  // guarda TODOS los archivos del proyecto en un solo request (`PUT /:id/save-all`),
+  // así que un proyecto con varios archivos (sobre todo exámenes, que incluyen
+  // páginas de referencia ya resueltas) supera fácilmente ese límite: Express
+  // rechaza el request con 413 antes de llegar al controller, y el frontend
+  // no mostraba ese error (solo lo logueaba), por lo que el guardado parecía
+  // fallar "sin razón" con el botón, el autosave de 5 min y al entregar.
+  app.useBodyParser('json', { limit: '15mb' });
+  app.useBodyParser('urlencoded', { limit: '15mb', extended: true });
+
   app.setGlobalPrefix('api');
 
   // La "API de práctica" (módulo aislado, sin auth) debe poder ser consumida
