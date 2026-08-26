@@ -1,4 +1,4 @@
-# Personal Page Backend (NestJS)
+# Personal Page Backend (NestJS) with PostgreSQL
 
 Backend listo para el frontend `personal-page-frontend`.
 
