@@ -12,6 +12,7 @@ export enum ProfileItemType {
   AWARD         = 'AWARD',
   PUBLICATION   = 'PUBLICATION',
   VOLUNTEER     = 'VOLUNTEER',
+  TALK          = 'TALK',
 }
 
 @Entity('profile_items')
