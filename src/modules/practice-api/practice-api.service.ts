@@ -70,7 +70,7 @@ const UNIQUE_FIELD_BY_VARIANT: Record<string, string> = {
   vehiculos: 'placa',
   mascotas: 'codigo',
   papeleria: 'codigo',
-  seguromedico: 'numeroPoliza',
+  'seguro-medico': 'numeroPoliza',
 };
 
 const UNIQUE_FIELD_LABEL: Record<string, string> = {

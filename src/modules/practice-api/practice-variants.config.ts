@@ -180,7 +180,7 @@ export const PRACTICE_VARIANTS: Record<string, VariantConfig> = {
       { plato: 'Torta de chocolate', categoria: 'Postre', precio: 3.5, tiempoPreparacion: 5, ingredientePrincipal: 'Chocolate', destacado: true, disponible: true },
     ],
   },
-  seguromedico: {
+  'seguro-medico': {
     resource: 'polizas',
     fields: [
       { key: 'numeroPoliza', type: 'string', label: 'Número de póliza' },
