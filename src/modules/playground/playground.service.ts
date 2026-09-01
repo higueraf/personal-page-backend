@@ -4982,11 +4982,18 @@ flutter:
     return snapshot;
   }
 
-  /** Admin/Teacher: reactiva un examen bloqueado por incidentes de seguridad. */
+  /** Admin/Teacher: reactiva un examen bloqueado por incidentes de seguridad.
+   *  Marca `security_unlocked_at`: si no se registrara este límite, el conteo de
+   *  incidentes de `logCheat` seguiría contando también los de ANTES de la
+   *  reactivación (ya en o sobre el umbral), y el próximo evento detectado —
+   *  incluso un falso positivo al refrescar la página — volvería a bloquear el
+   *  proyecto al instante. No se borra `cheating_logs`: el historial completo
+   *  se conserva para el admin (ver "Historial de infracciones" en AdminAssignments). */
   async unlockProject(projectId: string) {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project) throw new NotFoundException('Proyecto no encontrado');
     project.security_locked = false;
+    project.security_unlocked_at = new Date();
     await this.projectRepo.save(project);
     return { status: 'unlocked' };
   }
@@ -5135,7 +5142,14 @@ flutter:
     project.cheating_logs = currentLogs;
 
     if (!project.security_locked) {
-      const incidentCount = this.groupCheatingIncidents(currentLogs);
+      // Solo cuenta incidentes posteriores a la última reactivación manual (si hubo una) —
+      // ver `unlockProject`. Sin este corte, incidentes de ANTES de reactivar (ya en o sobre
+      // el umbral) volverían a bloquear el proyecto con el próximo evento detectado.
+      const unlockedAt = project.security_unlocked_at ? new Date(project.security_unlocked_at).getTime() : null;
+      const logsSinceUnlock = unlockedAt
+        ? currentLogs.filter((l) => new Date(l.timestamp).getTime() > unlockedAt)
+        : currentLogs;
+      const incidentCount = this.groupCheatingIncidents(logsSinceUnlock);
       if (incidentCount >= PlaygroundService.SECURITY_LOCK_THRESHOLD) {
         project.security_locked = true;
       }

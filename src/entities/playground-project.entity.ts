@@ -79,6 +79,13 @@ export class PlaygroundProject {
   @Column({ default: false })
   security_locked: boolean;
 
+  /** Marca de tiempo de la última reactivación manual (ver `unlockProject`). `logCheat` solo
+   *  cuenta incidentes posteriores a esta marca para el umbral de auto-bloqueo, sin borrar
+   *  `cheating_logs` — el historial completo se conserva para el admin ("Historial de
+   *  infracciones" en AdminAssignments). */
+  @Column({ type: 'timestamptz', nullable: true })
+  security_unlocked_at: Date | null;
+
   /** Groups all PlaygroundProjects created from the same assignment batch */
   @Column({ nullable: true })
   exam_group_id: string;

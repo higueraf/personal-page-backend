@@ -20,6 +20,12 @@ import { Resource, ResourceType } from '../entities/resource.entity';
 import { PlaygroundTemplate } from '../entities/playground-template.entity';
 import { ExamTemplate } from '../entities/exam-template.entity';
 import { ExamVersion, ExamQuestion } from '../entities/exam-version.entity';
+import { LmsCourse, LmsCourseStatus } from '../entities/lms-course.entity';
+import { LmsCourseUnit } from '../entities/lms-course-unit.entity';
+import { LmsActivity } from '../entities/lms-activity.entity';
+import { LmsQuizQuestion, LmsQuestionType } from '../entities/lms-quiz-question.entity';
+import { LmsQuizOption } from '../entities/lms-quiz-option.entity';
+import { LmsEnrollment, LmsEnrollmentStatus } from '../entities/lms-enrollment.entity';
 
 @Injectable()
 export class AppSeeder {
@@ -41,6 +47,12 @@ export class AppSeeder {
     @InjectRepository(PlaygroundTemplate) private readonly playgroundTemplatesRepo: Repository<PlaygroundTemplate>,
     @InjectRepository(ExamTemplate)  private readonly examTemplatesRepo: Repository<ExamTemplate>,
     @InjectRepository(ExamVersion)   private readonly examVersionsRepo:  Repository<ExamVersion>,
+    @InjectRepository(LmsCourse)       private readonly lmsCoursesRepo:      Repository<LmsCourse>,
+    @InjectRepository(LmsCourseUnit)   private readonly lmsUnitsRepo:        Repository<LmsCourseUnit>,
+    @InjectRepository(LmsActivity)     private readonly lmsActivitiesRepo:   Repository<LmsActivity>,
+    @InjectRepository(LmsQuizQuestion) private readonly lmsQuizQuestionsRepo: Repository<LmsQuizQuestion>,
+    @InjectRepository(LmsQuizOption)   private readonly lmsQuizOptionsRepo:  Repository<LmsQuizOption>,
+    @InjectRepository(LmsEnrollment)   private readonly lmsEnrollmentsRepo:  Repository<LmsEnrollment>,
   ) {}
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -51,11 +63,11 @@ export class AppSeeder {
 
     const adminUser = await this.ensureUser('admin@higueraf.dev',   'Admin123*',   'Francisco', 'Higuera',  adminRole,   UserStatus.APPROVED);
     await this.ensureUser('student@higueraf.dev', 'Student123*', 'Demo',      'Student',  studentRole, UserStatus.APPROVED);
-    await this.ensureUser('teacher@higueraf.dev', 'Teacher123*', 'Demo',      'Teacher',  teacherRole, UserStatus.APPROVED);
+    const teacherUser = await this.ensureUser('teacher@higueraf.dev', 'Teacher123*', 'Demo',      'Teacher',  teacherRole, UserStatus.APPROVED);
 
     // ── Alumnos ficticios para probar la distribución round-robin de variantes ──
-    await this.ensureUser('alumno1.prueba@higueraf.dev', 'Alumno123*', 'Alumno', 'Uno',    studentRole, UserStatus.APPROVED);
-    await this.ensureUser('alumno2.prueba@higueraf.dev', 'Alumno123*', 'Alumno', 'Dos',    studentRole, UserStatus.APPROVED);
+    const alumno1User = await this.ensureUser('alumno1.prueba@higueraf.dev', 'Alumno123*', 'Alumno', 'Uno',    studentRole, UserStatus.APPROVED);
+    const alumno2User = await this.ensureUser('alumno2.prueba@higueraf.dev', 'Alumno123*', 'Alumno', 'Dos',    studentRole, UserStatus.APPROVED);
     await this.ensureUser('alumno3.prueba@higueraf.dev', 'Alumno123*', 'Alumno', 'Tres',   studentRole, UserStatus.APPROVED);
     await this.ensureUser('alumno4.prueba@higueraf.dev', 'Alumno123*', 'Alumno', 'Cuatro', studentRole, UserStatus.APPROVED);
 
@@ -92,6 +104,7 @@ export class AppSeeder {
     await this.seedExamTemplateReactNativeBusinessRulesSingle(adminUser);
     await this.seedExamTemplateReactNativeSeguroMedico(adminUser);
     await this.seedExamTemplateReactCrudSeguroMedico(adminUser);
+    await this.seedLmsTestCourse(teacherUser, [alumno1User, alumno2User]);
 
     return { ok: true };
   }
@@ -5177,6 +5190,120 @@ const { data: user } = useQuery({
           questions,
         }),
       );
+    }
+  }
+
+  // ── LMS: curso de prueba (profesor + 2 alumnos matriculados) ────────────────
+  // Reutiliza los fixtures ya sembrados arriba (teacher@higueraf.dev,
+  // alumno1/2.prueba@higueraf.dev) — pensado para que el profesor pueda probar
+  // de punta a punta crear tareas/cuestionarios/etc. sin partir de cero, y para
+  // probar el flujo de cuestionario con SEB/pantalla completa (ver
+  // `config.requireSeb` en la actividad de tipo `quiz` de abajo).
+  private async seedLmsTestCourse(teacher: User, students: User[]) {
+    const slug = 'curso-de-prueba-lms';
+
+    let course = await this.lmsCoursesRepo.findOne({ where: { slug } });
+    if (!course) {
+      course = await this.lmsCoursesRepo.save(
+        this.lmsCoursesRepo.create({
+          title: 'Curso de Prueba — LMS',
+          slug,
+          description: 'Curso de prueba para validar el flujo completo del LMS: tareas, cuestionarios, entregas y calificación.',
+          status: LmsCourseStatus.PUBLISHED,
+          teacher_id: teacher.id,
+        }),
+      );
+    }
+
+    let unit = await this.lmsUnitsRepo.findOne({ where: { course_id: course.id, title: 'Unidad 1' } });
+    if (!unit) {
+      unit = await this.lmsUnitsRepo.save(
+        this.lmsUnitsRepo.create({ course_id: course.id, title: 'Unidad 1', order: 1, status: 'PUBLISHED' }),
+      );
+    }
+
+    let assignment = await this.lmsActivitiesRepo.findOne({ where: { unit_id: unit.id, type: 'assignment' } });
+    if (!assignment) {
+      assignment = await this.lmsActivitiesRepo.save(
+        this.lmsActivitiesRepo.create({
+          unit_id: unit.id,
+          type: 'assignment',
+          title: 'Tarea de ejemplo',
+          instructions: 'Sube un archivo con la solución del ejercicio propuesto en clase.',
+          order: 1,
+          status: 'PUBLISHED',
+          max_score: 10,
+          config: {},
+        }),
+      );
+    }
+
+    let quiz = await this.lmsActivitiesRepo.findOne({ where: { unit_id: unit.id, type: 'quiz' } });
+    if (!quiz) {
+      quiz = await this.lmsActivitiesRepo.save(
+        this.lmsActivitiesRepo.create({
+          unit_id: unit.id,
+          type: 'quiz',
+          title: 'Cuestionario de ejemplo',
+          instructions: 'Responde las siguientes preguntas. Este cuestionario requiere pantalla completa.',
+          order: 2,
+          status: 'PUBLISHED',
+          max_score: 10,
+          config: { requireSeb: true },
+        }),
+      );
+
+      const q1 = await this.lmsQuizQuestionsRepo.save(
+        this.lmsQuizQuestionsRepo.create({
+          activity_id: quiz.id,
+          text: '¿Cuál es la capital de Ecuador?',
+          type: LmsQuestionType.MULTIPLE_CHOICE,
+          order: 1,
+        }),
+      );
+      await this.lmsQuizOptionsRepo.save([
+        this.lmsQuizOptionsRepo.create({ question_id: q1.id, text: 'Quito', is_correct: true, order: 1 }),
+        this.lmsQuizOptionsRepo.create({ question_id: q1.id, text: 'Guayaquil', is_correct: false, order: 2 }),
+        this.lmsQuizOptionsRepo.create({ question_id: q1.id, text: 'Cuenca', is_correct: false, order: 3 }),
+      ]);
+
+      const q2 = await this.lmsQuizQuestionsRepo.save(
+        this.lmsQuizQuestionsRepo.create({
+          activity_id: quiz.id,
+          text: '¿Cuáles de los siguientes son lenguajes de programación?',
+          type: LmsQuestionType.MULTI_ANSWER,
+          order: 2,
+        }),
+      );
+      await this.lmsQuizOptionsRepo.save([
+        this.lmsQuizOptionsRepo.create({ question_id: q2.id, text: 'TypeScript', is_correct: true, order: 1 }),
+        this.lmsQuizOptionsRepo.create({ question_id: q2.id, text: 'Python', is_correct: true, order: 2 }),
+        this.lmsQuizOptionsRepo.create({ question_id: q2.id, text: 'HTML', is_correct: false, order: 3 }),
+      ]);
+
+      await this.lmsQuizQuestionsRepo.save(
+        this.lmsQuizQuestionsRepo.create({
+          activity_id: quiz.id,
+          text: 'Explica brevemente qué es una API REST.',
+          type: LmsQuestionType.OPEN,
+          order: 3,
+        }),
+      );
+    }
+
+    for (const student of students) {
+      const existingEnrollment = await this.lmsEnrollmentsRepo.findOne({
+        where: { course_id: course.id, student_id: student.id },
+      });
+      if (!existingEnrollment) {
+        await this.lmsEnrollmentsRepo.save(
+          this.lmsEnrollmentsRepo.create({
+            course_id: course.id,
+            student_id: student.id,
+            status: LmsEnrollmentStatus.ACTIVE,
+          }),
+        );
+      }
     }
   }
 

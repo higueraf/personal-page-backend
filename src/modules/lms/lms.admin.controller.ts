@@ -85,6 +85,76 @@ export class LmsAdminController {
     await this.activitiesService.delete(id, req.user);
   }
 
+  /**
+   * Descarga la configuración de Safe Exam Browser (.seb) para un cuestionario/examen que
+   * requiere pantalla completa (`config.requireSeb`). Mismo formato de plist que el .seb del
+   * Playground (`playground.controller.ts`), apuntando a la vista aislada del LMS en vez del IDE.
+   */
+  @Get('activities/:id/seb-config')
+  async downloadSebConfig(@Param('id') id: string, @Req() req: AuthedRequest, @Res() res: Response) {
+    const activity = await this.activitiesService.getForManage(id, req.user);
+
+    const origins = (process.env.APP_ORIGINS ?? 'http://localhost:5173').split(',');
+    const frontendUrl = origins[origins.length - 1].trim();
+    const startUrl = `${frontendUrl}/lms/examen/${activity.id}`;
+    const quitUrl = `${frontendUrl}/seb-quit`;
+
+    const sebXml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>startURL</key>
+  <string>${startUrl}</string>
+  <key>sendBrowserExamKey</key>
+  <true/>
+  <key>allowQuit</key>
+  <false/>
+  <key>ignoreExitKey</key>
+  <true/>
+  <key>quitURL</key>
+  <string>${quitUrl}</string>
+  <key>quitURLConfirm</key>
+  <false/>
+  <key>browserWindowAllowReload</key>
+  <false/>
+  <key>showReloadButton</key>
+  <false/>
+  <key>showTaskBar</key>
+  <false/>
+  <key>enablePrintScreen</key>
+  <false/>
+  <key>allowUserSwitching</key>
+  <false/>
+  <key>enableScreenCapture</key>
+  <false/>
+  <key>newBrowserWindowByLinkPolicy</key>
+  <integer>2</integer>
+  <key>URLFilterEnable</key>
+  <true/>
+  <key>URLFilterEnableContentFilter</key>
+  <false/>
+  <key>URLFilterRules</key>
+  <array>
+    <dict>
+      <key>active</key>
+      <true/>
+      <key>regex</key>
+      <false/>
+      <key>action</key>
+      <integer>1</integer>
+      <key>expression</key>
+      <string>${frontendUrl}/*</string>
+    </dict>
+  </array>
+</dict>
+</plist>`;
+
+    const safeName = activity.title.replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ ]/g, '_').trim();
+    res.setHeader('Content-Type', 'application/seb');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}.seb"`);
+    res.send(sebXml);
+  }
+
   // ── Foro (moderación) ────────────────────────────────────────────────────
   @Get('activities/:id/forum-threads') listThreads(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.forumService.listThreads(id, req.user);
