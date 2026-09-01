@@ -4567,9 +4567,9 @@ const { data: user } = useQuery({
     const templateName = 'React — CRUD y pantallas de lógica — Seguro Médico (API real)';
     const description =
       'Examen de React Web de una sola variante (Seguro Médico), partiendo del ejemplo de ' +
-      'referencia ToDo (ver ENUNCIADO.md): CRUD completo contra la API de práctica (7 pts), ' +
+      'referencia ToDo (ver ENUNCIADO.md): CRUD completo contra la API de práctica (6 pts), ' +
       'manejando además el error de la regla de negocio de la variante (número de póliza único), ' +
-      'y 2 páginas de cálculo (1.5 pts c/u) con lógica algo más elaborada que un promedio o una ' +
+      'y 2 páginas de cálculo (2 pts c/u) con lógica algo más elaborada que un promedio o una ' +
       'suma simple.';
 
     const version: { theme_name: string; order_index: number; questions: ExamQuestion[] } = {
@@ -4577,15 +4577,15 @@ const { data: user } = useQuery({
       order_index: 0,
       questions: [
         {
-          order: 1, points: 7, title: 'CRUD de pólizas de seguro médico contra la API',
+          order: 1, points: 6, title: 'CRUD de pólizas de seguro médico contra la API',
           statement: 'Construye la página de CRUD (duplicando/adaptando el ejemplo de referencia ToDo, ver ENUNCIADO.md) que consuma la API de práctica para gestionar las pólizas de un seguro médico. El recurso maneja los campos: numeroPoliza, asegurado, tipoPlan, primaMensual, cobertura, fechaVencimiento y activa. Debe permitir: (1) listar las pólizas mostrando al menos numeroPoliza, asegurado, tipoPlan y primaMensual; (2) crear una póliza nueva desde un formulario con todos los campos; (3) editar una póliza existente; (4) eliminar una póliza. La API rechaza con error 409 la creación/edición de una póliza con un `numeroPoliza` ya usado por otro registro: tu página debe mostrarle ese mensaje de error al usuario en vez de fallar silenciosamente. Actualiza la lista en pantalla después de cada operación.',
         },
         {
-          order: 2, points: 1.5, title: 'Total recaudado por pólizas activas',
+          order: 2, points: 2, title: 'Total recaudado por pólizas activas',
           statement: 'En tu propia página de cálculo (duplicando/adaptando la página de referencia, ver ENUNCIADO.md), calcula y muestra: el total mensual recaudado por pólizas con `activa == true` (suma de `primaMensual` de esas pólizas), el total anual proyectado (ese total mensual multiplicado por 12) y la cantidad de pólizas activas.',
         },
         {
-          order: 3, points: 1.5, title: 'Recargo del 12% a pólizas con cobertura por encima del promedio',
+          order: 3, points: 2, title: 'Recargo del 12% a pólizas con cobertura por encima del promedio',
           statement: 'En tu propia página de cálculo (duplicando/adaptando la página de referencia, ver ENUNCIADO.md), calcula primero la `cobertura` promedio de todas las pólizas; luego, a las pólizas cuya `cobertura` sea mayor a ese promedio (por representar mayor riesgo), aplícales un recargo del 12% sobre la `primaMensual` (fórmula: `primaConRecargo = primaMensual * 1.12`) y muestra número de póliza, asegurado, prima original y prima con recargo de cada una, además del total del recargo acumulado (suma de `primaConRecargo - primaMensual` de todas esas pólizas).',
         },
       ],
