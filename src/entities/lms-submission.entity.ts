@@ -4,11 +4,13 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import { LmsActivity } from './lms-activity.entity';
+import { LmsSubmissionFile } from './lms-submission-file.entity';
 import { User } from './user.entity';
 
 export enum LmsSubmissionStatus {
@@ -42,8 +44,12 @@ export class LmsSubmission {
   @Column({ type: 'text', nullable: true })
   content_text: string | null;
 
+  /** Legado: URL suelta (ej. link a Drive) pegada a mano antes de que existiera la subida real de archivos. */
   @Column({ nullable: true })
   file_url?: string;
+
+  @OneToMany(() => LmsSubmissionFile, (file) => file.submission)
+  files?: LmsSubmissionFile[];
 
   @Column({ type: 'enum', enum: LmsSubmissionStatus, default: LmsSubmissionStatus.PENDING })
   status: LmsSubmissionStatus;

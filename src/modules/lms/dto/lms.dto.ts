@@ -83,7 +83,7 @@ export class UpsertQuizOptionDto {
 export class UpsertQuizQuestionDto {
   @IsString() activity: string;
   @IsString() text: string;
-  @IsOptional() @IsIn(['MULTIPLE_CHOICE', 'OPEN']) type?: string;
+  @IsOptional() @IsIn(['MULTIPLE_CHOICE', 'MULTI_ANSWER', 'OPEN']) type?: string;
   @IsOptional() @IsInt() @Min(1) order?: number;
   @IsOptional() @IsString() feedback?: string | null;
   @IsOptional()
@@ -96,6 +96,7 @@ export class UpsertQuizQuestionDto {
 export class QuizAnswerInputDto {
   @IsString() question_id: string;
   @IsOptional() @IsString() selected_option_id?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) selected_option_ids?: string[];
   @IsOptional() @IsString() text_answer?: string;
 }
 
@@ -104,4 +105,55 @@ export class SubmitQuizAttemptDto {
   @ValidateNested({ each: true })
   @Type(() => QuizAnswerInputDto)
   answers: QuizAnswerInputDto[];
+}
+
+export class ImportQuizQuestionsDto {
+  @IsIn(['own', 'gift', 'aiken', 'moodle_xml']) format: 'own' | 'gift' | 'aiken' | 'moodle_xml';
+  @IsString() content: string;
+  @IsIn(['append', 'replace']) mode: 'append' | 'replace';
+}
+
+export class CreateQuizFromFileDto {
+  @IsOptional() @IsString() title?: string;
+  @IsIn(['own', 'gift', 'aiken', 'moodle_xml']) format: 'own' | 'gift' | 'aiken' | 'moodle_xml';
+  @IsString() content: string;
+}
+
+// ── Encuestas ────────────────────────────────────────────────────────────────
+
+export class UpsertSurveyOptionDto {
+  @IsString() text: string;
+  @IsOptional() @IsInt() @Min(1) order?: number;
+}
+
+export class UpsertSurveyQuestionDto {
+  @IsString() activity: string;
+  @IsString() text: string;
+  @IsOptional() @IsIn(['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'SCALE', 'TEXT']) type?: string;
+  @IsOptional() @IsInt() @Min(1) order?: number;
+  @IsOptional() @IsInt() scale_min?: number;
+  @IsOptional() @IsInt() scale_max?: number;
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpsertSurveyOptionDto)
+  options?: UpsertSurveyOptionDto[];
+}
+
+export class ImportSurveyMarkdownDto {
+  @IsString() markdown: string;
+}
+
+export class SurveyAnswerInputDto {
+  @IsString() question_id: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) selected_option_ids?: string[];
+  @IsOptional() @IsNumber() scale_value?: number;
+  @IsOptional() @IsString() text_answer?: string;
+}
+
+export class SubmitSurveyResponseDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SurveyAnswerInputDto)
+  answers: SurveyAnswerInputDto[];
 }

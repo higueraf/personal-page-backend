@@ -2,8 +2,14 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColum
 import { LmsActivity } from './lms-activity.entity';
 import { LmsQuizOption } from './lms-quiz-option.entity';
 
+/**
+ * MULTIPLE_CHOICE es, pese al nombre heredado, de una sola respuesta correcta (radio) — se
+ * mantiene el valor tal cual para no romper preguntas ya creadas. MULTI_ANSWER es la de varias
+ * respuestas correctas (checkboxes, calificación todo-o-nada). OPEN no se autocalifica.
+ */
 export enum LmsQuestionType {
   MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',
+  MULTI_ANSWER = 'MULTI_ANSWER',
   OPEN = 'OPEN',
 }
 

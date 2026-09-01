@@ -10,6 +10,7 @@ export const LMS_ACTIVITY_TYPES = [
   'assignment',
   'quiz',
   'exam',
+  'survey',
 ] as const;
 
 export type KnownLmsActivityType = (typeof LMS_ACTIVITY_TYPES)[number];

@@ -29,6 +29,10 @@ export class LmsQuizAnswer {
   @Column({ nullable: true })
   selected_option_id?: string;
 
+  /** Para preguntas MULTI_ANSWER (varias respuestas correctas); selected_option_id no se usa en ese caso. */
+  @Column({ type: 'jsonb', nullable: true })
+  selected_option_ids?: string[] | null;
+
   @Column({ type: 'text', nullable: true })
   text_answer?: string;
 
