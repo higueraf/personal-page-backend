@@ -13,6 +13,7 @@ async function bootstrap() {
   // Ensure uploads directory exists before the server starts
   mkdirSync(join(process.cwd(), 'uploads', 'avatars'), { recursive: true });
   mkdirSync(join(process.cwd(), 'uploads', 'lms-submissions'), { recursive: true });
+  mkdirSync(join(process.cwd(), 'uploads', 'lms-covers'), { recursive: true });
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 

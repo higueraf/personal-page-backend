@@ -1,4 +1,24 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Put,
+  Query,
+  Req,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -53,6 +73,29 @@ export class LmsAdminController {
   }
   @Put('courses/:id/archive') archiveCourse(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.coursesService.archive(id, req.user);
+  }
+  @Post('courses/:id/cover')
+  @UseInterceptors(FileInterceptor('cover', {
+    storage: diskStorage({
+      destination: join(process.cwd(), 'uploads', 'lms-covers'),
+      filename: (_, file, cb) => cb(null, `${uuidv4()}${extname(file.originalname)}`),
+    }),
+    fileFilter: (_, file, cb) => {
+      if (!file.mimetype.match(/^image\//)) {
+        return cb(new BadRequestException('Solo se permiten imágenes') as any, false);
+      }
+      cb(null, true);
+    },
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  }))
+  async uploadCourseCover(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: AuthedRequest,
+  ) {
+    if (!file) throw new BadRequestException('No se recibió ningún archivo');
+    const coverPath = `/uploads/lms-covers/${file.filename}`;
+    return this.coursesService.update(id, { cover_image: coverPath }, req.user);
   }
   @Get('courses/:id/units') listUnits(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.coursesService.listUnits(id, req.user);
