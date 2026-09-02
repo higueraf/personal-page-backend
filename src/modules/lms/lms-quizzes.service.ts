@@ -305,9 +305,22 @@ export class LmsQuizzesService {
     };
   }
 
+  /**
+   * `LmsQuizAttempt.answers` no viene cargado por `find()` (no es `eager` ni se pide `relations`)
+   * — sin esto, el frontend nunca podía distinguir "ya entregó" de "recién está por entregar" al
+   * refrescar, porque siempre le llegaba `answers: undefined`. Se enriquece solo el intento más
+   * reciente (el único que la UI muestra), y solo si `config.show_results !== false` — si el
+   * profesor desactivó mostrar el detalle, el alumno ve su nota pero no las respuestas/corrección
+   * por pregunta, ni siquiera inspeccionando la respuesta de la red.
+   */
   async myAttempts(activityId: string, student: User) {
     const activity = await this.activityOrFail(activityId);
     await this.coursesService.assertEnrolled(activity.unit.course_id, student);
-    return this.attemptsRepo.find({ where: { activity_id: activityId, student_id: student.id }, order: { created_at: 'DESC' } });
+    const attempts = await this.attemptsRepo.find({ where: { activity_id: activityId, student_id: student.id }, order: { created_at: 'DESC' } });
+    if (attempts.length === 0 || activity.config?.show_results === false) return attempts;
+
+    const [latest, ...rest] = attempts;
+    const detailed = await this.getAttemptWithFeedback(latest.id, student);
+    return [detailed, ...rest];
   }
 }

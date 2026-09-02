@@ -273,4 +273,18 @@ export class LmsCoursesService {
     if (percent === 100) enrollment.status = LmsEnrollmentStatus.COMPLETED;
     await this.enrollmentsRepo.save(enrollment);
   }
+
+  /**
+   * Progreso del alumno en cada actividad publicada del curso (estado + nota si ya se calificó),
+   * para mostrar en la ficha del curso sin tener que entrar a cada actividad una por una.
+   */
+  async myProgressForCourse(courseId: string, student: User) {
+    await this.assertEnrolled(courseId, student);
+    const activities = await this.activitiesRepo.find({
+      where: { unit: { course_id: courseId }, status: 'PUBLISHED' },
+    });
+    if (activities.length === 0) return [];
+    const activityIds = activities.map((a) => a.id);
+    return this.progressRepo.find({ where: { activity_id: In(activityIds), student_id: student.id } });
+  }
 }

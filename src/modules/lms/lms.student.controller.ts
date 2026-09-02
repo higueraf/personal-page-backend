@@ -52,6 +52,9 @@ export class LmsStudentController {
   @Get('my-courses') myCourses(@Req() req: AuthedRequest) {
     return this.coursesService.myCourses(req.user);
   }
+  @Get('courses/:id/my-progress') myProgress(@Param('id') id: string, @Req() req: AuthedRequest) {
+    return this.coursesService.myProgressForCourse(id, req.user);
+  }
 
   @Get('activities/:id') getActivity(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.activitiesService.studentView(id, req.user);
