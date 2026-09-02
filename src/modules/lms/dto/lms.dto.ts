@@ -29,6 +29,13 @@ export class UpsertLmsUnitDto {
   @IsString() title: string;
   @IsOptional() @IsInt() @Min(1) order?: number;
   @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsDateString() starts_at?: string | null;
+  @IsOptional() @IsDateString() ends_at?: string | null;
+}
+
+export class GenerateWeeklyUnitsDto {
+  @IsDateString() start_date: string;
+  @IsInt() @Min(1) weeks: number;
 }
 
 // ── Actividades ──────────────────────────────────────────────────────────────
@@ -40,6 +47,7 @@ export class UpsertLmsActivityDto {
   @IsOptional() @IsString() instructions?: string | null;
   @IsOptional() @IsInt() @Min(1) order?: number;
   @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsDateString() starts_at?: string | null;
   @IsOptional() @IsDateString() due_at?: string | null;
   @IsOptional() @IsNumber() max_score?: number | null;
   @IsOptional() @IsObject() config?: Record<string, any>;

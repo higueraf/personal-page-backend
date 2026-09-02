@@ -40,6 +40,7 @@ export class LmsActivitiesService {
       instructions: dto.instructions ?? null,
       order: dto.order ?? 1,
       status: dto.status || 'DRAFT',
+      starts_at: dto.starts_at ? new Date(dto.starts_at) : null,
       due_at: dto.due_at ? new Date(dto.due_at) : null,
       max_score: dto.max_score ?? null,
       config: dto.config || {},
@@ -54,6 +55,7 @@ export class LmsActivitiesService {
     if (dto.instructions !== undefined) activity.instructions = dto.instructions ?? null;
     if (dto.order !== undefined) activity.order = dto.order;
     if (dto.status !== undefined) activity.status = dto.status;
+    if (dto.starts_at !== undefined) activity.starts_at = dto.starts_at ? new Date(dto.starts_at) : null;
     if (dto.due_at !== undefined) activity.due_at = dto.due_at ? new Date(dto.due_at) : null;
     if (dto.max_score !== undefined) activity.max_score = dto.max_score ?? null;
     if (dto.config !== undefined) activity.config = dto.config;
@@ -76,6 +78,9 @@ export class LmsActivitiesService {
     const activity = await this.activitiesRepo.findOne({ where: { id: activityId }, relations: ['unit'] });
     if (!activity || activity.status !== 'PUBLISHED') throw new NotFoundException('Actividad no encontrada');
     await this.coursesService.assertEnrolled(activity.unit.course_id, student);
+    if (activity.starts_at && new Date() < activity.starts_at) {
+      throw new ForbiddenException(`Esta actividad estará disponible a partir del ${activity.starts_at.toLocaleString('es')}.`);
+    }
 
     let progress = await this.progressRepo.findOne({ where: { activity_id: activityId, student_id: student.id } });
     if (!progress) {

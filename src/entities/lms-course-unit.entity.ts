@@ -24,6 +24,17 @@ export class LmsCourseUnit {
   @Column({ default: 'DRAFT' })
   status: string;
 
+  /**
+   * Rango de fechas de la unidad (opcional) — organización "por semanas" al estilo Moodle:
+   * cuando ambas están definidas, el frontend muestra el rango en vez del título libre
+   * (o junto a él) y las actividades de esa unidad quedan agrupadas visualmente en esa semana.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  starts_at: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  ends_at: Date | null;
+
   @OneToMany(() => LmsActivity, (activity) => activity.unit)
   activities: LmsActivity[];
 }

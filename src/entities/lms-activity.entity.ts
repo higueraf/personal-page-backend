@@ -35,6 +35,10 @@ export class LmsActivity {
   @Column({ default: 'DRAFT' })
   status: string;
 
+  /** Fecha de activación: antes de esta fecha el alumno no puede abrir la actividad. */
+  @Column({ type: 'timestamptz', nullable: true })
+  starts_at: Date | null;
+
   @Column({ type: 'timestamptz', nullable: true })
   due_at: Date | null;
 

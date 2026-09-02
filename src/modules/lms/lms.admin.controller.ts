@@ -32,6 +32,7 @@ import { LmsQuizzesService } from './lms-quizzes.service';
 import { LmsSurveysService } from './lms-surveys.service';
 import {
   CreateQuizFromFileDto,
+  GenerateWeeklyUnitsDto,
   GradeSubmissionDto,
   ImportQuizQuestionsDto,
   ImportSurveyMarkdownDto,
@@ -103,6 +104,13 @@ export class LmsAdminController {
   @Get('courses/:id/roster') roster(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.coursesService.roster(id, req.user);
   }
+  @Post('courses/:id/units/generate-weeks') generateWeeklyUnits(
+    @Param('id') id: string,
+    @Body() dto: GenerateWeeklyUnitsDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.coursesService.generateWeeklyUnits(id, dto.start_date, dto.weeks, req.user);
+  }
 
   @Post('units') createUnit(@Body() dto: UpsertLmsUnitDto, @Req() req: AuthedRequest) {
     return this.coursesService.createUnit(dto, req.user);
@@ -117,6 +125,9 @@ export class LmsAdminController {
   // ── Actividades ──────────────────────────────────────────────────────────
   @Get('units/:unitId/activities') listActivities(@Param('unitId') unitId: string, @Req() req: AuthedRequest) {
     return this.activitiesService.listByUnit(unitId, req.user);
+  }
+  @Get('activities/:id') getActivityForManage(@Param('id') id: string, @Req() req: AuthedRequest) {
+    return this.activitiesService.getForManage(id, req.user);
   }
   @Post('activities') createActivity(@Body() dto: UpsertLmsActivityDto, @Req() req: AuthedRequest) {
     return this.activitiesService.create(dto, req.user);

@@ -93,6 +93,8 @@ export class LmsCoursesService {
       title: dto.title,
       order: dto.order ?? 1,
       status: dto.status || 'DRAFT',
+      starts_at: dto.starts_at ? new Date(dto.starts_at) : null,
+      ends_at: dto.ends_at ? new Date(dto.ends_at) : null,
     });
     return this.unitsRepo.save(unit);
   }
@@ -104,7 +106,46 @@ export class LmsCoursesService {
     if (dto.title !== undefined) unit.title = dto.title;
     if (dto.order !== undefined) unit.order = dto.order;
     if (dto.status !== undefined) unit.status = dto.status;
+    if (dto.starts_at !== undefined) unit.starts_at = dto.starts_at ? new Date(dto.starts_at) : null;
+    if (dto.ends_at !== undefined) unit.ends_at = dto.ends_at ? new Date(dto.ends_at) : null;
     return this.unitsRepo.save(unit);
+  }
+
+  /**
+   * Organización "por semanas" al estilo Moodle: crea `weeks` unidades consecutivas de 7 días
+   * cada una a partir de `startDate`, tituladas con el propio rango de fechas (el profesor puede
+   * renombrarlas después si quiere), continuando el `order` desde la última unidad existente.
+   */
+  async generateWeeklyUnits(courseId: string, startDate: string, weeks: number, user: User) {
+    await this.getForManage(courseId, user);
+    const [lastUnit] = await this.unitsRepo.find({ where: { course_id: courseId }, order: { order: 'DESC' }, take: 1 });
+    let order = (lastUnit?.order ?? 0) + 1;
+
+    // Aritmética en UTC de punta a punta (getUTCDate/setUTCDate + timeZone: 'UTC' al formatear):
+    // un <input type="date"> no lleva zona horaria, y con Date/setDate en hora local el resultado
+    // termina desfasado un día según la zona horaria del servidor (verificado con un caso real:
+    // "2026-04-06" salía formateado como "5 de abril"). En UTC la fecha calendario coincide
+    // siempre con lo que el profesor escribió, sin importar dónde corra el servidor.
+    const formatter = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+    const created: LmsCourseUnit[] = [];
+    const base = new Date(startDate);
+    for (let i = 0; i < weeks; i++) {
+      const starts_at = new Date(base);
+      starts_at.setUTCDate(starts_at.getUTCDate() + i * 7);
+      const ends_at = new Date(starts_at);
+      ends_at.setUTCDate(ends_at.getUTCDate() + 6);
+
+      const unit = this.unitsRepo.create({
+        course_id: courseId,
+        title: `${formatter.format(starts_at)} - ${formatter.format(ends_at)}`,
+        order: order++,
+        status: 'DRAFT',
+        starts_at,
+        ends_at,
+      });
+      created.push(await this.unitsRepo.save(unit));
+    }
+    return created;
   }
 
   async deleteUnit(id: string, user: User) {
