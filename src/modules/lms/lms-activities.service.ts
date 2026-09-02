@@ -75,7 +75,7 @@ export class LmsActivitiesService {
 
   /** Vista de alumno: valida inscripción, marca la actividad como vista (IN_PROGRESS) y devuelve su progreso. */
   async studentView(activityId: string, student: User) {
-    const activity = await this.activitiesRepo.findOne({ where: { id: activityId }, relations: ['unit'] });
+    const activity = await this.activitiesRepo.findOne({ where: { id: activityId }, relations: ['unit', 'unit.course'] });
     if (!activity || activity.status !== 'PUBLISHED') throw new NotFoundException('Actividad no encontrada');
     await this.coursesService.assertEnrolled(activity.unit.course_id, student);
     if (activity.starts_at && new Date() < activity.starts_at) {
@@ -93,7 +93,7 @@ export class LmsActivitiesService {
       progress.status = LmsActivityProgressStatus.IN_PROGRESS;
     }
     progress = await this.progressRepo.save(progress);
-    return { activity, progress, course_id: activity.unit.course_id };
+    return { activity, progress, course_id: activity.unit.course_id, course_slug: activity.unit.course.slug };
   }
 
   /**

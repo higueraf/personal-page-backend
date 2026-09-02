@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { LmsActivity } from '../../entities/lms-activity.entity';
@@ -229,6 +229,16 @@ export class LmsQuizzesService {
     const activity = await this.activityOrFail(activityId);
     if (activity.status !== 'PUBLISHED') throw new NotFoundException('Actividad no encontrada');
     await this.coursesService.assertEnrolled(activity.unit.course_id, student);
+
+    // Sin configurar, se mantiene el comportamiento histórico: 1 solo intento.
+    // `0` o negativo se trata como "ilimitado" (así lo expone el editor de actividad).
+    const attemptsAllowed = activity.config?.attempts_allowed ?? 1;
+    if (attemptsAllowed > 0) {
+      const used = await this.attemptsRepo.count({ where: { activity_id: activityId, student_id: student.id } });
+      if (used >= attemptsAllowed) {
+        throw new ForbiddenException(`Ya usaste tus ${attemptsAllowed} intento(s) permitido(s) para este cuestionario.`);
+      }
+    }
 
     const questions = await this.questionsRepo.find({ where: { activity_id: activityId }, relations: ['options'] });
     const questionsById = new Map(questions.map((q) => [q.id, q]));
