@@ -4785,14 +4785,44 @@ flutter:
     const project = await this.projectRepo.findOne({
       where: { user_id: userId, is_exam: true, status: ProjectStatus.PENDING },
       order: { created_at: 'DESC' },
+      relations: ['files', 'user'],
     });
     if (!project) return null;
+    await this.autoSubmitIfExpired(project);
+    if (project.status !== ProjectStatus.PENDING) return null; // ya se entregó (a tiempo o por vencimiento) — no es un examen "activo"
     return {
       id: project.id,
       require_seb: project.require_seb,
       start_time: project.start_time,
       end_time: project.end_time,
     };
+  }
+
+  /**
+   * Segunda red de seguridad, del lado del servidor: si un examen `PENDING` ya pasó su
+   * `end_time`, se entrega automáticamente ahora mismo (mismo efecto que el auto-submit que
+   * ya intenta el cliente en `PlaygroundIDE` cuando vence el timer local).
+   *
+   * Sin esto, un examen que nunca llegó a auto-entregarse del lado del cliente (pestaña
+   * cerrada antes de tiempo, refresh en mal momento, etc.) quedaba `PENDING` para siempre —
+   * y como `findOne` rechazaba con 403 cualquier acceso a un `PENDING` vencido, el alumno
+   * quedaba atrapado: `findMyActiveExam` lo seguía reportando como "examen activo" en cada
+   * login, lo redirigía de nuevo a ese mismo examen, que volvía a rebotar con el mismo 403 —
+   * sin ninguna forma de salir ni de que el examen se marcara como entregado.
+   */
+  private async autoSubmitIfExpired(project: PlaygroundProject): Promise<void> {
+    if (
+      project.is_exam &&
+      project.status === ProjectStatus.PENDING &&
+      project.end_time &&
+      new Date() > project.end_time
+    ) {
+      project.status = ProjectStatus.SUBMITTED;
+      await this.projectRepo.save(project);
+      this.sendExamZipEmail(project).catch((err) =>
+        this.logger.error(`ZIP email failed for project ${project.id}`, err?.message),
+      );
+    }
   }
 
   async findOne(id: string, userId: string, userRole?: string) {
@@ -4813,9 +4843,10 @@ flutter:
       if (project.start_time && now < project.start_time) {
         throw new ForbiddenException('Este examen aún no ha comenzado.');
       }
-      if (project.end_time && now > project.end_time) {
-        throw new ForbiddenException('El tiempo de este examen ha expirado.');
-      }
+      // Vencido: se entrega automáticamente en vez de bloquear el acceso (ver
+      // `autoSubmitIfExpired`) — el alumno cae al flujo normal de "examen entregado",
+      // de solo lectura, en vez de un 403 sin salida.
+      await this.autoSubmitIfExpired(project);
     }
 
     // Allow if owner or admin/teacher
