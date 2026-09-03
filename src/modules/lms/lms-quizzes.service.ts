@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { LmsActivity } from '../../entities/lms-activity.entity';
 import { LmsQuizQuestion } from '../../entities/lms-quiz-question.entity';
 import { LmsQuizOption } from '../../entities/lms-quiz-option.entity';
@@ -225,13 +225,22 @@ export class LmsQuizzesService {
     }));
   }
 
-  async submitAttempt(activityId: string, dto: SubmitQuizAttemptDto, student: User) {
+  /**
+   * Registra el inicio de un intento (hora de inicio real, separada de la entrega) — si ya había
+   * uno sin entregar, lo retoma en vez de crear otro. Valida el límite de intentos acá: empezar ya
+   * consume un intento, se haya terminado de entregar o no (igual que un examen real).
+   */
+  async startAttempt(activityId: string, student: User) {
     const activity = await this.activityOrFail(activityId);
     if (activity.status !== 'PUBLISHED') throw new NotFoundException('Actividad no encontrada');
     await this.coursesService.assertEnrolled(activity.unit.course_id, student);
 
-    // Sin configurar, se mantiene el comportamiento histórico: 1 solo intento.
-    // `0` o negativo se trata como "ilimitado" (así lo expone el editor de actividad).
+    const inProgress = await this.attemptsRepo.findOne({
+      where: { activity_id: activityId, student_id: student.id, submitted_at: IsNull() },
+      order: { started_at: 'DESC' },
+    });
+    if (inProgress) return inProgress;
+
     const attemptsAllowed = activity.config?.attempts_allowed ?? 1;
     if (attemptsAllowed > 0) {
       const used = await this.attemptsRepo.count({ where: { activity_id: activityId, student_id: student.id } });
@@ -239,13 +248,38 @@ export class LmsQuizzesService {
         throw new ForbiddenException(`Ya usaste tus ${attemptsAllowed} intento(s) permitido(s) para este cuestionario.`);
       }
     }
+    return this.attemptsRepo.save(
+      this.attemptsRepo.create({ activity_id: activityId, student_id: student.id, started_at: new Date() }),
+    );
+  }
+
+  async submitAttempt(activityId: string, dto: SubmitQuizAttemptDto, student: User) {
+    const activity = await this.activityOrFail(activityId);
+    if (activity.status !== 'PUBLISHED') throw new NotFoundException('Actividad no encontrada');
+    await this.coursesService.assertEnrolled(activity.unit.course_id, student);
+
+    // Normalmente ya existe un intento sin entregar (creado por startAttempt). Si no —
+    // compatibilidad con clientes que entregan sin haber llamado a "iniciar" antes— se valida el
+    // límite de intentos acá mismo y se crea el intento en el momento de entregar.
+    let attempt = await this.attemptsRepo.findOne({
+      where: { activity_id: activityId, student_id: student.id, submitted_at: IsNull() },
+      order: { started_at: 'DESC' },
+    });
+    if (!attempt) {
+      const attemptsAllowed = activity.config?.attempts_allowed ?? 1;
+      if (attemptsAllowed > 0) {
+        const used = await this.attemptsRepo.count({ where: { activity_id: activityId, student_id: student.id } });
+        if (used >= attemptsAllowed) {
+          throw new ForbiddenException(`Ya usaste tus ${attemptsAllowed} intento(s) permitido(s) para este cuestionario.`);
+        }
+      }
+      attempt = await this.attemptsRepo.save(
+        this.attemptsRepo.create({ activity_id: activityId, student_id: student.id, started_at: new Date() }),
+      );
+    }
 
     const questions = await this.questionsRepo.find({ where: { activity_id: activityId }, relations: ['options'] });
     const questionsById = new Map(questions.map((q) => [q.id, q]));
-
-    const attempt = await this.attemptsRepo.save(
-      this.attemptsRepo.create({ activity_id: activityId, student_id: student.id, submitted_at: new Date() }),
-    );
 
     let correct = 0;
     let gradable = 0;
@@ -281,46 +315,60 @@ export class LmsQuizzesService {
 
     const score = gradable > 0 ? Math.round((correct / gradable) * (activity.max_score ?? 100)) : null;
     attempt.score = score;
+    attempt.submitted_at = new Date();
     await this.attemptsRepo.save(attempt);
 
     await this.activitiesService.markCompleted(activity.id, activity.unit.course_id, student.id, score);
     return this.getAttemptWithFeedback(attempt.id, student);
   }
 
+  private mapAnswers(answers: LmsQuizAnswer[]) {
+    return answers.map((a) => ({
+      question_id: a.question_id,
+      question_text: a.question.text,
+      selected_option_id: a.selected_option_id,
+      selected_option_ids: a.selected_option_ids,
+      text_answer: a.text_answer,
+      is_correct: a.is_correct,
+      feedback: a.question.feedback,
+    }));
+  }
+
   async getAttemptWithFeedback(attemptId: string, student: User) {
     const attempt = await this.attemptsRepo.findOne({ where: { id: attemptId, student_id: student.id } });
     if (!attempt) throw new NotFoundException('Intento no encontrado');
     const answers = await this.answersRepo.find({ where: { attempt_id: attemptId }, relations: ['question', 'selected_option'] });
-    return {
-      ...attempt,
-      answers: answers.map((a) => ({
-        question_id: a.question_id,
-        question_text: a.question.text,
-        selected_option_id: a.selected_option_id,
-        selected_option_ids: a.selected_option_ids,
-        text_answer: a.text_answer,
-        is_correct: a.is_correct,
-        feedback: a.question.feedback,
-      })),
-    };
+    return { ...attempt, answers: this.mapAnswers(answers) };
   }
 
   /**
-   * `LmsQuizAttempt.answers` no viene cargado por `find()` (no es `eager` ni se pide `relations`)
-   * — sin esto, el frontend nunca podía distinguir "ya entregó" de "recién está por entregar" al
-   * refrescar, porque siempre le llegaba `answers: undefined`. Se enriquece solo el intento más
-   * reciente (el único que la UI muestra), y solo si `config.show_results !== false` — si el
-   * profesor desactivó mostrar el detalle, el alumno ve su nota pero no las respuestas/corrección
-   * por pregunta, ni siquiera inspeccionando la respuesta de la red.
+   * Devuelve TODOS los intentos del alumno (no solo el último) para que la UI pueda listarlos y
+   * dejar elegir cuál revisar — cada uno con su `started_at`/`submitted_at` propios. El detalle
+   * por pregunta (`answers`) solo se adjunta a los intentos ya entregados (uno en progreso todavía
+   * no tiene respuestas que mostrar), y solo si `config.show_results !== false`: si el profesor
+   * desactivó mostrar el detalle, el alumno ve su nota pero no las respuestas/corrección por
+   * pregunta de ningún intento, ni siquiera inspeccionando la respuesta de la red.
    */
   async myAttempts(activityId: string, student: User) {
     const activity = await this.activityOrFail(activityId);
     await this.coursesService.assertEnrolled(activity.unit.course_id, student);
-    const attempts = await this.attemptsRepo.find({ where: { activity_id: activityId, student_id: student.id }, order: { created_at: 'DESC' } });
+    const attempts = await this.attemptsRepo.find({ where: { activity_id: activityId, student_id: student.id }, order: { started_at: 'DESC' } });
     if (attempts.length === 0 || activity.config?.show_results === false) return attempts;
 
-    const [latest, ...rest] = attempts;
-    const detailed = await this.getAttemptWithFeedback(latest.id, student);
-    return [detailed, ...rest];
+    const submittedIds = attempts.filter((a) => a.submitted_at).map((a) => a.id);
+    if (submittedIds.length === 0) return attempts;
+
+    const allAnswers = await this.answersRepo.find({ where: { attempt_id: In(submittedIds) }, relations: ['question'] });
+    const answersByAttempt = new Map<string, LmsQuizAnswer[]>();
+    for (const a of allAnswers) {
+      const list = answersByAttempt.get(a.attempt_id) ?? [];
+      list.push(a);
+      answersByAttempt.set(a.attempt_id, list);
+    }
+
+    return attempts.map((attempt) => {
+      const list = answersByAttempt.get(attempt.id);
+      return list ? { ...attempt, answers: this.mapAnswers(list) } : attempt;
+    });
   }
 }

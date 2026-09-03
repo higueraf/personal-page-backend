@@ -25,6 +25,11 @@ export class LmsQuizAttempt {
   @Column({ type: 'float', nullable: true })
   score: number | null;
 
+  /** Momento en que el alumno inició este intento (distinto de `created_at`: hoy coinciden, pero
+   *  con el flujo de "iniciar" separado de "entregar" son dos momentos reales distintos). */
+  @Column({ type: 'timestamptz', nullable: true })
+  started_at: Date | null;
+
   @Column({ type: 'timestamptz', nullable: true })
   submitted_at: Date | null;
 

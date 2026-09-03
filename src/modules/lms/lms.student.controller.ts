@@ -112,6 +112,9 @@ export class LmsStudentController {
   @Get('activities/:id/quiz-questions') quizQuestions(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.quizzesService.listQuestionsForStudent(id, req.user);
   }
+  @Post('activities/:id/quiz-attempts/start') startAttempt(@Param('id') id: string, @Req() req: AuthedRequest) {
+    return this.quizzesService.startAttempt(id, req.user);
+  }
   @Post('activities/:id/quiz-attempts') submitAttempt(
     @Param('id') id: string,
     @Body() dto: SubmitQuizAttemptDto,
