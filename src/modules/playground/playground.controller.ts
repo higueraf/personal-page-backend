@@ -16,19 +16,10 @@ export class PlaygroundController {
   ) {}
 
   /** Presencia (no validación criptográfica) del header que SEB real envía cuando
-   *  `sendBrowserExamKey` está habilitado en el .seb — ver `assertSebHeader` en el service.
-   *
-   *  `sendBrowserExamKey` activa el mecanismo "Browser Exam Key" de SEB, que manda el
-   *  header `X-SafeExamBrowser-RequestHash` (no `X-SafeExamBrowser-ConfigKeyHash`, que es
-   *  un mecanismo aparte — "Config Key" — que este .seb no activa). Chequeamos ambos por
-   *  si en el futuro se genera el config también con Config Key habilitado. */
+   *  `sendBrowserExamKey` está habilitado en el .seb — ver `assertSebHeader` en el service. */
   private hasSebHeader(req: Request): boolean {
-    const requestHash = req.headers['x-safeexambrowser-requesthash'];
-    const configKeyHash = req.headers['x-safeexambrowser-configkeyhash'];
-    return (
-      (typeof requestHash === 'string' && requestHash.length > 0) ||
-      (typeof configKeyHash === 'string' && configKeyHash.length > 0)
-    );
+    const header = req.headers['x-safeexambrowser-configkeyhash'];
+    return typeof header === 'string' && header.length > 0;
   }
 
   @Get()
