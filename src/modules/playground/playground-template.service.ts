@@ -57,4 +57,24 @@ export class PlaygroundTemplateService {
     await this.templateRepo.delete(id);
     return { success: true };
   }
+
+  async setStatementPdf(id: string, file: Express.Multer.File) {
+    await this.get(id);
+    await this.templateRepo.update(id, {
+      statement_type: 'pdf',
+      statement_pdf_url: `/uploads/playground-statements/${file.filename}`,
+      statement_pdf_original_name: file.originalname,
+    });
+    return this.get(id);
+  }
+
+  async clearStatementPdf(id: string) {
+    await this.get(id);
+    await this.templateRepo.update(id, {
+      statement_type: 'text',
+      statement_pdf_url: null,
+      statement_pdf_original_name: null,
+    });
+    return this.get(id);
+  }
 }

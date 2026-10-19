@@ -1,4 +1,8 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, UseInterceptors, UploadedFile, Req, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ExamTemplateService } from './exam-template.service';
 import { PracticeApiService } from '../practice-api/practice-api.service';
@@ -62,6 +66,36 @@ export class ExamTemplateController {
   async remove(@Req() req: Request, @Param('id') id: string) {
     this.assertAllowed(req);
     return this.examTemplateService.remove(id);
+  }
+
+  @Post('versions/:versionId/statement-pdf')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: diskStorage({
+      destination: join(process.cwd(), 'uploads', 'playground-statements'),
+      filename: (_, file, cb) => cb(null, `${uuidv4()}${extname(file.originalname)}`),
+    }),
+    fileFilter: (_, file, cb) => {
+      if (!/pdf/.test(file.mimetype)) {
+        return cb(new BadRequestException('Solo se permiten archivos PDF') as any, false);
+      }
+      cb(null, true);
+    },
+    limits: { fileSize: 20 * 1024 * 1024 },
+  }))
+  async uploadVersionStatementPdf(
+    @Req() req: Request,
+    @Param('versionId') versionId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    this.assertAllowed(req);
+    if (!file) throw new BadRequestException('No se recibió ningún archivo');
+    return this.examTemplateService.setVersionStatementPdf(versionId, file);
+  }
+
+  @Delete('versions/:versionId/statement-pdf')
+  async removeVersionStatementPdf(@Req() req: Request, @Param('versionId') versionId: string) {
+    this.assertAllowed(req);
+    return this.examTemplateService.clearVersionStatementPdf(versionId);
   }
 
   /**
