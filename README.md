@@ -51,3 +51,5 @@ Credenciales:
 
 - `TYPEORM_SYNC=true` crea las tablas automáticamente
 - `RUN_SEED=true` ejecuta el seed al arrancar
+
+## update domain
