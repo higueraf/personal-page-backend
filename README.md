@@ -53,3 +53,4 @@ Credenciales:
 - `RUN_SEED=true` ejecuta el seed al arrancar
 
 ## update domain
+francisco-higuera.site
