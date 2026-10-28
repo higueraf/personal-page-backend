@@ -136,6 +136,7 @@ Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exact
     if (language === 'react-native') return this.buildReactNativeExamFiles(version);
     if (language === 'html') return this.buildHtmlDomExamFiles(version);
     if (language === 'html-array') return this.buildHtmlArrayExamFiles(version);
+    if (language === 'html-design') return this.buildHtmlStaticLayoutExamFiles(version);
 
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
 
@@ -5275,6 +5276,83 @@ flutter:
         { filename: `${safeName}.zip`, content: zipBuffer, contentType: 'application/zip' },
       ],
     });
+  }
+
+  /** Explicación de la rúbrica para el examen de maquetación HTML/CSS estática (sin API, sin
+   *  CRUD): no aplica el desglose 60/20/20 "funcional/lógica/codificación" de los demás exámenes
+   *  (no hay lógica de negocio acá), así que usa su propio criterio enfocado en estructura semántica
+   *  y fidelidad visual al diseño pedido. */
+  private static readonly HTML_LAYOUT_RUBRIC = `## Rúbrica de evaluación
+
+Este examen se califica con estos 3 criterios:
+
+- **Estructura semántica y completitud (40%):** la página incluye TODOS los elementos pedidos
+  (imagen, lista, tabla y formulario) con las etiquetas HTML correctas (\`<ul>\`/\`<ol>\` para la
+  lista, \`<table>\` con \`<thead>\`/\`<tbody>\` para la tabla, \`<form>\` con sus \`<label>\`/\`<input>\`
+  para el formulario).
+- **Fidelidad al diseño pedido (40%):** el contenido de la lista, las columnas de la tabla y los
+  campos del formulario corresponden exactamente a lo solicitado en el enunciado.
+- **Codificación y organización (20%):** el CSS vive en \`style.css\` (no estilos inline), nombres
+  de clases claros, e indentación/organización prolija del HTML.
+`;
+
+  /**
+   * Andamiaje de HTML/CSS estático (sin JS, sin API): el proyecto arranca con un `index.html` y un
+   * `style.css` prácticamente en blanco. El alumno debe maquetar DESDE CERO, con HTML y CSS propios
+   * (sin ningún framework ni librería), la página que describe el enunciado de su variante —
+   * siempre con una imagen (URL dada), una lista, una tabla y un formulario. No se evalúa lógica de
+   * negocio ni JavaScript: es un examen de estructura semántica + CSS puro, corrección 100% manual.
+   */
+  private buildHtmlStaticLayoutExamFiles(version: ExamVersion) {
+    const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
+    const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0);
+
+    const enunciado = [
+      `# Examen HTML/CSS — Maquetación de diseño — ${version.theme_name}`,
+      '',
+      `Puntaje total: ${totalPoints} pts`,
+      '',
+      PlaygroundService.HTML_LAYOUT_RUBRIC,
+      '',
+      '## Punto de partida',
+      '',
+      '  El proyecto arranca con `index.html` y `style.css` prácticamente en blanco. No hay ningún',
+      '  framework ni JavaScript involucrado: armá toda la página con HTML y CSS propios, enlazando',
+      '  `style.css` desde el `<head>` de `index.html` (ya viene enlazado).',
+      '',
+      '## Tu diseño a replicar',
+      '',
+      ...questions.map((q) => `${q.statement}\n`),
+    ].join('\n');
+
+    const indexHtml = [
+      '<!DOCTYPE html>',
+      '<html lang="es">',
+      '<head>',
+      '  <meta charset="UTF-8">',
+      '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+      `  <title>${version.theme_name}</title>`,
+      '  <link rel="stylesheet" href="style.css">',
+      '</head>',
+      '<body>',
+      '  <!-- Armá acá tu página siguiendo el diseño pedido en ENUNCIADO.md: -->',
+      '  <!-- encabezado, imagen, lista, tabla y formulario. -->',
+      '',
+      '</body>',
+      '</html>',
+      '',
+    ].join('\n');
+
+    const stylesCss = [
+      '/* Escribí acá todo el CSS de tu página — no uses estilos inline (style="..."). */',
+      '',
+    ].join('\n');
+
+    return [
+      this.buildEnunciadoFile(enunciado, version),
+      { name: 'index.html', path: '/index.html', content: indexHtml, is_folder: false },
+      { name: 'style.css', path: '/style.css', content: stylesCss, is_folder: false },
+    ];
   }
 
   // Admin methods
