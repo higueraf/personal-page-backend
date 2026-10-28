@@ -2,12 +2,15 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ExamTemplate } from '../../entities/exam-template.entity';
-import { ExamVersion, ExamQuestion } from '../../entities/exam-version.entity';
+import { ExamVersion, ExamQuestion, StatementType } from '../../entities/exam-version.entity';
 
 interface SaveVersionDto {
   theme_name: string;
   order_index: number;
   questions: ExamQuestion[];
+  statement_type?: StatementType;
+  statement_pdf_url?: string | null;
+  statement_pdf_original_name?: string | null;
 }
 
 interface SaveExamTemplateDto {
@@ -60,6 +63,9 @@ export class ExamTemplateService {
         theme_name: v.theme_name,
         order_index: v.order_index,
         questions: v.questions ?? [],
+        statement_type: v.statement_type ?? 'text',
+        statement_pdf_url: v.statement_pdf_url ?? null,
+        statement_pdf_original_name: v.statement_pdf_original_name ?? null,
       }),
     );
     if (versions.length) await this.versionRepo.save(versions);
@@ -84,6 +90,9 @@ export class ExamTemplateService {
           theme_name: v.theme_name,
           order_index: v.order_index,
           questions: v.questions ?? [],
+          statement_type: v.statement_type ?? 'text',
+          statement_pdf_url: v.statement_pdf_url ?? null,
+          statement_pdf_original_name: v.statement_pdf_original_name ?? null,
         }),
       );
       if (versions.length) await this.versionRepo.save(versions);
@@ -96,5 +105,31 @@ export class ExamTemplateService {
     await this.get(id);
     await this.templateRepo.delete(id);
     return { success: true };
+  }
+
+  private async getVersion(versionId: string) {
+    const version = await this.versionRepo.findOne({ where: { id: versionId } });
+    if (!version) throw new NotFoundException('Variante no encontrada');
+    return version;
+  }
+
+  async setVersionStatementPdf(versionId: string, file: Express.Multer.File) {
+    await this.getVersion(versionId);
+    await this.versionRepo.update(versionId, {
+      statement_type: 'pdf',
+      statement_pdf_url: `/uploads/playground-statements/${file.filename}`,
+      statement_pdf_original_name: file.originalname,
+    });
+    return this.getVersion(versionId);
+  }
+
+  async clearVersionStatementPdf(versionId: string) {
+    await this.getVersion(versionId);
+    await this.versionRepo.update(versionId, {
+      statement_type: 'text',
+      statement_pdf_url: null,
+      statement_pdf_original_name: null,
+    });
+    return this.getVersion(versionId);
   }
 }

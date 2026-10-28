@@ -16,6 +16,8 @@ export interface ExamQuestion {
   statement: string;
 }
 
+export type StatementType = 'text' | 'pdf';
+
 @Entity('exam_versions')
 export class ExamVersion {
   @PrimaryGeneratedColumn('uuid')
@@ -30,6 +32,17 @@ export class ExamVersion {
 
   @Column({ type: 'jsonb', default: [] })
   questions: ExamQuestion[];
+
+  /** Cuando es 'pdf', el enunciado de TODA la variante se entrega como un único PDF
+   *  subido (statement_pdf_url) en vez del texto de `questions[].statement`. */
+  @Column({ default: 'text' })
+  statement_type: StatementType;
+
+  @Column({ type: 'varchar', nullable: true })
+  statement_pdf_url: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  statement_pdf_original_name: string | null;
 
   @ManyToOne(() => ExamTemplate, (template) => template.versions, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'exam_template_id' })

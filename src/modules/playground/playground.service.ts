@@ -6,7 +6,7 @@ import { PlaygroundProject, ProjectStatus } from '../../entities/playground-proj
 import { PlaygroundFile } from '../../entities/playground-file.entity';
 import { PlaygroundSnapshot } from '../../entities/playground-snapshot.entity';
 import { PlaygroundTemplate } from '../../entities/playground-template.entity';
-import { ExamVersion, ExamQuestion } from '../../entities/exam-version.entity';
+import { ExamVersion, ExamQuestion, StatementType } from '../../entities/exam-version.entity';
 import { User } from '../../entities/user.entity';
 import { MailService } from '../mail/mail.service';
 import { getVariantConfig, DartFieldType } from '../practice-api/practice-variants.config';
@@ -104,6 +104,25 @@ Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exact
     return `${funcional} funcional / ${logica} lógica / ${codificacion} codificación`;
   }
 
+  /**
+   * Devuelve el archivo de enunciado de una variante de examen: el markdown generado
+   * (ENUNCIADO.md) normalmente, o una referencia al PDF subido (ENUNCIADO.pdf) cuando
+   * la variante fue configurada con `statement_type: 'pdf'`.
+   */
+  private buildEnunciadoFile(markdown: string, source: { statement_type?: StatementType; statement_pdf_url?: string | null }) {
+    if (source.statement_type === 'pdf' && source.statement_pdf_url) {
+      return {
+        name: 'ENUNCIADO.pdf',
+        path: '/ENUNCIADO.pdf',
+        content: '',
+        is_folder: false,
+        file_type: 'pdf' as const,
+        external_url: source.statement_pdf_url,
+      };
+    }
+    return { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: markdown, is_folder: false, file_type: 'code' as const };
+  }
+
   /** Builds blank exam files with only the question statement as a top comment, per the requested file mode. */
   private buildExamVersionFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion', language?: string) {
     // Dispatch is purely by ExamTemplate.language — no name-string matching. Each React variant
@@ -119,6 +138,22 @@ Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exact
     if (language === 'html-array') return this.buildHtmlArrayExamFiles(version);
 
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
+
+    // Enunciado en PDF: el código arranca con solo un comentario señalando el PDF —
+    // no hay statement por pregunta para incrustar como comentario.
+    if (version.statement_type === 'pdf' && version.statement_pdf_url) {
+      const placeholder = '// Ver el enunciado completo en ENUNCIADO.pdf.\n\n';
+      const codeFiles =
+        fileMode === 'single'
+          ? [{ name: 'examen.ts', path: '/examen.ts', content: placeholder, is_folder: false }]
+          : questions.map((q) => ({
+              name: `ejercicio-${q.order}.ts`,
+              path: `/ejercicio-${q.order}.ts`,
+              content: placeholder,
+              is_folder: false,
+            }));
+      return [this.buildEnunciadoFile('', version), ...codeFiles];
+    }
 
     const block = (q: ExamQuestion) =>
       `/**\n * Ejercicio ${q.order}: ${q.title} (${q.points} pts)\n *\n${wrapStatement(q.statement)}\n */\n\n`;
@@ -220,7 +255,7 @@ Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exact
     ].join('\n');
 
     return [
-      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      this.buildEnunciadoFile(enunciado, version),
       { name: 'lib', path: '/lib', content: '', is_folder: true },
       { name: 'models', path: '/lib/models', content: '', is_folder: true },
       { name: 'services', path: '/lib/services', content: '', is_folder: true },
@@ -1253,7 +1288,7 @@ flutter:
       "bootstrap();\n";
 
     return [
-      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      this.buildEnunciadoFile(enunciado, version),
       { name: 'src', path: '/src', content: '', is_folder: true },
       { name: 'main.ts', path: '/src/main.ts', content: mainTs, is_folder: false },
       { name: 'app.module.ts', path: '/src/app.module.ts', content: appModule, is_folder: false },
@@ -1815,7 +1850,7 @@ flutter:
     ].join('\n');
 
     return [
-      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', is_folder: false, content: enunciado },
+      this.buildEnunciadoFile(enunciado, version),
       { name: 'src', path: '/src', is_folder: true, content: '' },
       { name: 'main.tsx', path: '/src/main.tsx', is_folder: false, content: mainTsx },
       { name: 'App.tsx', path: '/src/App.tsx', is_folder: false, content: appTsx },
@@ -2560,7 +2595,7 @@ flutter:
     ].join('\n');
 
     return [
-      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      this.buildEnunciadoFile(enunciado, version),
       { name: 'src', path: '/src', content: '', is_folder: true },
       { name: 'main.tsx', path: '/src/main.tsx', content: mainTsx, is_folder: false },
       { name: 'App.tsx', path: '/src/App.tsx', content: appTsx, is_folder: false },
@@ -3271,7 +3306,7 @@ flutter:
     ].join('\n');
 
     return [
-      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      this.buildEnunciadoFile(enunciado, version),
       { name: 'package.json', path: '/package.json', content: packageJson, is_folder: false },
       { name: 'vite.config.ts', path: '/vite.config.ts', content: viteConfigTs, is_folder: false },
       { name: 'tsconfig.json', path: '/tsconfig.json', content: tsconfigJson, is_folder: false },
@@ -4046,7 +4081,7 @@ flutter:
     ].join('\n');
 
     return [
-      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      this.buildEnunciadoFile(enunciado, version),
       { name: 'App.tsx', path: '/App.tsx', content: appTsx, is_folder: false },
       { name: 'src', path: '/src', content: '', is_folder: true },
       { name: 'styles.ts', path: '/src/styles.ts', content: stylesTs, is_folder: false },
@@ -4405,7 +4440,7 @@ flutter:
     ].join('\n');
 
     return [
-      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      this.buildEnunciadoFile(enunciado, version),
       { name: 'index.html', path: '/index.html', content: indexHtml, is_folder: false },
       { name: 'styles.css', path: '/styles.css', content: stylesCss, is_folder: false },
       { name: 'nav.js', path: '/nav.js', content: navJs, is_folder: false },
@@ -4741,7 +4776,7 @@ flutter:
     ].join('\n');
 
     return [
-      { name: 'ENUNCIADO.md', path: '/ENUNCIADO.md', content: enunciado, is_folder: false },
+      this.buildEnunciadoFile(enunciado, version),
       { name: 'index.html', path: '/index.html', content: indexHtml, is_folder: false },
       { name: 'styles.css', path: '/styles.css', content: stylesCss, is_folder: false },
       { name: 'nav.js', path: '/nav.js', content: navJs, is_folder: false },
@@ -5295,7 +5330,15 @@ flutter:
     if (!Array.isArray(resolvedFiles) || resolvedFiles.length === 0) {
       if (templateId) {
         const template = await this.templateRepo.findOne({ where: { id: templateId } });
-        resolvedFiles = template?.files;
+        if (template) {
+          resolvedFiles = template.files ?? [];
+          // Si la plantilla no trae ya su propio ENUNCIADO.md/pdf entre los archivos
+          // (admin-authored), le agregamos uno con la `description`/PDF del template.
+          const hasOwnEnunciado = resolvedFiles.some((f: any) => /^ENUNCIADO\.(md|pdf)$/i.test(f.name));
+          if (!hasOwnEnunciado && (template.description || (template.statement_type === 'pdf' && template.statement_pdf_url))) {
+            resolvedFiles = [this.buildEnunciadoFile(template.description ?? '', template), ...resolvedFiles];
+          }
+        }
       }
     }
     if (!Array.isArray(resolvedFiles) || resolvedFiles.length === 0) {
@@ -5309,6 +5352,8 @@ flutter:
         content:    f.content ?? '',
         is_folder:  f.is_folder ?? false,
         path:       f.path ?? `/${f.name}`,
+        file_type:  f.file_type ?? 'code',
+        external_url: f.external_url ?? null,
       }),
     );
     await this.fileRepo.save(fileEntities);

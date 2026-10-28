@@ -33,6 +33,17 @@ export class PlaygroundTemplate {
   @Column({ type: 'jsonb', default: [] })
   files: PlaygroundTemplateFile[];
 
+  /** Cuando es 'pdf', el enunciado de la plantilla se entrega como el PDF subido
+   *  (statement_pdf_url) en vez del texto de `description`. */
+  @Column({ default: 'text' })
+  statement_type: 'text' | 'pdf';
+
+  @Column({ type: 'varchar', nullable: true })
+  statement_pdf_url: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  statement_pdf_original_name: string | null;
+
   @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'created_by' })
   createdBy: User;
