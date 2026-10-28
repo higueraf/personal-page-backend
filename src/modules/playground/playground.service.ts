@@ -8,8 +8,11 @@ import { PlaygroundSnapshot } from '../../entities/playground-snapshot.entity';
 import { PlaygroundTemplate } from '../../entities/playground-template.entity';
 import { ExamVersion, ExamQuestion, StatementType } from '../../entities/exam-version.entity';
 import { User } from '../../entities/user.entity';
+import { LmsCourse } from '../../entities/lms-course.entity';
+import { LmsEnrollment, LmsEnrollmentStatus } from '../../entities/lms-enrollment.entity';
 import { MailService } from '../mail/mail.service';
 import { getVariantConfig, DartFieldType } from '../practice-api/practice-variants.config';
+import { assertTeacherOwnsCourse } from '../../common/lms-access';
 
 function dartType(type: DartFieldType): string {
   return type === 'string' ? 'String' : type === 'int' ? 'int' : type === 'double' ? 'double' : 'bool';
@@ -75,6 +78,10 @@ export class PlaygroundService {
     private templateRepo: Repository<PlaygroundTemplate>,
     @InjectRepository(ExamVersion)
     private examVersionRepo: Repository<ExamVersion>,
+    @InjectRepository(LmsCourse)
+    private lmsCourseRepo: Repository<LmsCourse>,
+    @InjectRepository(LmsEnrollment)
+    private lmsEnrollmentRepo: Repository<LmsEnrollment>,
     private mailService: MailService,
   ) {}
 
@@ -5364,6 +5371,23 @@ Este examen se califica con estos 3 criterios:
       .andWhere('u.is_active = true')
       .getMany();
     return students.map(s => s.id);
+  }
+
+  /**
+   * Resuelve los IDs de los alumnos a asignar cuando el examen se crea desde la pantalla de un
+   * curso del LMS (en vez del picker manual del dashboard de admin): son exactamente los alumnos
+   * con matrícula activa en ese `LmsCourse`, sin selección manual. Solo el profesor dueño del curso
+   * (o un admin) puede hacerlo — ver `assertTeacherOwnsCourse`.
+   */
+  async getStudentsFromLmsCourse(lmsCourseId: string, user: { id: string; role?: { name?: string } }) {
+    const course = await this.lmsCourseRepo.findOne({ where: { id: lmsCourseId } });
+    if (!course) throw new NotFoundException('Curso no encontrado');
+    assertTeacherOwnsCourse(course, user);
+
+    const enrollments = await this.lmsEnrollmentRepo.find({
+      where: { course_id: lmsCourseId, status: LmsEnrollmentStatus.ACTIVE },
+    });
+    return enrollments.map((e) => e.student_id);
   }
 
   async assignExam(

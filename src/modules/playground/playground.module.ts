@@ -10,6 +10,8 @@ import { PlaygroundTemplate } from '../../entities/playground-template.entity';
 import { ExamTemplate } from '../../entities/exam-template.entity';
 import { ExamVersion } from '../../entities/exam-version.entity';
 import { User } from '../../entities/user.entity';
+import { LmsCourse } from '../../entities/lms-course.entity';
+import { LmsEnrollment } from '../../entities/lms-enrollment.entity';
 
 import { PlaygroundService } from './playground.service';
 import { PlaygroundTemplateService } from './playground-template.service';
@@ -25,7 +27,7 @@ import { TodoApiModule } from '../todo-api/todo-api.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PlaygroundProject, PlaygroundFile, PlaygroundSnapshot, PlaygroundTemplate, ExamTemplate, ExamVersion, User]),
+    TypeOrmModule.forFeature([PlaygroundProject, PlaygroundFile, PlaygroundSnapshot, PlaygroundTemplate, ExamTemplate, ExamVersion, User, LmsCourse, LmsEnrollment]),
     MailModule,
     PracticeApiModule,
     TodoApiModule,

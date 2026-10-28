@@ -209,7 +209,12 @@ export class PlaygroundController {
     }
 
     let studentIds: string[] = [];
-    if (data.courseId) {
+    if (data.lmsCourseId) {
+      // Asignación desde la pantalla de un curso del LMS: sin picker manual — siempre los
+      // alumnos con matrícula activa en ESE curso. Lanza 403 si el profesor no es el dueño.
+      studentIds = await this.playgroundService.getStudentsFromLmsCourse(data.lmsCourseId, teacher);
+      if (studentIds.length === 0) throw new ForbiddenException('El curso no tiene alumnos matriculados.');
+    } else if (data.courseId) {
       studentIds = await this.playgroundService.getStudentsFromCourse(data.courseId);
       if (studentIds.length === 0) throw new ForbiddenException('El curso no tiene alumnos activos.');
     } else {
