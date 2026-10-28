@@ -100,6 +100,7 @@ export class AppSeeder {
     await this.seedExamTemplateDomSingle(adminUser);
     await this.seedExamTemplateHtmlArray(adminUser);
     await this.seedExamTemplateHtmlArraySingle(adminUser);
+    await this.seedExamTemplateHtmlDesign(adminUser);
     await this.seedExamTemplateReactNativeBusinessRules(adminUser);
     await this.seedExamTemplateReactNativeBusinessRulesSingle(adminUser);
     await this.seedExamTemplateReactNativeSeguroMedico(adminUser);
@@ -4277,6 +4278,182 @@ const { data: user } = useQuery({
           questions: version.questions,
         }),
       );
+    }
+  }
+
+  // ── Examen HTML/CSS — Maquetación de diseño (sin JS, sin API, 5 variantes) ──
+  private async seedExamTemplateHtmlDesign(admin: User) {
+    const templateName =
+      'HTML/CSS — Maquetación de diseño con imagen, lista, tabla y formulario (5 variantes)';
+    const description =
+      'Examen de HTML/CSS puro (sin JavaScript, sin frameworks, sin API) con 5 variantes temáticas ' +
+      '(Panadería, Hotel, Floristería, Academia de Idiomas, Centro de Yoga). El proyecto arranca con ' +
+      'un `index.html` y un `style.css` prácticamente en blanco: el alumno debe maquetar desde cero, ' +
+      'con HTML y CSS propios, la página de inicio del negocio de su variante, incluyendo SIEMPRE una ' +
+      'imagen (URL dada en el enunciado), una lista, una tabla y un formulario con el contenido ' +
+      'específico que pide cada variante. No hay lógica de negocio ni tests automáticos: la ' +
+      'corrección es 100% manual (estructura semántica + fidelidad al diseño pedido + CSS).';
+
+    // El enunciado de cada variante se entrega como PDF (no texto): los 5 PDFs generados viven en
+    // `uploads/playground-statements/` y se versionan en git junto con el código (igual que
+    // cualquier otro asset estático del repo) para que el deploy los copie a la VPS.
+    const versions: {
+      theme_name: string;
+      order_index: number;
+      questions: ExamQuestion[];
+      statement_type: 'pdf';
+      statement_pdf_url: string;
+      statement_pdf_original_name: string;
+    }[] = [
+      {
+        theme_name: 'Panadería', order_index: 0,
+        statement_type: 'pdf',
+        statement_pdf_url: '/uploads/playground-statements/fc2eaeaf-105b-4b38-af26-6aaa7e7f81bc.pdf',
+        statement_pdf_original_name: 'panaderia.pdf',
+        questions: [{
+          order: 1, points: 10, title: 'Maquetación de página de inicio — Panadería',
+          statement:
+            '### Diseño a replicar: Panadería "Pan y Miel"\n\n' +
+            'Armá la página de inicio de la panadería **"Pan y Miel"**, con estos elementos obligatorios:\n\n' +
+            '1. **Encabezado:** un `<header>` con el nombre del negocio ("Pan y Miel") y un menú de navegación simple (enlaces `#inicio`, `#productos`, `#horario`, `#contacto`; no hace falta que funcionen).\n' +
+            '2. **Imagen destacada:** usá esta foto como imagen principal (banner/hero) de la página:\n   `https://images.pexels.com/photos/36169944/pexels-photo-36169944.jpeg?auto=compress&cs=tinysrgb&w=1200`\n' +
+            '3. **Lista** titulada "Productos destacados" con estos 5 ítems: Pan de masa madre, Croissants de mantequilla, Tarta de manzana, Galletas de avena, Pan integral.\n' +
+            '4. **Tabla** titulada "Horario de atención" con columnas **Día / Apertura / Cierre** y estas 3 filas: Lunes a Viernes — 07:00 — 19:00; Sábado — 08:00 — 20:00; Domingo — 08:00 — 13:00.\n' +
+            '5. **Formulario** titulado "Encargos especiales" con estos campos: Nombre completo (texto), Teléfono (texto), Producto a encargar (texto), Cantidad (número), Fecha de retiro (fecha), Comentario (área de texto), y un botón "Enviar encargo".\n\n' +
+            'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>`, `<input>`/`<textarea>` y el botón.',
+        }],
+      },
+      {
+        theme_name: 'Hotel', order_index: 1,
+        statement_type: 'pdf',
+        statement_pdf_url: '/uploads/playground-statements/99ec48a0-c098-4dd6-aac0-3f8e72ec678e.pdf',
+        statement_pdf_original_name: 'hotel.pdf',
+        questions: [{
+          order: 1, points: 10, title: 'Maquetación de página de inicio — Hotel',
+          statement:
+            '### Diseño a replicar: Hotel "Las Palmeras"\n\n' +
+            'Armá la página de inicio del hotel **"Las Palmeras"**, con estos elementos obligatorios:\n\n' +
+            '1. **Encabezado:** un `<header>` con el nombre del hotel ("Hotel Las Palmeras") y un menú de navegación simple (enlaces `#inicio`, `#servicios`, `#habitaciones`, `#reservar`; no hace falta que funcionen).\n' +
+            '2. **Imagen destacada:** usá esta foto como imagen principal (banner/hero) de la página:\n   `https://images.pexels.com/photos/35215413/pexels-photo-35215413.jpeg?auto=compress&cs=tinysrgb&w=1200`\n' +
+            '3. **Lista** titulada "Servicios del hotel" con estos 5 ítems: Wifi gratuito en todas las habitaciones, Desayuno buffet incluido, Piscina climatizada, Gimnasio 24 horas, Estacionamiento privado.\n' +
+            '4. **Tabla** titulada "Tipos de habitación" con columnas **Tipo / Capacidad / Precio por noche** y estas 3 filas: Individual — 1 persona — $45; Doble — 2 personas — $70; Suite — 4 personas — $120.\n' +
+            '5. **Formulario** titulado "Reservar una habitación" con estos campos: Nombre completo (texto), Correo electrónico (email), Fecha de entrada (fecha), Fecha de salida (fecha), Número de huéspedes (número), Tipo de habitación (lista desplegable con las 3 opciones de la tabla), y un botón "Reservar".\n\n' +
+            'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>`, `<input>`/`<select>` y el botón.',
+        }],
+      },
+      {
+        theme_name: 'Floristería', order_index: 2,
+        statement_type: 'pdf',
+        statement_pdf_url: '/uploads/playground-statements/a343ed42-623a-4f4b-9b95-f0cc914bd35b.pdf',
+        statement_pdf_original_name: 'floristeria.pdf',
+        questions: [{
+          order: 1, points: 10, title: 'Maquetación de página de inicio — Floristería',
+          statement:
+            '### Diseño a replicar: Floristería "Flor y Jardín"\n\n' +
+            'Armá la página de inicio de la floristería **"Flor y Jardín"**, con estos elementos obligatorios:\n\n' +
+            '1. **Encabezado:** un `<header>` con el nombre del negocio ("Flor y Jardín") y un menú de navegación simple (enlaces `#inicio`, `#arreglos`, `#precios`, `#pedido`; no hace falta que funcionen).\n' +
+            '2. **Imagen destacada:** usá esta foto como imagen principal (banner/hero) de la página:\n   `https://images.pexels.com/photos/5414011/pexels-photo-5414011.jpeg?auto=compress&cs=tinysrgb&w=1200`\n' +
+            '3. **Lista** titulada "Arreglos florales" con estos 5 ítems: Ramo de rosas rojas, Arreglo de girasoles, Centro de mesa primaveral, Canasta de flores mixtas, Corona para eventos.\n' +
+            '4. **Tabla** titulada "Precios por tamaño" con columnas **Tamaño / Precio / Flores incluidas** y estas 3 filas: Pequeño — $15 — 6 flores; Mediano — $25 — 12 flores; Grande — $40 — 24 flores.\n' +
+            '5. **Formulario** titulado "Pedido a domicilio" con estos campos: Nombre del remitente (texto), Dirección de entrega (texto), Arreglo deseado (lista desplegable con los 5 ítems de la lista), Mensaje para la tarjeta (área de texto), Fecha de entrega (fecha), y un botón "Enviar pedido".\n\n' +
+            'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>`, `<input>`/`<select>`/`<textarea>` y el botón.',
+        }],
+      },
+      {
+        theme_name: 'Academia de Idiomas', order_index: 3,
+        statement_type: 'pdf',
+        statement_pdf_url: '/uploads/playground-statements/3bfdf91f-dce9-4898-b18d-3c2e3f17b90c.pdf',
+        statement_pdf_original_name: 'academia-idiomas.pdf',
+        questions: [{
+          order: 1, points: 10, title: 'Maquetación de página de inicio — Academia de Idiomas',
+          statement:
+            '### Diseño a replicar: Academia "Global Idiomas"\n\n' +
+            'Armá la página de inicio de la academia **"Global Idiomas"**, con estos elementos obligatorios:\n\n' +
+            '1. **Encabezado:** un `<header>` con el nombre de la academia ("Global Idiomas") y un menú de navegación simple (enlaces `#inicio`, `#idiomas`, `#horarios`, `#inscripcion`; no hace falta que funcionen).\n' +
+            '2. **Imagen destacada:** usá esta foto como imagen principal (banner/hero) de la página:\n   `https://images.pexels.com/photos/29242202/pexels-photo-29242202.jpeg?auto=compress&cs=tinysrgb&w=1200`\n' +
+            '3. **Lista** titulada "Idiomas que ofrecemos" con estos 5 ítems: Inglés, Francés, Alemán, Italiano, Portugués.\n' +
+            '4. **Tabla** titulada "Niveles y horarios" con columnas **Nivel / Días / Horario** y estas 3 filas: Básico — Lunes y Miércoles — 18:00 a 19:30; Intermedio — Martes y Jueves — 18:00 a 19:30; Avanzado — Viernes — 16:00 a 19:00.\n' +
+            '5. **Formulario** titulado "Inscripción" con estos campos: Nombre completo (texto), Correo electrónico (email), Idioma de interés (lista desplegable con los 5 idiomas), Nivel (lista desplegable: Básico/Intermedio/Avanzado), Horario preferido (texto), y un botón "Inscribirme".\n\n' +
+            'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>`, `<input>`/`<select>` y el botón.',
+        }],
+      },
+      {
+        theme_name: 'Centro de Yoga', order_index: 4,
+        statement_type: 'pdf',
+        statement_pdf_url: '/uploads/playground-statements/90053206-afc8-4c38-b2a2-1b97d8385128.pdf',
+        statement_pdf_original_name: 'centro-yoga.pdf',
+        questions: [{
+          order: 1, points: 10, title: 'Maquetación de página de inicio — Centro de Yoga',
+          statement:
+            '### Diseño a replicar: Centro de Yoga "Yoga Armonía"\n\n' +
+            'Armá la página de inicio del centro **"Yoga Armonía"**, con estos elementos obligatorios:\n\n' +
+            '1. **Encabezado:** un `<header>` con el nombre del centro ("Yoga Armonía") y un menú de navegación simple (enlaces `#inicio`, `#clases`, `#horario`, `#prueba`; no hace falta que funcionen).\n' +
+            '2. **Imagen destacada:** usá esta foto como imagen principal (banner/hero) de la página:\n   `https://images.pexels.com/photos/8436589/pexels-photo-8436589.jpeg?auto=compress&cs=tinysrgb&w=1200`\n' +
+            '3. **Lista** titulada "Clases disponibles" con estos 5 ítems: Yoga para principiantes, Yoga restaurativo, Meditación guiada, Yoga en pareja, Yoga prenatal.\n' +
+            '4. **Tabla** titulada "Horario semanal" con columnas **Clase / Día / Hora** y estas 3 filas: Yoga para principiantes — Lunes — 07:00; Yoga restaurativo — Miércoles — 18:00; Meditación guiada — Viernes — 07:30.\n' +
+            '5. **Formulario** titulado "Clase de prueba gratuita" con estos campos: Nombre completo (texto), Correo electrónico (email), Clase de interés (lista desplegable con los 5 ítems de la lista), Nivel de experiencia (lista desplegable: Principiante/Intermedio/Avanzado), Día preferido (texto), y un botón "Reservar clase de prueba".\n\n' +
+            'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>`, `<input>`/`<select>` y el botón.',
+        }],
+      },
+    ];
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'html-design',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+            statement_type: v.statement_type,
+            statement_pdf_url: v.statement_pdf_url,
+            statement_pdf_original_name: v.statement_pdf_original_name,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'html-design';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = v.questions;
+        existing.statement_type = v.statement_type;
+        existing.statement_pdf_url = v.statement_pdf_url;
+        existing.statement_pdf_original_name = v.statement_pdf_original_name;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+            statement_type: v.statement_type,
+            statement_pdf_url: v.statement_pdf_url,
+            statement_pdf_original_name: v.statement_pdf_original_name,
+          }),
+        );
+      }
     }
   }
 
