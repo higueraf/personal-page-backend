@@ -139,6 +139,18 @@ export class LmsAdminController {
     await this.activitiesService.delete(id, req.user);
   }
 
+  /** URL pública de este backend, para whitelistearla en `URLFilterRules` del .seb junto
+   *  al frontend. No hay variable dedicada: se puede fijar `API_URL` explícitamente, o se
+   *  infiere del origin de `GOOGLE_CALLBACK_URL` (ya configurado en todos los entornos). */
+  private resolveApiUrl(): string {
+    if (process.env.API_URL) return process.env.API_URL.trim();
+    try {
+      return new URL(process.env.GOOGLE_CALLBACK_URL ?? '').origin;
+    } catch {
+      return '';
+    }
+  }
+
   /**
    * Descarga la configuración de Safe Exam Browser (.seb) para un cuestionario/examen que
    * requiere pantalla completa (`config.requireSeb`). Mismo formato de plist que el .seb del
@@ -152,6 +164,7 @@ export class LmsAdminController {
     const frontendUrl = origins[origins.length - 1].trim();
     const startUrl = `${frontendUrl}/lms/examen/${activity.id}`;
     const quitUrl = `${frontendUrl}/seb-quit`;
+    const apiUrl = this.resolveApiUrl();
 
     const sebXml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -198,7 +211,17 @@ export class LmsAdminController {
       <integer>1</integer>
       <key>expression</key>
       <string>${frontendUrl}/*</string>
-    </dict>
+    </dict>${apiUrl ? `
+    <dict>
+      <key>active</key>
+      <true/>
+      <key>regex</key>
+      <false/>
+      <key>action</key>
+      <integer>1</integer>
+      <key>expression</key>
+      <string>${apiUrl}/*</string>
+    </dict>` : ''}
   </array>
 </dict>
 </plist>`;

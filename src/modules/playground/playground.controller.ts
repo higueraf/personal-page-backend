@@ -31,6 +31,18 @@ export class PlaygroundController {
     );
   }
 
+  /** URL pública de este backend, para whitelistearla en `URLFilterRules` del .seb junto
+   *  al frontend. No hay variable dedicada: se puede fijar `API_URL` explícitamente, o se
+   *  infiere del origin de `GOOGLE_CALLBACK_URL` (ya configurado en todos los entornos). */
+  private resolveApiUrl(): string {
+    if (process.env.API_URL) return process.env.API_URL.trim();
+    try {
+      return new URL(process.env.GOOGLE_CALLBACK_URL ?? '').origin;
+    } catch {
+      return '';
+    }
+  }
+
   @Get()
   async getProjects(@Req() req: Request) {
     const user = req.user as any;
@@ -433,6 +445,7 @@ export class PlaygroundController {
     const startUrl = `${frontendUrl}/playground/exam/${groupId}`;
 
     const quitUrl = `${frontendUrl}/seb-quit`;
+    const apiUrl = this.resolveApiUrl();
 
     const sebXml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -483,7 +496,17 @@ export class PlaygroundController {
       <integer>1</integer>
       <key>expression</key>
       <string>${frontendUrl}/*</string>
-    </dict>
+    </dict>${apiUrl ? `
+    <dict>
+      <key>active</key>
+      <true/>
+      <key>regex</key>
+      <false/>
+      <key>action</key>
+      <integer>1</integer>
+      <key>expression</key>
+      <string>${apiUrl}/*</string>
+    </dict>` : ''}
   </array>
 </dict>
 </plist>`;
