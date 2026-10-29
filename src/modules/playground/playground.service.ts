@@ -4832,7 +4832,11 @@ flutter:
    */
   async findMyActiveExam(userId: string) {
     const project = await this.projectRepo.findOne({
-      where: { user_id: userId, is_exam: true, status: ProjectStatus.PENDING },
+      // exited_without_submit=false: un alumno que usó "Salir sin entregar" no debe quedar
+      // force-redirigido de vuelta a este mismo examen en cada navegación (ExamLockGate) — eso
+      // anularía por completo el botón de salida. El proyecto sigue "pending" para que el
+      // profesor pueda seguir viéndolo/calificándolo; solo deja de ser el "examen activo".
+      where: { user_id: userId, is_exam: true, status: ProjectStatus.PENDING, exited_without_submit: false },
       order: { created_at: 'DESC' },
       relations: ['files', 'user'],
     });
@@ -5253,6 +5257,25 @@ flutter:
     );
 
     return { status: 'submitted' };
+  }
+
+  /**
+   * Válvula de escape para el alumno: salir del examen SIN entregar. Deliberadamente no llama a
+   * `assertSebHeader` ni chequea `security_locked` — es la única acción que siempre debe
+   * funcionar, incluso cuando el examen está bloqueado (SEB requerido fuera de SEB real, editor
+   * bloqueado por incidentes, etc.), para que el alumno nunca quede sin forma de salir. No
+   * cambia `status`: el profesor sigue viéndolo como no entregado, con la marca de que salió
+   * sin terminar.
+   */
+  async exitWithoutSubmitting(id: string, userId: string) {
+    const project = await this.projectRepo.findOne({ where: { id } });
+    if (!project || project.user_id !== userId) throw new ForbiddenException();
+
+    project.exited_without_submit = true;
+    project.exited_at = new Date();
+    await this.projectRepo.save(project);
+
+    return { status: 'exited' };
   }
 
   private async sendExamZipEmail(project: PlaygroundProject) {

@@ -86,6 +86,18 @@ export class PlaygroundProject {
   @Column({ type: 'timestamptz', nullable: true })
   security_unlocked_at: Date | null;
 
+  /** El alumno usó el botón "Salir sin entregar" (ver `exitWithoutSubmitting`): abandonó el
+   *  examen deliberadamente sin entregar, en vez de quedar sin opción de salir cuando algo le
+   *  impide guardar/entregar (p. ej. un examen marcado `require_seb` abierto fuera de SEB real).
+   *  No cambia `status` — el examen sigue "pending" (o lo que estuviera) para que el profesor
+   *  pueda seguir calificando lo que alcanzó a guardar, pero esta marca le avisa que no llegó
+   *  a entregar voluntariamente. */
+  @Column({ default: false })
+  exited_without_submit: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  exited_at: Date | null;
+
   /** Groups all PlaygroundProjects created from the same assignment batch */
   @Column({ nullable: true })
   exam_group_id: string;

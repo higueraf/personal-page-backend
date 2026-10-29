@@ -185,6 +185,14 @@ export class PlaygroundController {
     return this.playgroundService.submitExam(id, user.id);
   }
 
+  /** Salir sin entregar — ver el comentario en `PlaygroundService.exitWithoutSubmitting`:
+   *  deliberadamente no pasa por `hasSebHeader`/ningún otro guard de bloqueo. */
+  @Post(':id/exit-without-submit')
+  async exitWithoutSubmit(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as any;
+    return this.playgroundService.exitWithoutSubmitting(id, user.id);
+  }
+
   /**
    * Admin/Teacher: assign an exam project to one or more students.
    * Body: {
