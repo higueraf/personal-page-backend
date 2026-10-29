@@ -268,6 +268,17 @@ export class PlaygroundController {
       ),
     );
 
+    // Asignado desde una unidad/semana de un curso del LMS: deja una "Examen (Playground)"
+    // publicada en esa unidad, apuntando a este exam_group_id, para que el alumno la vea en el
+    // contenido del curso y el profesor pueda descargar el .seb y revisar la lista desde ahí.
+    if (data.lmsCourseId && data.unitId) {
+      await this.playgroundService.createLmsExamActivity(data.unitId, data.lmsCourseId, {
+        title: data.name,
+        exam_group_id,
+        require_seb: isPractice ? false : !!data.require_seb,
+      });
+    }
+
     return { data: results, count: results.length, exam_group_id };
   }
 

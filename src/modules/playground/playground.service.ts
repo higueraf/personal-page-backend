@@ -10,6 +10,8 @@ import { ExamVersion, ExamQuestion, StatementType } from '../../entities/exam-ve
 import { User } from '../../entities/user.entity';
 import { LmsCourse } from '../../entities/lms-course.entity';
 import { LmsEnrollment, LmsEnrollmentStatus } from '../../entities/lms-enrollment.entity';
+import { LmsCourseUnit } from '../../entities/lms-course-unit.entity';
+import { LmsActivity } from '../../entities/lms-activity.entity';
 import { MailService } from '../mail/mail.service';
 import { getVariantConfig, DartFieldType } from '../practice-api/practice-variants.config';
 import { assertTeacherOwnsCourse } from '../../common/lms-access';
@@ -82,6 +84,10 @@ export class PlaygroundService {
     private lmsCourseRepo: Repository<LmsCourse>,
     @InjectRepository(LmsEnrollment)
     private lmsEnrollmentRepo: Repository<LmsEnrollment>,
+    @InjectRepository(LmsCourseUnit)
+    private lmsCourseUnitRepo: Repository<LmsCourseUnit>,
+    @InjectRepository(LmsActivity)
+    private lmsActivityRepo: Repository<LmsActivity>,
     private mailService: MailService,
   ) {}
 
@@ -5388,6 +5394,34 @@ Este examen se califica con estos 3 criterios:
       where: { course_id: lmsCourseId, status: LmsEnrollmentStatus.ACTIVE },
     });
     return enrollments.map((e) => e.student_id);
+  }
+
+  /**
+   * Deja una actividad tipo 'playground_exam' publicada en la unidad del curso, apuntando al
+   * `exam_group_id` recién creado — así el examen aparece en el contenido del curso (junto a
+   * tareas/quizzes) y el profesor puede descargar el .seb y revisar la lista de alumnos desde ahí.
+   * No duplica datos del examen: la única "config" es la referencia al exam_group_id.
+   */
+  async createLmsExamActivity(
+    unitId: string,
+    lmsCourseId: string,
+    data: { title: string; exam_group_id: string; require_seb: boolean },
+  ) {
+    const unit = await this.lmsCourseUnitRepo.findOne({ where: { id: unitId } });
+    if (!unit || unit.course_id !== lmsCourseId) {
+      throw new NotFoundException('La unidad no pertenece a este curso.');
+    }
+    const order = await this.lmsActivityRepo.count({ where: { unit_id: unitId } });
+    return this.lmsActivityRepo.save(
+      this.lmsActivityRepo.create({
+        unit_id: unitId,
+        type: 'playground_exam',
+        title: data.title,
+        status: 'PUBLISHED',
+        order: order + 1,
+        config: { exam_group_id: data.exam_group_id, require_seb: data.require_seb },
+      }),
+    );
   }
 
   async assignExam(
