@@ -3,7 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { Request, Response } from 'express';
+import { CookieOptions, Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -17,16 +17,30 @@ import { GoogleAuthGuard } from './google-auth.guard';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  /** Opciones de la cookie JWT. Frontend y backend viven en subdominios distintos
+   *  (p.ej. franciscohiguera.site / api.franciscohiguera.site): sin `domain` explícito
+   *  la cookie queda host-only y depende de que el navegador clasifique el request como
+   *  "same-site" para enviarla en peticiones AJAX cross-subdominio — el navegador embebido
+   *  de Safe Exam Browser no lo hacía, así que la cookie nunca llegaba al backend dentro de
+   *  una sesión SEB y todo lo que requiere auth (guardar, autosave, entregar) fallaba con 401.
+   *  `COOKIE_DOMAIN` (p.ej. ".franciscohiguera.site") resuelve esto sin depender de esa
+   *  heurística; en desarrollo local se deja sin definir y el comportamiento no cambia. */
+  private cookieOptions(): CookieOptions {
+    const domain = process.env.COOKIE_DOMAIN?.trim();
+    return {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: !!domain,
+      path: '/',
+      ...(domain ? { domain } : {}),
+    };
+  }
+
   @Post('auth/login')
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const user = await this.authService.validateUser(dto.email, dto.password);
     const jwt = this.authService.sign(user);
-    res.cookie(process.env.COOKIE_NAME || 'jwt', jwt, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-      path: '/',
-    });
+    res.cookie(process.env.COOKIE_NAME || 'jwt', jwt, this.cookieOptions());
     return { jwt };
   }
 
@@ -37,7 +51,7 @@ export class AuthController {
 
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie(process.env.COOKIE_NAME || 'jwt', { path: '/' });
+    res.clearCookie(process.env.COOKIE_NAME || 'jwt', this.cookieOptions());
     return { ok: true };
   }
 
@@ -107,12 +121,7 @@ export class AuthController {
     const jwt = this.authService.sign(user);
 
     // Establecer la cookie JWT
-    res.cookie(process.env.COOKIE_NAME || 'jwt', jwt, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-      path: '/',
-    });
+    res.cookie(process.env.COOKIE_NAME || 'jwt', jwt, this.cookieOptions());
 
     // Redirigir al frontend
     res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin`);
