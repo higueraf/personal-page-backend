@@ -186,6 +186,36 @@ export class LmsCoursesService {
     }));
   }
 
+  /** Inscribe manualmente a un alumno (profesor dueño del curso o admin). Idempotente: si ya
+   *  estaba inscrito, devuelve la matrícula existente en vez de fallar por la unique constraint
+   *  (course_id, student_id). */
+  async enrollStudent(courseId: string, studentId: string, user: User) {
+    await this.getForManage(courseId, user);
+
+    const student = await this.usersRepo.findOne({ where: { id: studentId } });
+    if (!student) throw new NotFoundException('Alumno no encontrado');
+
+    const existing = await this.enrollmentsRepo.findOne({ where: { course_id: courseId, student_id: studentId } });
+    if (existing) return existing;
+
+    const enrollment = this.enrollmentsRepo.create({
+      course_id: courseId,
+      student_id: studentId,
+      status: LmsEnrollmentStatus.ACTIVE,
+    });
+    return this.enrollmentsRepo.save(enrollment);
+  }
+
+  /** Da de baja a un alumno del curso (profesor dueño o admin). Se identifica por
+   *  `enrollment_id` (el que ya devuelve `roster()`), no por student_id, para no ambigüedad. */
+  async removeEnrollment(courseId: string, enrollmentId: string, user: User) {
+    await this.getForManage(courseId, user);
+    const enrollment = await this.enrollmentsRepo.findOne({ where: { id: enrollmentId, course_id: courseId } });
+    if (!enrollment) throw new NotFoundException('Matrícula no encontrada en este curso');
+    await this.enrollmentsRepo.delete(enrollmentId);
+    return { success: true };
+  }
+
   // ── Catálogo y consumo (alumno) ──────────────────────────────────────────────
 
   async publicCatalog(query: { search?: string; study_course_id?: string; page?: number; page_size?: number }) {

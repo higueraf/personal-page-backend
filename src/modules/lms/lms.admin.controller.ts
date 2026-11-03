@@ -104,6 +104,20 @@ export class LmsAdminController {
   @Get('courses/:id/roster') roster(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.coursesService.roster(id, req.user);
   }
+  @Post('courses/:id/enrollments') enrollStudent(
+    @Param('id') id: string,
+    @Body('student_id') studentId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.coursesService.enrollStudent(id, studentId, req.user);
+  }
+  @Delete('courses/:id/enrollments/:enrollmentId') removeEnrollment(
+    @Param('id') id: string,
+    @Param('enrollmentId') enrollmentId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.coursesService.removeEnrollment(id, enrollmentId, req.user);
+  }
   @Post('courses/:id/units/generate-weeks') generateWeeklyUnits(
     @Param('id') id: string,
     @Body() dto: GenerateWeeklyUnitsDto,
