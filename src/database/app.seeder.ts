@@ -27,6 +27,18 @@ import { LmsQuizQuestion, LmsQuestionType } from '../entities/lms-quiz-question.
 import { LmsQuizOption } from '../entities/lms-quiz-option.entity';
 import { LmsEnrollment, LmsEnrollmentStatus } from '../entities/lms-enrollment.entity';
 
+/** URL pública del backend, usada en las plantillas seed que hacen fetch a la API de
+ *  práctica. Se toma de `API_URL`; si no está definida, se infiere del origin de
+ *  `GOOGLE_CALLBACK_URL` (ya configurado en todos los entornos). */
+function resolveApiUrl(): string {
+  if (process.env.API_URL) return process.env.API_URL.trim();
+  try {
+    return new URL(process.env.GOOGLE_CALLBACK_URL ?? '').origin;
+  } catch {
+    return '';
+  }
+}
+
 @Injectable()
 export class AppSeeder {
   constructor(
@@ -1409,7 +1421,7 @@ const { data: user } = useQuery({
     const todoApiTs = [
       "import type { Todo } from '../models/todo';",
       '',
-      "const API_URL = 'https://api.franciscohiguera.site/api/todo-api/todos';",
+      `const API_URL = '${resolveApiUrl()}/api/todo-api/todos';`,
       '',
       'export async function fetchTodos(): Promise<Todo[]> {',
       '  const res = await fetch(API_URL);',
@@ -1722,7 +1734,7 @@ const { data: user } = useQuery({
       '',
       'export type { Todo };',
       '',
-      "const API_URL = 'https://api.franciscohiguera.site/api/todo-api/todos';",
+      `const API_URL = '${resolveApiUrl()}/api/todo-api/todos';`,
       '',
       'export async function fetchTodos(): Promise<Todo[]> {',
       '  const res = await fetch(API_URL);',

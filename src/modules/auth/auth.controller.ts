@@ -18,12 +18,12 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   /** Opciones de la cookie JWT. Frontend y backend viven en subdominios distintos
-   *  (p.ej. franciscohiguera.site / api.franciscohiguera.site): sin `domain` explícito
+   *  (p.ej. francisco-higuera.site / api.francisco-higuera.site): sin `domain` explícito
    *  la cookie queda host-only y depende de que el navegador clasifique el request como
    *  "same-site" para enviarla en peticiones AJAX cross-subdominio — el navegador embebido
    *  de Safe Exam Browser no lo hacía, así que la cookie nunca llegaba al backend dentro de
    *  una sesión SEB y todo lo que requiere auth (guardar, autosave, entregar) fallaba con 401.
-   *  `COOKIE_DOMAIN` (p.ej. ".franciscohiguera.site") resuelve esto sin depender de esa
+   *  `COOKIE_DOMAIN` (p.ej. ".francisco-higuera.site") resuelve esto sin depender de esa
    *  heurística; en desarrollo local se deja sin definir y el comportamiento no cambia. */
   private cookieOptions(): CookieOptions {
     const domain = process.env.COOKIE_DOMAIN?.trim();

@@ -28,6 +28,18 @@ function cap(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** URL pública del backend, usada en las plantillas de examen que hacen fetch a la API
+ *  de práctica. Se toma de `API_URL`; si no está definida, se infiere del origin de
+ *  `GOOGLE_CALLBACK_URL` (ya configurado en todos los entornos). */
+function resolveApiUrl(): string {
+  if (process.env.API_URL) return process.env.API_URL.trim();
+  try {
+    return new URL(process.env.GOOGLE_CALLBACK_URL ?? '').origin;
+  } catch {
+    return '';
+  }
+}
+
 /** Slug simple para el "type" (namespace) de la API de práctica, derivado del theme_name de la variante. */
 function slugify(text: string): string {
   return text
@@ -211,7 +223,7 @@ Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exact
     const typeSlug = slugify(version.theme_name);
     const variant = getVariantConfig(typeSlug);
     const fields = variant.fields;
-    const apiBase = 'https://api.franciscohiguera.site/api';
+    const apiBase = `${resolveApiUrl()}/api`;
     const endpoint = `${apiBase}/practice-api/${typeSlug}/${variant.resource}`;
     const todoEndpoint = `${apiBase}/todo-api/todos`;
 
@@ -1333,7 +1345,7 @@ flutter:
     const typeSlug = slugify(version.theme_name);
     const variant = getVariantConfig(typeSlug);
     const fields = variant.fields;
-    const apiBase = 'https://api.franciscohiguera.site/api';
+    const apiBase = `${resolveApiUrl()}/api`;
     const endpoint = `${apiBase}/practice-api/${typeSlug}/${variant.resource}`;
     const todoEndpoint = `${apiBase}/todo-api/todos`;
 
@@ -1894,7 +1906,7 @@ flutter:
     const fields = variant.fields;
     const resource = variant.resource;
     const ClassName = cap(resource);
-    const apiBase = 'https://api.franciscohiguera.site/api';
+    const apiBase = `${resolveApiUrl()}/api`;
     const endpoint = `${apiBase}/practice-api/${typeSlug}/${resource}`;
     const seeds = variant.seeds.length ? variant.seeds : [{}];
     const textFields = fields.filter((f) => f.type !== 'bool');
@@ -2650,7 +2662,7 @@ flutter:
     const fields = variant.fields;
     const resource = variant.resource;
     const ClassName = cap(resource);
-    const apiBase = 'https://api.franciscohiguera.site/api';
+    const apiBase = `${resolveApiUrl()}/api`;
     const endpoint = `${apiBase}/practice-api/${typeSlug}/${resource}`;
     const seeds = variant.seeds.length ? variant.seeds : [{}];
     const textFields = fields.filter((f) => f.type !== 'bool');
@@ -3373,7 +3385,7 @@ flutter:
     const typeSlug = slugify(version.theme_name);
     const variant = getVariantConfig(typeSlug);
     const fields = variant.fields;
-    const apiBase = 'https://api.franciscohiguera.site/api';
+    const apiBase = `${resolveApiUrl()}/api`;
     const endpoint = `${apiBase}/practice-api/${typeSlug}/${variant.resource}`;
     const todoEndpoint = `${apiBase}/todo-api/todos`;
 
@@ -4147,7 +4159,7 @@ flutter:
     const fields = variant.fields;
     const resource = variant.resource;
     const ClassName = cap(resource);
-    const apiBase = 'https://api.franciscohiguera.site/api';
+    const apiBase = `${resolveApiUrl()}/api`;
     const endpoint = `${apiBase}/practice-api/${typeSlug}/${resource}`;
     const todoEndpoint = `${apiBase}/todo-api/todos`;
 
