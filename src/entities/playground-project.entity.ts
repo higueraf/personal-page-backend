@@ -102,6 +102,13 @@ export class PlaygroundProject {
   @Column({ nullable: true })
   exam_group_id: string;
 
+  /** Quién asignó este examen (admin o profesor que llamó a `assignExam`). Nullable: exámenes
+   *  creados antes de que existiera esta columna no tienen dueño conocido. Se usa para que un
+   *  profesor en `/teacher/examenes` solo vea los exámenes que él mismo asignó, no los de todos
+   *  los profesores (un admin sigue viendo todo). */
+  @Column({ nullable: true })
+  assigned_by_id: string;
+
   /** Which themed variant (ExamVersion) was assigned to this student, if any */
   @ManyToOne(() => ExamVersion, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'exam_version_id' })

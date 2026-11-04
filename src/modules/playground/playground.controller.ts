@@ -312,8 +312,8 @@ export class PlaygroundController {
     if (!allowedRoles.includes(teacher.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden ver los exámenes.');
     }
-    
-    const exams = await this.playgroundService.findAllAdminExams();
+    const isAdmin = teacher.role?.name?.toLowerCase() === 'admin';
+    const exams = await this.playgroundService.findAllAdminExams(teacher.id, isAdmin);
     return { data: exams };
   }
 
@@ -342,7 +342,8 @@ export class PlaygroundController {
     if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden ver los exámenes.');
     }
-    return { data: await this.playgroundService.findAdminExamGroups() };
+    const isAdmin = user.role?.name?.toLowerCase() === 'admin';
+    return { data: await this.playgroundService.findAdminExamGroups(user.id, isAdmin) };
   }
 
   /**
@@ -355,6 +356,7 @@ export class PlaygroundController {
     if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden ver los exámenes.');
     }
+    await this.playgroundService.assertExamGroupOwnership(groupId, user);
     return { data: await this.playgroundService.findAdminExamsByGroup(groupId) };
   }
 
@@ -373,6 +375,7 @@ export class PlaygroundController {
     if (!validStatuses.includes(status as any)) {
       throw new ForbiddenException(`Estado inválido. Valores permitidos: ${validStatuses.join(', ')}`);
     }
+    await this.playgroundService.assertExamOwnership(id, user);
     return this.playgroundService.changeExamStatus(id, status as any);
   }
 
@@ -391,6 +394,7 @@ export class PlaygroundController {
     if (!validStatuses.includes(status as any)) {
       throw new ForbiddenException(`Estado inválido. Valores permitidos: ${validStatuses.join(', ')}`);
     }
+    await this.playgroundService.assertExamGroupOwnership(groupId, user);
     return this.playgroundService.changeExamGroupStatus(groupId, status as any);
   }
 
@@ -404,8 +408,10 @@ export class PlaygroundController {
     if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden editar exámenes.');
     }
+    await this.playgroundService.assertExamGroupOwnership(groupId, user);
     return this.playgroundService.updateAdminExamGroup(groupId, {
       name:            body.name,
+      materia:         body.materia,
       start_time:      body.start_time ? new Date(body.start_time) : body.start_time,
       end_time:        body.end_time   ? new Date(body.end_time)   : body.end_time,
       allow_copy_paste: body.allow_copy_paste,
@@ -429,6 +435,7 @@ export class PlaygroundController {
     if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden descargar la configuración SEB.');
     }
+    await this.playgroundService.assertExamGroupOwnership(groupId, user);
 
     // Resolve the exam group to get a name for the filename
     const projects = await this.playgroundService.findAdminExamsByGroup(groupId);
@@ -447,6 +454,12 @@ export class PlaygroundController {
     const quitUrl = `${frontendUrl}/seb-quit`;
     const apiUrl = this.resolveApiUrl();
 
+    // browserWindowWebView=2 ("prefer classic for same host, modern for a different host")
+    // forces SEB's Mac/iOS client to use the classic WebView for this exam's own origin. SEB's
+    // modern WKWebView engine is documented (by SEB's own team) to NOT support sending the
+    // Browser Exam Key header on any request, which otherwise makes every guardado/save call
+    // fail with "Esta acción requiere Safe Exam Browser" even though the student is genuinely
+    // inside SEB. Harmless on Windows SEB, which ignores this Mac/iOS-only key.
     const sebXml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -455,6 +468,8 @@ export class PlaygroundController {
   <string>${startUrl}</string>
   <key>sendBrowserExamKey</key>
   <true/>
+  <key>browserWindowWebView</key>
+  <integer>2</integer>
   <key>allowQuit</key>
   <false/>
   <key>ignoreExitKey</key>
@@ -527,6 +542,7 @@ export class PlaygroundController {
     if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden eliminar exámenes.');
     }
+    await this.playgroundService.assertExamGroupOwnership(groupId, user);
     return this.playgroundService.deleteAdminExamGroup(groupId);
   }
 
@@ -545,6 +561,7 @@ export class PlaygroundController {
     if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden calificar exámenes.');
     }
+    await this.playgroundService.assertExamOwnership(id, user);
     return this.playgroundService.gradeExam(id, Number(grade), feedback);
   }
 
@@ -558,6 +575,7 @@ export class PlaygroundController {
     if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden ver el prompt de corrección.');
     }
+    await this.playgroundService.assertExamOwnership(id, user);
     return this.playgroundService.buildGradingPrompt(id);
   }
 
@@ -572,6 +590,7 @@ export class PlaygroundController {
     if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden ver el historial.');
     }
+    await this.playgroundService.assertExamOwnership(projectId, user);
     return { data: await this.playgroundService.getSnapshots(projectId) };
   }
 
@@ -589,6 +608,7 @@ export class PlaygroundController {
     if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden ver el historial.');
     }
+    await this.playgroundService.assertExamOwnership(projectId, user);
     return this.playgroundService.getSnapshot(projectId, snapshotId);
   }
 
@@ -603,6 +623,7 @@ export class PlaygroundController {
     if (!allowedRoles.includes(user.role?.name?.toLowerCase())) {
       throw new ForbiddenException('Solo administradores o profesores pueden reactivar exámenes.');
     }
+    await this.playgroundService.assertExamOwnership(id, user);
     return this.playgroundService.unlockProject(id);
   }
 }

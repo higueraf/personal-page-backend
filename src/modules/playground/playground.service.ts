@@ -5188,15 +5188,18 @@ flutter:
   // se bloquea automáticamente en solo lectura hasta que un admin/profesor lo reactive.
   private static readonly SECURITY_LOCK_THRESHOLD = 5;
 
-  /** Defensa adicional server-side para exámenes con `require_seb`: exige que el request traiga
-   *  el header que un SEB real (con `sendBrowserExamKey` habilitado) siempre envía. No es una
-   *  validación criptográfica del hash (SEB firma la URL completa con la config real, lo cual es
-   *  frágil de reproducir acá) — solo cierra el hueco actual de que cualquier navegador normal con
-   *  un user-agent falsificado pase el check hoy 100% client-side sin tener SEB instalado. */
-  private assertSebHeader(project: PlaygroundProject, sebHeaderPresent: boolean) {
-    if (project.require_seb && !sebHeaderPresent) {
-      throw new ForbiddenException('Esta acción requiere Safe Exam Browser.');
-    }
+  /** Deliberadamente YA NO bloquea: exámenes `require_seb` reportaban en producción 403
+   *  "Esta acción requiere Safe Exam Browser" en guardados y entregas de alumnos genuinamente
+   *  dentro de SEB real, porque el motor WKWebView que usa SEB en Mac/iOS no soporta enviar el
+   *  header del Browser Exam Key en ninguna petición (limitación documentada por el propio
+   *  equipo de SEB, no un bug de esta app) — ver `browserWindowWebView` en el .seb generado
+   *  (mitigación del lado del cliente, no garantizada en todas las versiones/plataformas de
+   *  SEB). Bloquear el guardado por esto es peor que no bloquearlo: pierde trabajo real de un
+   *  alumno real por una limitación de un tercero. El chequeo de `require_seb` sigue existiendo
+   *  solo como señal informativa en el IDE (overlay "requiere SEB" en PlaygroundIDE), nunca como
+   *  bloqueo duro de guardar/entregar. */
+  private assertSebHeader(_project: PlaygroundProject, _sebHeaderPresent: boolean) {
+    // no-op — ver comentario arriba.
   }
 
   /** Agrupa logs crudos en "incidentes reales": los mismos 2000ms de deduplicación que ya se
@@ -5481,6 +5484,7 @@ Este examen se califica con estos 3 criterios:
       status:           ProjectStatus.PENDING,
       exam_group_id:    exam_group_id ?? null,
       exam_version_id:  examVersionId ?? null,
+      assigned_by_id:   teacherId,
     });
     const saved = await this.projectRepo.save(project) as unknown as PlaygroundProject;
     const projectId: string = saved.id;
@@ -5582,18 +5586,23 @@ Este examen se califica con estos 3 criterios:
     return { prompt };
   }
 
-  async findAllAdminExams() {
+  /** `requesterId`/`isAdmin`: un profesor solo debe ver los exámenes que él mismo asignó
+   *  (`assigned_by_id`), nunca los de otros profesores. Un admin ve todo. */
+  async findAllAdminExams(requesterId?: string, isAdmin = true) {
     return this.projectRepo.find({
-      where: { is_exam: true },
+      where: isAdmin ? { is_exam: true } : { is_exam: true, assigned_by_id: requesterId },
       order: { created_at: 'DESC' },
       relations: ['user'],
     });
   }
 
-  /** Returns one summary entry per exam/practice batch (grouped by exam_group_id) */
-  async findAdminExamGroups() {
+  /** Returns one summary entry per exam/practice batch (grouped by exam_group_id).
+   *  Same `requesterId`/`isAdmin` scoping as `findAllAdminExams`. */
+  async findAdminExamGroups(requesterId?: string, isAdmin = true) {
     const exams = await this.projectRepo.find({
-      where: [{ is_exam: true }, { exam_group_id: Not(IsNull()) }],
+      where: isAdmin
+        ? [{ is_exam: true }, { exam_group_id: Not(IsNull()) }]
+        : [{ is_exam: true, assigned_by_id: requesterId }, { exam_group_id: Not(IsNull()), assigned_by_id: requesterId }],
       order: { created_at: 'DESC' },
       relations: ['user'],
     });
@@ -5624,6 +5633,25 @@ Este examen se califica con estos 3 criterios:
         cheating_count:  projects.filter(p => Array.isArray(p.cheating_logs) && p.cheating_logs.length > 0).length,
       };
     });
+  }
+
+  /** Admin ve todo; un profesor solo puede operar sobre exámenes que él mismo asignó
+   *  (`assigned_by_id`). Exámenes legacy sin `assigned_by_id` (creados antes de que existiera
+   *  esta columna) quedan visibles solo para admin, por no tener dueño conocido. */
+  async assertExamGroupOwnership(groupId: string, user: { id: string; role?: { name?: string } }) {
+    if (user.role?.name?.toLowerCase() === 'admin') return;
+    const project = await this.projectRepo.findOne({ where: { exam_group_id: groupId } })
+      ?? await this.projectRepo.findOne({ where: { id: groupId, is_exam: true } });
+    if (!project) throw new NotFoundException('Examen no encontrado');
+    if (project.assigned_by_id !== user.id) throw new ForbiddenException('No tienes permiso sobre este examen.');
+  }
+
+  /** Igual que `assertExamGroupOwnership` pero para un único proyecto de alumno por su id. */
+  async assertExamOwnership(projectId: string, user: { id: string; role?: { name?: string } }) {
+    if (user.role?.name?.toLowerCase() === 'admin') return;
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Examen no encontrado');
+    if (project.assigned_by_id !== user.id) throw new ForbiddenException('No tienes permiso sobre este examen.');
   }
 
   /** Returns all student projects belonging to an exam/practice group */
@@ -5658,7 +5686,7 @@ Este examen se califica con estos 3 criterios:
   /** Updates metadata on all student projects in an exam/practice group */
   async updateAdminExamGroup(
     groupId: string,
-    data: { name?: string; start_time?: Date | null; end_time?: Date | null; allow_copy_paste?: boolean; require_seb?: boolean; timezone_offset_minutes?: number },
+    data: { name?: string; materia?: string; start_time?: Date | null; end_time?: Date | null; allow_copy_paste?: boolean; require_seb?: boolean; timezone_offset_minutes?: number },
   ) {
     const projects = await this.projectRepo.find({ where: { exam_group_id: groupId } });
     if (projects.length === 0) {
