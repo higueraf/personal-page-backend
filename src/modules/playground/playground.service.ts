@@ -49,7 +49,7 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function wrapStatement(text: string, width = 90): string {
+function wrapStatement(text: string, width = 90, prefix = ' * '): string {
   const words = text.split(/\s+/);
   const lines: string[] = [];
   let current = '';
@@ -62,7 +62,7 @@ function wrapStatement(text: string, width = 90): string {
     }
   }
   if (current) lines.push(current.trim());
-  return lines.map(l => ` * ${l}`).join('\n');
+  return lines.map(l => `${prefix}${l}`).join('\n');
 }
 
 /** Fallback starter files when an exam is assigned without explicit files */
@@ -162,6 +162,7 @@ Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exact
     if (language === 'html') return this.buildHtmlDomExamFiles(version);
     if (language === 'html-array') return this.buildHtmlArrayExamFiles(version);
     if (language === 'html-design') return this.buildHtmlStaticLayoutExamFiles(version);
+    if (language === 'python') return this.buildPythonExamFiles(version, fileMode);
 
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
 
@@ -197,6 +198,62 @@ Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exact
       content: block(q),
       is_folder: false,
     }));
+  }
+
+  /**
+   * Examen de Python: sin andamiaje de app (son ejercicios algorítmicos sueltos, no una
+   * aplicación), pero a diferencia del fallback genérico de TS sí arma un ENUNCIADO.md con la
+   * rúbrica estándar (60/20/20) — el criterio "Funcional" (que el script corra sin errores) queda
+   * como el de mayor peso. Cada archivo de ejercicio arranca solo con el enunciado como comentario
+   * `#`, igual de en blanco que el resto de la familia "genérica" (TS, etc.).
+   */
+  private buildPythonExamFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion') {
+    const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
+    const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0);
+
+    const enunciado = [
+      `# Examen Python — ${version.theme_name}`,
+      '',
+      `Puntaje total: ${totalPoints} pts`,
+      '',
+      PlaygroundService.RUBRIC_EXPLICATION,
+      '',
+      '## Preguntas',
+      '',
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n\n${q.statement}\n`),
+    ].join('\n');
+
+    if (version.statement_type === 'pdf' && version.statement_pdf_url) {
+      const placeholder = '# Ver el enunciado completo en ENUNCIADO.pdf.\n\n';
+      const codeFiles =
+        fileMode === 'single'
+          ? [{ name: 'examen.py', path: '/examen.py', content: placeholder, is_folder: false }]
+          : questions.map((q) => ({
+              name: `ejercicio-${q.order}.py`,
+              path: `/ejercicio-${q.order}.py`,
+              content: placeholder,
+              is_folder: false,
+            }));
+      return [this.buildEnunciadoFile('', version), ...codeFiles];
+    }
+
+    const block = (q: ExamQuestion) =>
+      `# Ejercicio ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n#\n${wrapStatement(q.statement, 90, '# ')}\n\n`;
+
+    const codeFiles =
+      fileMode === 'single'
+        ? [{
+            name: 'examen.py', path: '/examen.py', is_folder: false,
+            content: questions.map((q, i) => (i > 0 ? `# ─────────────────────────────\n\n${block(q)}` : block(q))).join(''),
+          }]
+        : questions.map((q) => ({
+            name: `ejercicio-${q.order}.py`,
+            path: `/ejercicio-${q.order}.py`,
+            content: block(q),
+            is_folder: false,
+          }));
+
+    return [this.buildEnunciadoFile(enunciado, version), ...codeFiles];
   }
 
   /**

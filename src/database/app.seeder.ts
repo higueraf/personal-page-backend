@@ -117,6 +117,7 @@ export class AppSeeder {
     await this.seedExamTemplateReactNativeBusinessRulesSingle(adminUser);
     await this.seedExamTemplateReactNativeSeguroMedico(adminUser);
     await this.seedExamTemplateReactCrudSeguroMedico(adminUser);
+    await this.seedExamTemplatePythonBasico(adminUser);
     await this.seedLmsTestCourse(teacherUser, [alumno1User, alumno2User]);
 
     return { ok: true };
@@ -2841,6 +2842,153 @@ const { data: user } = useQuery({
         name: templateName,
         description: 'Examen de TypeScript con 4 ejercicios (for+if, switch, for+if, while) y 4 variantes temáticas para evitar copias entre alumnos.',
         language: 'typescript',
+        created_by: admin.id,
+      }),
+    );
+
+    await this.examVersionsRepo.save(
+      versions.map((v) =>
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: v.theme_name,
+          order_index: v.order_index,
+          questions: v.questions,
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Examen básico de Python: 4 ejercicios (2.5 pts c/u) que cada uno exige explícitamente una
+   * estructura distinta — variables+condicionales, bucles, funciones, diccionarios+listas — y
+   * 5 variantes temáticas (round-robin) para evitar copias entre alumnos. La rúbrica 60/20/20
+   * (funcional/lógica/codificación) la agrega automáticamente `buildPythonExamFiles` en el
+   * ENUNCIADO.md de cada variante; "funcional" (que el script corra sin errores) es el criterio
+   * de mayor peso.
+   */
+  private async seedExamTemplatePythonBasico(admin: User) {
+    const templateName = 'Python Básico — Variables, Condicionales, Ciclos, Funciones y Estructuras de Datos';
+    const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
+    if (exists) return;
+
+    // Mismas 4 consignas (mismo orden/estructura exigida) re-temáticas en 5 contextos distintos:
+    //   Q1: variables + if/elif/else — clasificar un valor de stock/disponibilidad en 4 rangos
+    //   Q2: for sobre una lista     — acumular un total y contar cuántos superan un umbral
+    //   Q3: función (def + return)  — calcular un monto a partir de varios parámetros
+    //   Q4: lista de diccionarios   — recorrerla para promediar y filtrar por encima del promedio
+    const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
+      {
+        theme_name: 'Tienda de Ropa', order_index: 0,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Clasificación de stock',
+            statement: 'Se registra el precio de venta de una prenda y la cantidad de unidades disponibles en stock. Declara las variables `precio` y `stock` con los valores asignados, y usando una estructura condicional `if/elif/else`, clasifica el stock en: "Agotado" (0 unidades), "Bajo" (1 a 5 unidades), "Normal" (6 a 20 unidades) o "Alto" (más de 20 unidades). Imprime el precio, el stock y la clasificación. Debes usar: declaración de variables y condicionales `if/elif/else`.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Total de ventas del día',
+            statement: 'Una tienda registró las ventas (en dólares) de 5 prendas distintas durante el día, guardadas en una lista. Usando un ciclo `for`, recorre la lista para calcular el total vendido y contar cuántas prendas se vendieron en más de $50. Imprime el total y el conteo. Debes usar: un ciclo `for` (bucle) sobre una lista.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cálculo del total de la compra',
+            statement: 'Define una función `calcular_total(precio, cantidad, descuento)` que reciba el precio unitario, la cantidad de prendas compradas y un porcentaje de descuento (0 a 100), calcule el subtotal (precio × cantidad), aplique el descuento y retorne (`return`) el total final. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función definida con `def`, parámetros y `return`.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Inventario por encima del promedio',
+            statement: 'Representa el inventario de la tienda con una lista de diccionarios, donde cada diccionario tiene las claves `nombre`, `talla` y `precio` (incluye al menos 4 prendas). Usando un ciclo `for`, recorre la lista para calcular el precio promedio del inventario e imprime el nombre de las prendas cuyo precio sea mayor al promedio. Debes usar: una lista de diccionarios (`dict`) y recorrerla con un ciclo.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Biblioteca', order_index: 1,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Clasificación de disponibilidad',
+            statement: 'Se registra el valor de la multa por día de atraso y la cantidad de ejemplares disponibles de un libro. Declara las variables `multa_por_dia` y `ejemplares_disponibles`, y usando una estructura condicional `if/elif/else`, clasifica la disponibilidad en: "Agotado" (0 ejemplares), "Bajo" (1 a 5), "Normal" (6 a 20) o "Alto" (más de 20). Imprime la multa, los ejemplares y la clasificación. Debes usar: declaración de variables y condicionales `if/elif/else`.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Préstamos de la semana',
+            statement: 'La biblioteca registró la cantidad de préstamos realizados por día durante 5 días, guardada en una lista. Usando un ciclo `for`, calcula el total de préstamos de la semana y cuenta cuántos días tuvieron más de 10 préstamos. Imprime el total y el conteo. Debes usar: un ciclo `for` (bucle) sobre una lista.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cálculo de la multa',
+            statement: 'Define una función `calcular_multa(dias_atraso, multa_por_dia, es_estudiante)` que reciba los días de atraso en la devolución, el valor de la multa diaria y si el usuario es estudiante (`True`/`False`, aplica 50% de descuento), calcule y retorne (`return`) el monto final de la multa. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función definida con `def`, parámetros y `return`.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Libros con pocos ejemplares',
+            statement: 'Representa el catálogo de la biblioteca con una lista de diccionarios, donde cada diccionario tiene las claves `titulo`, `autor` y `ejemplares` (incluye al menos 4 libros). Usando un ciclo `for`, recorre la lista para calcular el total de ejemplares disponibles e imprime el título de los libros con menos de 3 ejemplares. Debes usar: una lista de diccionarios (`dict`) y recorrerla con un ciclo.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Gimnasio', order_index: 2,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Clasificación del plan',
+            statement: 'Se registra el costo de la mensualidad y el número de clases disponibles en un plan del gimnasio. Declara las variables `costo_mensualidad` y `clases_disponibles`, y usando una estructura condicional `if/elif/else`, clasifica el plan en: "Básico" (1 a 8 clases), "Intermedio" (9 a 16 clases), "Premium" (17 a 30 clases) o "Ilimitado" (más de 30 clases). Imprime el costo, las clases y la clasificación. Debes usar: declaración de variables y condicionales `if/elif/else`.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Asistencia de la semana',
+            statement: 'El gimnasio registró la asistencia de 5 clases distintas durante la semana, guardada en una lista. Usando un ciclo `for`, calcula el total de asistentes y cuenta cuántas clases tuvieron más de 15 asistentes. Imprime el total y el conteo. Debes usar: un ciclo `for` (bucle) sobre una lista.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cálculo de calorías quemadas',
+            statement: 'Define una función `calcular_calorias(peso, minutos, intensidad)` que reciba el peso de la persona en kg, los minutos de ejercicio y un factor de intensidad (bajo=3, medio=6, alto=9 calorías por kg por hora), calcule y retorne (`return`) las calorías quemadas aproximadas. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función definida con `def`, parámetros y `return`.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Miembros mayores al promedio',
+            statement: 'Representa a los miembros del gimnasio con una lista de diccionarios, donde cada diccionario tiene las claves `nombre`, `plan` y `edad` (incluye al menos 4 miembros). Usando un ciclo `for`, recorre la lista para calcular la edad promedio de los miembros e imprime el nombre de los miembros mayores al promedio. Debes usar: una lista de diccionarios (`dict`) y recorrerla con un ciclo.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Cafetería', order_index: 3,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Clasificación de ventas del día',
+            statement: 'Se registra el precio de una bebida y la cantidad de unidades vendidas en el día. Declara las variables `precio` y `unidades_vendidas`, y usando una estructura condicional `if/elif/else`, clasifica las ventas del día en: "Bajas" (1 a 10 unidades), "Normales" (11 a 30 unidades), "Altas" (31 a 60 unidades) o "Excelentes" (más de 60 unidades). Imprime el precio, las unidades y la clasificación. Debes usar: declaración de variables y condicionales `if/elif/else`.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Ventas de la semana',
+            statement: 'La cafetería registró el total de ventas (en dólares) de 5 días distintos, guardado en una lista. Usando un ciclo `for`, calcula el total vendido en la semana y cuenta cuántos días se vendió más de $100. Imprime el total y el conteo. Debes usar: un ciclo `for` (bucle) sobre una lista.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cálculo de la cuenta',
+            statement: 'Define una función `calcular_cuenta(precio_bebida, cantidad, propina_porcentaje)` que reciba el precio de la bebida, la cantidad pedida y un porcentaje de propina, calcule el subtotal, la propina y retorne (`return`) el total a pagar. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función definida con `def`, parámetros y `return`.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Productos más baratos que el promedio',
+            statement: 'Representa el menú de la cafetería con una lista de diccionarios, donde cada diccionario tiene las claves `nombre`, `categoria` y `precio` (incluye al menos 4 productos). Usando un ciclo `for`, recorre la lista para calcular el precio promedio del menú e imprime el nombre de los productos cuyo precio sea menor al promedio. Debes usar: una lista de diccionarios (`dict`) y recorrerla con un ciclo.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Taller Mecánico', order_index: 4,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Clasificación de inventario',
+            statement: 'Se registra el costo de un repuesto y la cantidad disponible en el taller. Declara las variables `costo_repuesto` y `cantidad_disponible`, y usando una estructura condicional `if/elif/else`, clasifica el inventario en: "Agotado" (0 unidades), "Bajo" (1 a 5 unidades), "Normal" (6 a 15 unidades) o "Alto" (más de 15 unidades). Imprime el costo, la cantidad y la clasificación. Debes usar: declaración de variables y condicionales `if/elif/else`.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Facturación de la semana',
+            statement: 'El taller registró el costo de 5 reparaciones distintas realizadas en la semana, guardado en una lista. Usando un ciclo `for`, calcula el total facturado en la semana y cuenta cuántas reparaciones costaron más de $80. Imprime el total y el conteo. Debes usar: un ciclo `for` (bucle) sobre una lista.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cálculo de la factura',
+            statement: 'Define una función `calcular_factura(costo_mano_obra, costo_repuestos, iva_porcentaje)` que reciba el costo de mano de obra, el costo de repuestos y el porcentaje de IVA, calcule el subtotal, el IVA y retorne (`return`) el total a pagar. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función definida con `def`, parámetros y `return`.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Órdenes por encima del promedio',
+            statement: 'Representa las órdenes de trabajo del taller con una lista de diccionarios, donde cada diccionario tiene las claves `vehiculo`, `servicio` y `costo` (incluye al menos 4 órdenes). Usando un ciclo `for`, recorre la lista para calcular el costo total de todas las órdenes e imprime el vehículo de las órdenes cuyo costo sea mayor al promedio. Debes usar: una lista de diccionarios (`dict`) y recorrerla con un ciclo.',
+          },
+        ],
+      },
+    ];
+
+    const template = await this.examTemplatesRepo.save(
+      this.examTemplatesRepo.create({
+        name: templateName,
+        description: 'Examen básico de Python con 4 ejercicios (variables+condicionales, bucles, funciones, diccionarios+listas) y 5 variantes temáticas para evitar copias entre alumnos.',
+        language: 'python',
         created_by: admin.id,
       }),
     );
