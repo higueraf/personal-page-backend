@@ -5424,7 +5424,7 @@ Este examen se califica con estos 3 criterios:
    * (o un admin) puede hacerlo — ver `assertTeacherOwnsCourse`.
    */
   async getStudentsFromLmsCourse(lmsCourseId: string, user: { id: string; role?: { name?: string } }) {
-    const course = await this.lmsCourseRepo.findOne({ where: { id: lmsCourseId } });
+    const course = await this.lmsCourseRepo.findOne({ where: { id: lmsCourseId }, relations: ['co_teachers'] });
     if (!course) throw new NotFoundException('Curso no encontrado');
     assertTeacherOwnsCourse(course, user);
 

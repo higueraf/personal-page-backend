@@ -75,6 +75,20 @@ export class LmsAdminController {
   @Put('courses/:id/archive') archiveCourse(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.coursesService.archive(id, req.user);
   }
+  @Post('courses/:id/co-teachers') addCoTeacher(
+    @Param('id') id: string,
+    @Body('teacher_id') teacherId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.coursesService.addCoTeacher(id, teacherId, req.user);
+  }
+  @Delete('courses/:id/co-teachers/:teacherId') removeCoTeacher(
+    @Param('id') id: string,
+    @Param('teacherId') teacherId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.coursesService.removeCoTeacher(id, teacherId, req.user);
+  }
   @Post('courses/:id/cover')
   @UseInterceptors(FileInterceptor('cover', {
     storage: diskStorage({

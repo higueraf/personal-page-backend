@@ -21,6 +21,7 @@ export class UpsertLmsCourseDto {
   @IsOptional() @IsString() description?: string | null;
   @IsOptional() @IsString() status?: string;
   @IsOptional() @IsString() cover_image?: string;
+  @IsOptional() @IsBoolean() is_public?: boolean;
   @IsOptional() @IsArray() @IsString({ each: true }) study_courses?: string[];
 }
 

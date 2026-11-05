@@ -116,7 +116,7 @@ describe('LMS: flujo crear → publicar → visualizar, y control de acceso', ()
     // Un alumno no puede inscribirse en un curso que todavía no está publicado.
     await expect(coursesService.enroll(course.id, student)).rejects.toThrow();
 
-    await coursesService.update(course.id, { status: 'PUBLISHED' } as any, teacherA);
+    await coursesService.update(course.id, { status: 'PUBLISHED', is_public: true } as any, teacherA);
     await coursesService.updateUnit(unit.id, { status: 'PUBLISHED' } as any, teacherA);
     await activitiesService.update(activity.id, { status: 'PUBLISHED' } as any, teacherA);
 

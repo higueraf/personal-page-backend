@@ -28,9 +28,11 @@ export class LmsCoursesService {
   // ── Gestión (profesor/admin) ────────────────────────────────────────────────
 
   async listForTeacher(user: User, query: { search?: string; page?: number; page_size?: number }) {
-    const qb = this.coursesRepo.createQueryBuilder('course');
+    const qb = this.coursesRepo.createQueryBuilder('course')
+      .leftJoin('course.co_teachers', 'co_teacher')
+      .distinct(true);
     if (user.role?.name?.toLowerCase() !== 'admin') {
-      qb.where('course.teacher_id = :teacherId', { teacherId: user.id });
+      qb.where('course.teacher_id = :teacherId OR co_teacher.id = :teacherId', { teacherId: user.id });
     }
     if (query.search) {
       qb.andWhere('course.title ILIKE :search', { search: `%${query.search}%` });
@@ -40,10 +42,43 @@ export class LmsCoursesService {
   }
 
   async getForManage(id: string, user: User) {
-    const course = await this.coursesRepo.findOne({ where: { id }, relations: ['study_courses'] });
+    const course = await this.coursesRepo.findOne({ where: { id }, relations: ['study_courses', 'co_teachers'] });
     if (!course) throw new NotFoundException('Curso no encontrado');
     assertTeacherOwnsCourse(course, user);
     return course;
+  }
+
+  async addCoTeacher(id: string, teacherId: string, user: User) {
+    const course = await this.coursesRepo.findOne({ where: { id }, relations: ['co_teachers'] });
+    if (!course) throw new NotFoundException('Curso no encontrado');
+    assertTeacherOwnsCourse(course, user);
+
+    if (teacherId === course.teacher_id) {
+      throw new BadRequestException('Ese usuario ya es el profesor dueño del curso');
+    }
+    if (course.co_teachers?.some((t) => t.id === teacherId)) {
+      throw new BadRequestException('Ese profesor ya está asociado al curso');
+    }
+
+    const teacher = await this.usersRepo.findOne({ where: { id: teacherId } });
+    if (!teacher) throw new NotFoundException('Profesor no encontrado');
+    if (teacher.role?.name?.toLowerCase() !== 'teacher' && teacher.role?.name?.toLowerCase() !== 'admin') {
+      throw new BadRequestException('Ese usuario no tiene rol de profesor');
+    }
+
+    course.co_teachers = [...(course.co_teachers ?? []), teacher];
+    await this.coursesRepo.save(course);
+    return this.getForManage(id, user);
+  }
+
+  async removeCoTeacher(id: string, teacherId: string, user: User) {
+    const course = await this.coursesRepo.findOne({ where: { id }, relations: ['co_teachers'] });
+    if (!course) throw new NotFoundException('Curso no encontrado');
+    assertTeacherOwnsCourse(course, user);
+
+    course.co_teachers = (course.co_teachers ?? []).filter((t) => t.id !== teacherId);
+    await this.coursesRepo.save(course);
+    return this.getForManage(id, user);
   }
 
   async create(dto: UpsertLmsCourseDto, user: User) {
@@ -61,6 +96,7 @@ export class LmsCoursesService {
       description: dto.description ?? null,
       status: (dto.status as LmsCourseStatus) || LmsCourseStatus.DRAFT,
       cover_image: dto.cover_image,
+      is_public: dto.is_public ?? false,
       teacher_id: user.id,
       study_courses,
     });
@@ -74,6 +110,7 @@ export class LmsCoursesService {
     if (dto.description !== undefined) course.description = dto.description ?? null;
     if (dto.status !== undefined) course.status = dto.status as LmsCourseStatus;
     if (dto.cover_image !== undefined) course.cover_image = dto.cover_image;
+    if (dto.is_public !== undefined) course.is_public = dto.is_public;
     if (dto.study_courses) {
       course.study_courses = await this.studyCoursesRepo.find({ where: { id: In(dto.study_courses) } });
     }
@@ -218,11 +255,14 @@ export class LmsCoursesService {
 
   // ── Catálogo y consumo (alumno) ──────────────────────────────────────────────
 
+  /** Catálogo de auto-matrícula: solo cursos publicados y marcados como públicos (`is_public`).
+   *  Los cursos no públicos solo los ve el alumno ya matriculado, en `myCourses()`. */
   async publicCatalog(query: { search?: string; study_course_id?: string; page?: number; page_size?: number }) {
     const qb = this.coursesRepo
       .createQueryBuilder('course')
       .leftJoinAndSelect('course.study_courses', 'study_course')
-      .where('course.status = :status', { status: LmsCourseStatus.PUBLISHED });
+      .where('course.status = :status', { status: LmsCourseStatus.PUBLISHED })
+      .andWhere('course.is_public = true');
     if (query.search) {
       qb.andWhere('course.title ILIKE :search', { search: `%${query.search}%` });
     }
@@ -233,12 +273,29 @@ export class LmsCoursesService {
     return paginate(items, query.page, query.page_size);
   }
 
-  async publicDetail(slug: string) {
+  /** Un curso no público no existe para el resto del mundo: ni se lista en el catálogo ni se
+   *  puede ver su ficha directamente por slug. Solo lo ven el alumno ya matriculado, el profesor
+   *  dueño/co-profesor, o un admin. Se responde 404 (no 403) para no revelar que el curso existe. */
+  private async hasCourseAccess(course: LmsCourse, user?: User): Promise<boolean> {
+    if (!user?.id) return false;
+    const roleName = user.role?.name?.toLowerCase();
+    if (roleName === 'admin') return true;
+    if (roleName === 'teacher' && (course.teacher_id === user.id || course.co_teachers?.some((t) => t.id === user.id))) {
+      return true;
+    }
+    const enrollment = await this.enrollmentsRepo.findOne({ where: { course_id: course.id, student_id: user.id } });
+    return !!enrollment;
+  }
+
+  async publicDetail(slug: string, user?: User) {
     const course = await this.coursesRepo.findOne({
       where: { slug, status: LmsCourseStatus.PUBLISHED },
-      relations: ['study_courses', 'teacher'],
+      relations: ['study_courses', 'teacher', 'co_teachers'],
     });
     if (!course) throw new NotFoundException('Curso no encontrado');
+    if (!course.is_public && !(await this.hasCourseAccess(course, user))) {
+      throw new NotFoundException('Curso no encontrado');
+    }
     const units = await this.unitsRepo.find({
       where: { course_id: course.id, status: 'PUBLISHED' },
       order: { order: 'ASC' },
@@ -256,6 +313,9 @@ export class LmsCoursesService {
     const course = await this.coursesRepo.findOne({ where: { id: courseId } });
     if (!course || course.status !== LmsCourseStatus.PUBLISHED) {
       throw new NotFoundException('Curso no disponible');
+    }
+    if (!course.is_public) {
+      throw new ForbiddenException('Este curso no admite auto-matrícula; pide a tu profesor que te inscriba');
     }
     const existing = await this.enrollmentsRepo.findOne({ where: { course_id: courseId, student_id: student.id } });
     if (existing) return existing;

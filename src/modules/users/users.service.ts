@@ -16,7 +16,7 @@ export class UsersService {
     @InjectRepository(StudyCourse)  private readonly studyCoursesRepo: Repository<StudyCourse>,
   ) {}
 
-  async findAll(page: string, pageSize: string, status?: string, search?: string) {
+  async findAll(page: string, pageSize: string, status?: string, search?: string, role?: string) {
     const p    = Math.max(1, parseInt(page));
     const size = Math.min(100, parseInt(pageSize));
 
@@ -30,6 +30,7 @@ export class UsersService {
       .take(size);
 
     if (status) qb.andWhere('u.status = :status', { status });
+    if (role) qb.andWhere('role.name = :role', { role });
     if (search) {
       qb.andWhere(
         '(u.email ILIKE :q OR u.first_name ILIKE :q OR u.last_name ILIKE :q)',

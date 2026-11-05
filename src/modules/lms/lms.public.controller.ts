@@ -1,7 +1,11 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt.guard';
 import { LmsCoursesService } from './lms-courses.service';
 
-/** Catálogo de cursos LMS abierto, sin autenticación (equivalente a un catálogo tipo Udemy). */
+/** Catálogo de cursos LMS abierto, sin autenticación (equivalente a un catálogo tipo Udemy).
+ *  Los cursos no públicos (`is_public = false`) no aparecen aquí ni son accesibles por slug;
+ *  ver `LmsCoursesService.hasCourseAccess`. */
 @Controller('public/lms')
 export class LmsPublicController {
   constructor(private readonly coursesService: LmsCoursesService) {}
@@ -20,7 +24,8 @@ export class LmsPublicController {
     });
   }
 
-  @Get('courses/:slug') detail(@Param('slug') slug: string) {
-    return this.coursesService.publicDetail(slug);
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get('courses/:slug') detail(@Param('slug') slug: string, @Req() req: Request & { user?: any }) {
+    return this.coursesService.publicDetail(slug, req.user ?? undefined);
   }
 }
