@@ -118,6 +118,7 @@ export class AppSeeder {
     await this.seedExamTemplateReactNativeSeguroMedico(adminUser);
     await this.seedExamTemplateReactCrudSeguroMedico(adminUser);
     await this.seedExamTemplatePythonBasico(adminUser);
+    await this.seedExamTemplatePythonIntermedio(adminUser);
     await this.seedLmsTestCourse(teacherUser, [alumno1User, alumno2User]);
 
     return { ok: true };
@@ -2988,6 +2989,153 @@ const { data: user } = useQuery({
       this.examTemplatesRepo.create({
         name: templateName,
         description: 'Examen básico de Python con 4 ejercicios (variables+condicionales, bucles, funciones, diccionarios+listas) y 5 variantes temáticas para evitar copias entre alumnos.',
+        language: 'python',
+        created_by: admin.id,
+      }),
+    );
+
+    await this.examVersionsRepo.save(
+      versions.map((v) =>
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: v.theme_name,
+          order_index: v.order_index,
+          questions: v.questions,
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Examen intermedio de Python: 4 ejercicios (2.5 pts c/u) más exigentes que el básico —
+   * ninguno se resuelve solo declarando variables, los 4 exigen cómputo con varios pasos.
+   * 5 variantes temáticas para evitar copias entre alumnos.
+   *   Q1: match/case (switch) — costo con una fórmula matemática DISTINTA en cada caso
+   *       (no solo un % distinto), incluyendo un recargo/cargo condicional en al menos un caso
+   *   Q2: match/case (switch) — comisión por nivel, con un bono condicional dentro de un caso
+   *       (si el monto supera un umbral) en al menos dos niveles
+   *   Q3: función (def/return) + ciclo for — acumula un total, cuenta cuántos superan un
+   *       umbral, y calcula además un porcentaje de cumplimiento (3 resultados retornados)
+   *   Q4: función (def/return) + ciclo for sobre lista de diccionarios — valor total
+   *       (precio × cantidad), promedio, y el elemento de mayor valor individual
+   */
+  private async seedExamTemplatePythonIntermedio(admin: User) {
+    const templateName = 'Python Intermedio — Switch, Funciones y Ciclos con Cómputo';
+    const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
+    if (exists) return;
+
+    const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
+      {
+        theme_name: 'Tienda de Electrónica', order_index: 0,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Costo de envío según tipo',
+            statement: 'Una tienda de electrónica calcula el costo de envío de un pedido según el tipo de envío elegido (código 1 a 4: Normal, Express, Internacional, Mismo Día), el peso del paquete en kilogramos y la distancia de entrega en kilómetros. Declara las variables `tipo_envio`, `peso_kg` y `distancia_km` con los valores asignados, y usando `match`/`case` (equivalente a switch), calcula el costo de envío según estas fórmulas: Normal (1): `peso_kg * 0.5 + distancia_km * 0.1`; Express (2): `peso_kg * 0.8 + distancia_km * 0.2 + 5.00` (cargo fijo); Internacional (3): `peso_kg * 2.5 + distancia_km * 0.05`, y si el peso supera los 20 kg se aplica un recargo adicional del 15% sobre ese resultado; Mismo Día (4): `(peso_kg * 1.0 + distancia_km * 0.3) * 1.2`. Imprime el tipo de envío, el peso, la distancia y el costo final calculado. Debes usar: declaración de variables, `match`/`case` con un cálculo distinto en cada caso, y un condicional `if` dentro del caso correspondiente para aplicar el recargo.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Comisión de vendedor por nivel',
+            statement: 'La tienda paga comisiones a sus vendedores según su nivel (código 1 a 4: Junior, Intermedio, Senior, Experto) y el monto total vendido en el mes. Declara las variables `nivel_vendedor` y `monto_vendido`, y usando `match`/`case`, calcula la comisión: Junior (1): 4% del monto vendido; Intermedio (2): 6% del monto vendido; Senior (3): 8% del monto vendido, más un bono de $50 si el monto vendido supera los $1000; Experto (4): 10% del monto vendido, más un bono de $100 si el monto vendido supera los $1500. Imprime el nivel, el monto vendido y la comisión total (porcentaje más bono, si aplica). Debes usar: `match`/`case`, y un condicional `if` dentro de al menos un caso para aplicar el bono.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cumplimiento de meta de ventas',
+            statement: 'La tienda registró el monto vendido por 5 vendedores distintos durante el mes, guardado en una lista. Define una función `procesar_ventas(montos, meta_individual, meta_total)` que, usando un ciclo `for`, recorra la lista para calcular el total vendido por todo el equipo, cuente cuántos vendedores superaron su `meta_individual`, y calcule el porcentaje de cumplimiento del equipo respecto a la `meta_total` (`total_vendido / meta_total * 100`). La función debe retornar (`return`) el total, el conteo y el porcentaje. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función definida con `def`, un ciclo `for` sobre una lista, un condicional `if` dentro del ciclo para contar los que superan el umbral, y `return` con varios valores.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Producto más valioso del inventario',
+            statement: 'La tienda representa su inventario con una lista de diccionarios, donde cada diccionario tiene las claves `nombre`, `precio` y `cantidad` (incluye al menos 4 productos). Define una función `analizar_inventario(productos)` que, usando un ciclo `for`, recorra la lista para calcular el valor total del inventario (la suma de `precio * cantidad` de cada producto), el precio promedio de los productos, y determine cuál producto tiene el mayor valor total individual (`precio * cantidad`). La función debe retornar (`return`) el valor total, el promedio y el nombre del producto más valioso. Imprime los resultados. Debes usar: una función definida con `def`, un ciclo `for` sobre una lista de diccionarios, un condicional `if` dentro del ciclo para comparar y determinar el de mayor valor, y `return` con varios valores.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Agencia de Transporte', order_index: 1,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Costo de pasaje según tipo de servicio',
+            statement: 'Una agencia de buses interprovinciales calcula el costo de un boleto según el tipo de servicio elegido (código 1 a 4: Económico, Ejecutivo, Internacional, Nocturno), la distancia del viaje en kilómetros y el número de pasajeros del grupo. Declara las variables `tipo_servicio`, `distancia_km` y `num_pasajeros`, y usando `match`/`case` (equivalente a switch), calcula el costo total según estas fórmulas: Económico (1): `distancia_km * 0.08 * num_pasajeros`; Ejecutivo (2): `distancia_km * 0.15 * num_pasajeros + 3.00` (cargo fijo por reserva); Internacional (3): `distancia_km * 0.20 * num_pasajeros`, y si el grupo supera los 10 pasajeros se aplica un descuento del 10% sobre ese resultado; Nocturno (4): `(distancia_km * 0.10 * num_pasajeros) * 1.2` (recargo nocturno). Imprime el tipo de servicio, la distancia, los pasajeros y el costo final calculado. Debes usar: declaración de variables, `match`/`case` con un cálculo distinto en cada caso, y un condicional `if` dentro del caso correspondiente para aplicar el recargo.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Comisión de agente de ventas por nivel',
+            statement: 'La agencia paga comisiones a sus agentes de venta de boletos según su nivel (código 1 a 4: Junior, Intermedio, Senior, Experto) y el monto total vendido en el mes. Declara las variables `nivel_agente` y `monto_vendido`, y usando `match`/`case`, calcula la comisión: Junior (1): 4% del monto vendido; Intermedio (2): 6% del monto vendido; Senior (3): 8% del monto vendido, más un bono de $50 si el monto vendido supera los $1000; Experto (4): 10% del monto vendido, más un bono de $100 si el monto vendido supera los $1500. Imprime el nivel, el monto vendido y la comisión total (porcentaje más bono, si aplica). Debes usar: `match`/`case`, y un condicional `if` dentro de al menos un caso para aplicar el bono.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cumplimiento de meta de ventas de boletos',
+            statement: 'La agencia registró el monto vendido por 5 agentes distintos durante el mes, guardado en una lista. Define una función `procesar_ventas(montos, meta_individual, meta_total)` que, usando un ciclo `for`, recorra la lista para calcular el total vendido por todo el equipo, cuente cuántos agentes superaron su `meta_individual`, y calcule el porcentaje de cumplimiento del equipo respecto a la `meta_total` (`total_vendido / meta_total * 100`). La función debe retornar (`return`) el total, el conteo y el porcentaje. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función definida con `def`, un ciclo `for` sobre una lista, un condicional `if` dentro del ciclo para contar los que superan el umbral, y `return` con varios valores.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Ruta más rentable',
+            statement: 'La agencia representa sus rutas con una lista de diccionarios, donde cada diccionario tiene las claves `ruta`, `precio` y `pasajeros` (incluye al menos 4 rutas). Define una función `analizar_rutas(rutas)` que, usando un ciclo `for`, recorra la lista para calcular el ingreso total de todas las rutas (la suma de `precio * pasajeros` de cada una), el precio promedio de los boletos, y determine cuál ruta generó el mayor ingreso individual (`precio * pasajeros`). La función debe retornar (`return`) el ingreso total, el promedio y el nombre de la ruta más rentable. Imprime los resultados. Debes usar: una función definida con `def`, un ciclo `for` sobre una lista de diccionarios, un condicional `if` dentro del ciclo para comparar y determinar el de mayor valor, y `return` con varios valores.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Restaurante', order_index: 2,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Costo de domicilio según tipo de entrega',
+            statement: 'Un restaurante calcula el costo de domicilio de un pedido según el tipo de entrega elegido (código 1 a 4: Estándar, Express, Zona Lejana, Evento), el peso del pedido en kilogramos y la distancia de entrega en kilómetros. Declara las variables `tipo_entrega`, `peso_kg` y `distancia_km`, y usando `match`/`case` (equivalente a switch), calcula el costo de domicilio según estas fórmulas: Estándar (1): `peso_kg * 0.5 + distancia_km * 0.1`; Express (2): `peso_kg * 0.8 + distancia_km * 0.2 + 5.00` (cargo fijo); Zona Lejana (3): `peso_kg * 2.5 + distancia_km * 0.05`, y si el peso supera los 20 kg se aplica un recargo adicional del 15% sobre ese resultado; Evento (4): `(peso_kg * 1.0 + distancia_km * 0.3) * 1.2`. Imprime el tipo de entrega, el peso, la distancia y el costo final calculado. Debes usar: declaración de variables, `match`/`case` con un cálculo distinto en cada caso, y un condicional `if` dentro del caso correspondiente para aplicar el recargo.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Comisión de mesero por nivel',
+            statement: 'El restaurante paga comisiones a sus meseros según su nivel de experiencia (código 1 a 4: Junior, Intermedio, Senior, Experto) y el monto total vendido en el mes. Declara las variables `nivel_mesero` y `monto_vendido`, y usando `match`/`case`, calcula la comisión: Junior (1): 4% del monto vendido; Intermedio (2): 6% del monto vendido; Senior (3): 8% del monto vendido, más un bono de $50 si el monto vendido supera los $1000; Experto (4): 10% del monto vendido, más un bono de $100 si el monto vendido supera los $1500. Imprime el nivel, el monto vendido y la comisión total (porcentaje más bono, si aplica). Debes usar: `match`/`case`, y un condicional `if` dentro de al menos un caso para aplicar el bono.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cumplimiento de meta de ventas del restaurante',
+            statement: 'El restaurante registró el monto vendido por 5 meseros distintos durante el mes, guardado en una lista. Define una función `procesar_ventas(montos, meta_individual, meta_total)` que, usando un ciclo `for`, recorra la lista para calcular el total vendido por todo el equipo, cuente cuántos meseros superaron su `meta_individual`, y calcule el porcentaje de cumplimiento del equipo respecto a la `meta_total` (`total_vendido / meta_total * 100`). La función debe retornar (`return`) el total, el conteo y el porcentaje. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función definida con `def`, un ciclo `for` sobre una lista, un condicional `if` dentro del ciclo para contar los que superan el umbral, y `return` con varios valores.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Plato más rentable del menú',
+            statement: 'El restaurante representa su menú con una lista de diccionarios, donde cada diccionario tiene las claves `nombre`, `precio` y `cantidad_vendida` (incluye al menos 4 platos). Define una función `analizar_menu(platos)` que, usando un ciclo `for`, recorra la lista para calcular el ingreso total del menú (la suma de `precio * cantidad_vendida` de cada plato), el precio promedio de los platos, y determine cuál plato generó el mayor ingreso individual (`precio * cantidad_vendida`). La función debe retornar (`return`) el ingreso total, el promedio y el nombre del plato más rentable. Imprime los resultados. Debes usar: una función definida con `def`, un ciclo `for` sobre una lista de diccionarios, un condicional `if` dentro del ciclo para comparar y determinar el de mayor valor, y `return` con varios valores.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Hotel', order_index: 3,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Costo de hospedaje según tipo de habitación',
+            statement: 'Un hotel calcula el costo de una reserva según el tipo de habitación elegido (código 1 a 4: Estándar, Ejecutiva, Suite, Presidencial), el número de noches y el número de huéspedes. Declara las variables `tipo_habitacion`, `noches` y `num_huespedes`, y usando `match`/`case` (equivalente a switch), calcula el costo total según estas fórmulas: Estándar (1): `noches * 40 + num_huespedes * 5`; Ejecutiva (2): `noches * 70 + num_huespedes * 8 + 10.00` (cargo fijo de servicio); Suite (3): `noches * 120 + num_huespedes * 10`, y si el número de huéspedes supera los 4 se aplica un recargo adicional del 15% sobre ese resultado; Presidencial (4): `(noches * 200 + num_huespedes * 15) * 1.2`. Imprime el tipo de habitación, las noches, los huéspedes y el costo final calculado. Debes usar: declaración de variables, `match`/`case` con un cálculo distinto en cada caso, y un condicional `if` dentro del caso correspondiente para aplicar el recargo.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Comisión de recepcionista por nivel',
+            statement: 'El hotel paga comisiones a sus recepcionistas según su nivel (código 1 a 4: Junior, Intermedio, Senior, Experto) por el monto en reservas que gestionaron en el mes. Declara las variables `nivel_recepcionista` y `monto_gestionado`, y usando `match`/`case`, calcula la comisión: Junior (1): 4% del monto gestionado; Intermedio (2): 6% del monto gestionado; Senior (3): 8% del monto gestionado, más un bono de $50 si el monto gestionado supera los $1000; Experto (4): 10% del monto gestionado, más un bono de $100 si el monto gestionado supera los $1500. Imprime el nivel, el monto gestionado y la comisión total (porcentaje más bono, si aplica). Debes usar: `match`/`case`, y un condicional `if` dentro de al menos un caso para aplicar el bono.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cumplimiento de meta de reservas',
+            statement: 'El hotel registró el monto en reservas gestionado por 5 recepcionistas distintos durante el mes, guardado en una lista. Define una función `procesar_ventas(montos, meta_individual, meta_total)` que, usando un ciclo `for`, recorra la lista para calcular el total gestionado por todo el equipo, cuente cuántos recepcionistas superaron su `meta_individual`, y calcule el porcentaje de cumplimiento del equipo respecto a la `meta_total` (`total_gestionado / meta_total * 100`). La función debe retornar (`return`) el total, el conteo y el porcentaje. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función definida con `def`, un ciclo `for` sobre una lista, un condicional `if` dentro del ciclo para contar los que superan el umbral, y `return` con varios valores.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Tipo de habitación más rentable',
+            statement: 'El hotel representa su oferta de habitaciones con una lista de diccionarios, donde cada diccionario tiene las claves `tipo`, `precio` y `noches_reservadas` (incluye al menos 4 tipos). Define una función `analizar_habitaciones(habitaciones)` que, usando un ciclo `for`, recorra la lista para calcular el ingreso total de todas las habitaciones (la suma de `precio * noches_reservadas` de cada tipo), el precio promedio por noche, y determine cuál tipo de habitación generó el mayor ingreso individual (`precio * noches_reservadas`). La función debe retornar (`return`) el ingreso total, el promedio y el nombre del tipo más rentable. Imprime los resultados. Debes usar: una función definida con `def`, un ciclo `for` sobre una lista de diccionarios, un condicional `if` dentro del ciclo para comparar y determinar el de mayor valor, y `return` con varios valores.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Farmacia', order_index: 4,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Costo de domicilio de medicamentos según tipo de entrega',
+            statement: 'Una farmacia calcula el costo de domicilio de un pedido de medicamentos según el tipo de entrega elegido (código 1 a 4: Estándar, Express, Urgente, Nocturno), el peso del pedido en kilogramos y la distancia de entrega en kilómetros. Declara las variables `tipo_entrega`, `peso_kg` y `distancia_km`, y usando `match`/`case` (equivalente a switch), calcula el costo de domicilio según estas fórmulas: Estándar (1): `peso_kg * 0.5 + distancia_km * 0.1`; Express (2): `peso_kg * 0.8 + distancia_km * 0.2 + 5.00` (cargo fijo); Urgente (3): `peso_kg * 2.5 + distancia_km * 0.05`, y si el peso supera los 20 kg se aplica un recargo adicional del 15% sobre ese resultado; Nocturno (4): `(peso_kg * 1.0 + distancia_km * 0.3) * 1.2`. Imprime el tipo de entrega, el peso, la distancia y el costo final calculado. Debes usar: declaración de variables, `match`/`case` con un cálculo distinto en cada caso, y un condicional `if` dentro del caso correspondiente para aplicar el recargo.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Comisión de vendedor de farmacia por nivel',
+            statement: 'La farmacia paga comisiones a sus vendedores según su nivel (código 1 a 4: Junior, Intermedio, Senior, Experto) y el monto total vendido en el mes. Declara las variables `nivel_vendedor` y `monto_vendido`, y usando `match`/`case`, calcula la comisión: Junior (1): 4% del monto vendido; Intermedio (2): 6% del monto vendido; Senior (3): 8% del monto vendido, más un bono de $50 si el monto vendido supera los $1000; Experto (4): 10% del monto vendido, más un bono de $100 si el monto vendido supera los $1500. Imprime el nivel, el monto vendido y la comisión total (porcentaje más bono, si aplica). Debes usar: `match`/`case`, y un condicional `if` dentro de al menos un caso para aplicar el bono.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cumplimiento de meta de ventas de la farmacia',
+            statement: 'La farmacia registró el monto vendido por 5 vendedores distintos durante el mes, guardado en una lista. Define una función `procesar_ventas(montos, meta_individual, meta_total)` que, usando un ciclo `for`, recorra la lista para calcular el total vendido por todo el equipo, cuente cuántos vendedores superaron su `meta_individual`, y calcule el porcentaje de cumplimiento del equipo respecto a la `meta_total` (`total_vendido / meta_total * 100`). La función debe retornar (`return`) el total, el conteo y el porcentaje. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función definida con `def`, un ciclo `for` sobre una lista, un condicional `if` dentro del ciclo para contar los que superan el umbral, y `return` con varios valores.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Medicamento más rentable del inventario',
+            statement: 'La farmacia representa su inventario con una lista de diccionarios, donde cada diccionario tiene las claves `nombre`, `precio` y `cantidad` (incluye al menos 4 medicamentos). Define una función `analizar_inventario(medicamentos)` que, usando un ciclo `for`, recorra la lista para calcular el valor total del inventario (la suma de `precio * cantidad` de cada medicamento), el precio promedio, y determine cuál medicamento tiene el mayor valor total individual (`precio * cantidad`). La función debe retornar (`return`) el valor total, el promedio y el nombre del medicamento más rentable. Imprime los resultados. Debes usar: una función definida con `def`, un ciclo `for` sobre una lista de diccionarios, un condicional `if` dentro del ciclo para comparar y determinar el de mayor valor, y `return` con varios valores.',
+          },
+        ],
+      },
+    ];
+
+    const template = await this.examTemplatesRepo.save(
+      this.examTemplatesRepo.create({
+        name: templateName,
+        description: 'Examen intermedio de Python con 4 ejercicios de cómputo real (match/case, funciones y ciclos) y 5 variantes temáticas para evitar copias entre alumnos.',
         language: 'python',
         created_by: admin.id,
       }),
