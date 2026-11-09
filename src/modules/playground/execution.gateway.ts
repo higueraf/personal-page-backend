@@ -591,9 +591,18 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     shellCmd: string,
     execEnv: NodeJS.ProcessEnv,
   ) {
+    // `detached: true` hace que `sh` arranque como líder de su propio grupo de procesos
+    // (setsid). Es indispensable para poder matarlo de verdad: `sh -c "python3 archivo.py"`
+    // NO reemplaza su propio proceso por el de python3 (no hay exec-optimization acá) — python3
+    // corre como hijo de `sh`, con el mismo grupo. Sin `detached`, `killSession` solo mataba a
+    // `sh` y dejaba a python3 (o cualquier intérprete) corriendo huérfano en el servidor,
+    // todavía dueño de los pipes de stdout/stderr — por eso el evento `close` nunca llegaba a
+    // disparar `execution_done` y tanto "Ejecutar" como "Detener" se quedaban colgados para
+    // siempre (verificado: un `python3` bloqueado en `input()` sobrevivía al kill del padre).
     const child = spawn('sh', ['-c', shellCmd], {
       cwd: sessionDir,
       env: execEnv,
+      detached: true,
     });
 
     this.sessions.set(client.id, { process: child, sessionDir });
@@ -618,10 +627,19 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
   }
 
+  /** Mata el grupo de procesos completo (PID negativo = señal a todo el grupo, ver el
+   *  comentario en `spawnAndStream`), no solo el `sh` que Node ve como hijo directo —
+   *  si no, el intérprete real (python3, node, etc.) sobrevive huérfano. */
   private killSession(clientId: string) {
     const session = this.sessions.get(clientId);
     if (!session) return;
-    try { session.process.kill('SIGTERM'); } catch { /* already dead */ }
+    const pid = session.process.pid;
+    try {
+      if (pid) process.kill(-pid, 'SIGTERM');
+      else session.process.kill('SIGTERM');
+    } catch {
+      try { session.process.kill('SIGTERM'); } catch { /* already dead */ }
+    }
     this.sessions.delete(clientId);
     this.cleanupDir(session.sessionDir);
   }
