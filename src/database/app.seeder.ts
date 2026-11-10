@@ -113,6 +113,7 @@ export class AppSeeder {
     await this.seedExamTemplateHtmlArray(adminUser);
     await this.seedExamTemplateHtmlArraySingle(adminUser);
     await this.seedExamTemplateHtmlDesign(adminUser);
+    await this.seedExamTemplateHtmlDesignV2(adminUser);
     await this.seedExamTemplateReactNativeBusinessRules(adminUser);
     await this.seedExamTemplateReactNativeBusinessRulesSingle(adminUser);
     await this.seedExamTemplateReactNativeSeguroMedico(adminUser);
@@ -4701,6 +4702,191 @@ const { data: user } = useQuery({
             '4. **Tabla** titulada "Horario semanal" con columnas **Clase / Día / Hora** y estas 3 filas: Yoga para principiantes — Lunes — 07:00; Yoga restaurativo — Miércoles — 18:00; Meditación guiada — Viernes — 07:30.\n' +
             '5. **Formulario** titulado "Clase de prueba gratuita" con estos campos: Nombre completo (texto), Correo electrónico (email), Clase de interés (lista desplegable con los 5 ítems de la lista), Nivel de experiencia (lista desplegable: Principiante/Intermedio/Avanzado), Día preferido (texto), y un botón "Reservar clase de prueba".\n\n' +
             'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>`, `<input>`/`<select>` y el botón.',
+        }],
+      },
+    ];
+
+    let template = await this.examTemplatesRepo.findOne({
+      where: { name: templateName },
+      relations: ['versions'],
+    });
+
+    if (!template) {
+      template = await this.examTemplatesRepo.save(
+        this.examTemplatesRepo.create({
+          name: templateName,
+          description,
+          language: 'html-design',
+          created_by: admin.id,
+        }),
+      );
+      await this.examVersionsRepo.save(
+        versions.map((v) =>
+          this.examVersionsRepo.create({
+            exam_template_id: template!.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+            statement_type: v.statement_type,
+            statement_pdf_url: v.statement_pdf_url,
+            statement_pdf_original_name: v.statement_pdf_original_name,
+          }),
+        ),
+      );
+      return;
+    }
+
+    template.description = description;
+    template.language = 'html-design';
+    await this.examTemplatesRepo.save(template);
+
+    const existingByTheme = new Map((template.versions ?? []).map((v) => [v.theme_name, v]));
+    for (const v of versions) {
+      const existing = existingByTheme.get(v.theme_name);
+      if (existing) {
+        existing.order_index = v.order_index;
+        existing.questions = v.questions;
+        existing.statement_type = v.statement_type;
+        existing.statement_pdf_url = v.statement_pdf_url;
+        existing.statement_pdf_original_name = v.statement_pdf_original_name;
+        await this.examVersionsRepo.save(existing);
+      } else {
+        await this.examVersionsRepo.save(
+          this.examVersionsRepo.create({
+            exam_template_id: template.id,
+            theme_name: v.theme_name,
+            order_index: v.order_index,
+            questions: v.questions,
+            statement_type: v.statement_type,
+            statement_pdf_url: v.statement_pdf_url,
+            statement_pdf_original_name: v.statement_pdf_original_name,
+          }),
+        );
+      }
+    }
+  }
+
+  // ── Examen HTML/CSS — Maquetación de diseño, variantes 2 (perfiles/landing educativos, PDF) ──
+  private async seedExamTemplateHtmlDesignV2(admin: User) {
+    const templateName =
+      'HTML/CSS — Maquetación de diseño con imagen, lista, tabla y formulario (variantes 2)';
+    const description =
+      'Segunda tanda del examen de HTML/CSS puro (sin JavaScript, sin frameworks, sin API) con 5 ' +
+      'variantes temáticas (Perfil Académico, IA — Soluciones Prácticas, Historia de los Automóviles, ' +
+      'Simón Bolívar, Atahualpa). El proyecto arranca con un `index.html` y un `style.css` ' +
+      'prácticamente en blanco: el alumno debe maquetar desde cero, con HTML y CSS propios, la página ' +
+      'de su variante, respetando el contenido, la estructura y los colores (fondo y texto) del modelo ' +
+      'que acompaña cada enunciado en PDF. No hay lógica de negocio ni tests automáticos: la ' +
+      'corrección es 100% manual (estructura semántica + fidelidad al diseño pedido + CSS).';
+
+    // Mismo patrón que `seedExamTemplateHtmlDesign`: el enunciado de cada variante es un PDF
+    // (instrucciones + captura del modelo a replicar), copiado a mano a
+    // `uploads/playground-statements/` y versionado en git junto con el código.
+    const versions: {
+      theme_name: string;
+      order_index: number;
+      questions: ExamQuestion[];
+      statement_type: 'pdf';
+      statement_pdf_url: string;
+      statement_pdf_original_name: string;
+    }[] = [
+      {
+        theme_name: 'Perfil Académico', order_index: 0,
+        statement_type: 'pdf',
+        statement_pdf_url: '/uploads/playground-statements/af87a14b-17fb-44f9-a442-5a62de1af680.pdf',
+        statement_pdf_original_name: 'perfil-academico.pdf',
+        questions: [{
+          order: 1, points: 10, title: 'Maquetación de página de perfil — Perfil Académico',
+          statement:
+            '### Diseño a replicar: Perfil Académico — Sofía Andrade\n\n' +
+            'Armá una página de perfil académico de estudiante, con estos elementos obligatorios:\n\n' +
+            '1. **Barra lateral:** un bloque con el nombre "Sofía Andrade", el rol ("Estudiante — Ing. de Software") y 3 etiquetas (IA aplicada, Desarrollo Web, Ciencia de Datos), además de las secciones "Contacto" (Email, Teléfono, Ciudad), "Idiomas" (Español — Nativo, Inglés — B2) y "Habilidades" (al menos 4 etiquetas, por ejemplo Python, JavaScript, HTML/CSS, Git).\n' +
+            '2. **Imagen destacada:** usá esta foto como foto de perfil (avatar circular) en la barra lateral:\n   `https://francisco-higuera.netlify.app/profile.jpg`\n' +
+            '3. **Lista numerada** titulada "Objetivos" con estos 3 ítems: Publicar proyecto IA open source, Certificación en seguridad web, Pasantía internacional.\n' +
+            '4. **Tabla** titulada "Trayectoria académica" con columnas **Institución / Programa / Año** y estas 3 filas: Colegio Técnico Pichincha — Bachillerato en Informática — 2019–2022; Universidad Politécnica — Ingeniería en Software — 2023–Hoy; Curso en Línea — Introducción a Ciberseguridad — 2025.\n' +
+            '5. **Formulario** titulado "Deja una reseña" con estos campos: Nombre (texto), Calificación (lista desplegable o selector de 1 a 5 estrellas), Comentario (área de texto), y un botón "Enviar reseña".\n' +
+            '6. En el contenido principal agregá también "Acerca de mí" (párrafo breve) y "Proyectos" con al menos 2 proyectos (nombre + descripción corta).\n\n' +
+            '**Estilo:** maquetá en dos columnas (barra lateral + contenido principal) con Flexbox y/o Grid, y usá los colores de fondo y de letras del modelo (PDF adjunto): barra lateral morada con texto blanco, fondo general claro y textos oscuros.\n\n' +
+            'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>`, `<input>`/`<select>`/`<textarea>` y el botón.',
+        }],
+      },
+      {
+        theme_name: 'IA — Soluciones Prácticas', order_index: 1,
+        statement_type: 'pdf',
+        statement_pdf_url: '/uploads/playground-statements/19521ef7-6b17-4405-b0c1-074dd5e74ae1.pdf',
+        statement_pdf_original_name: 'ia-soluciones.pdf',
+        questions: [{
+          order: 1, points: 10, title: 'Maquetación de página de inicio — IA Soluciones Prácticas',
+          statement:
+            '### Diseño a replicar: IA — Soluciones Prácticas\n\n' +
+            'Armá una landing page de servicios de Inteligencia Artificial para empresas, con estos elementos obligatorios:\n\n' +
+            '1. **Encabezado:** un `<header>` con el título "Inteligencia Artificial — Soluciones Prácticas" y la bajada "IA para automatizar, predecir y decidir mejor" + "Modelos listos para negocio • Datos confiables • Implementación rápida".\n' +
+            '2. **Imagen destacada:** usá esta imagen junto al texto "¿Por qué IA ahora?":\n   `https://francisco-higuera.netlify.app/inteligencia.webp`\n' +
+            '3. **Tabla** (cuadrícula de 3 columnas) con encabezados **Atención al Cliente / Operaciones / Producto** y 2 filas de contenido: (Chatbots y análisis de sentimiento | Detección de anomalías y mantenimiento | Recomendadores personalizados) y (Resumen automático de tickets | Pronóstico de demanda | Clasificación de imágenes y textos).\n' +
+            '4. **Lista** titulada "Servicios de IA" con estos 4 ítems: Asistentes conversacionales (NLP), Modelos de clasificación y regresión (ML), Visión por computador (detección/segmentación), ETL — limpieza y gobierno de datos.\n' +
+            '5. **Lista numerada** titulada "Beneficios Clave" con estos 4 ítems: Automatización de tareas repetitivas, Decisiones basadas en datos, Experiencias personalizadas, Reducción de costos y tiempos.\n' +
+            '6. **Formulario** titulado "Deja tu Reseña" con estos campos: Nombre completo (texto), Calificación (lista desplegable o estrellas), Comentario (área de texto), y un botón "Enviar Reseña".\n\n' +
+            '**Estilo:** usá Flexbox y/o Grid para el layout de tarjetas y columnas, y los colores del modelo (PDF adjunto): tonos verde/turquesa para encabezados y botones, fondo claro.\n\n' +
+            'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>`, `<input>`/`<textarea>` y el botón.',
+        }],
+      },
+      {
+        theme_name: 'Historia de los Automóviles', order_index: 2,
+        statement_type: 'pdf',
+        statement_pdf_url: '/uploads/playground-statements/e8ebeca4-cd5f-4da2-a412-2332d5afcd27.pdf',
+        statement_pdf_original_name: 'historia-automoviles.pdf',
+        questions: [{
+          order: 1, points: 10, title: 'Maquetación de página de inicio — Historia de los Automóviles',
+          statement:
+            '### Diseño a replicar: Historia de los Automóviles\n\n' +
+            'Armá una página divulgativa sobre la historia del automóvil, con estos elementos obligatorios:\n\n' +
+            '1. **Encabezado:** un `<header>` con el título "Historia de los Automóviles" y la bajada "Del motor a vapor al coche eléctrico" + "Innovación, diseño y velocidad a través de más de 130 años".\n' +
+            '2. **Imagen destacada:** usá esta foto junto al texto "Un viaje sobre ruedas":\n   `https://francisco-higuera.netlify.app/carro.jpeg`\n' +
+            '3. **Tabla** titulada "Hitos" con columnas **Fecha / Hito / Descripción** y estas filas: 1769 — Vehículo a vapor — Primeros carros autopropulsados en Europa; 1886 — Patente del automóvil — Motor de combustión interna y chasis ligero; 1913 — Producción en cadena — La fabricación en serie populariza el automóvil; 1950–70 — Seguridad y diseño — Cinturón, carrocerías resistentes, aerodinámica; 1990–2000 — Electrónica — Inyección, catalizadores y normas ambientales; 2010–hoy — Híbridos y eléctricos — Baterías, conducción asistida, conectividad.\n' +
+            '4. **Lista** titulada "Inventores y Marcas Clave" con estos 4 ítems: Primeras patentes y motores de combustión, Producción en masa y estandarización, Revolución del diseño y aerodinámica, Transición a la electrificación.\n' +
+            '5. **Lista numerada** titulada "Curiosidades" con estos 4 ítems: El límite urbano fue 16 km/h en algunos lugares, Los cinturones de 3 puntos se popularizaron en los 60, Los primeros EV datan de fines del siglo XIX, Las actualizaciones OTA mejoran el auto sin ir al taller.\n' +
+            '6. **Formulario** titulado "Comentarios y Sugerencias" con estos campos: Nombre (texto), Correo electrónico (email), Tipo de comentario (lista desplegable), Tu mensaje (área de texto), y un botón "Enviar Comentario".\n\n' +
+            '**Estilo:** usá Flexbox y/o Grid para organizar las tablas y tarjetas, y los colores del modelo (PDF adjunto): tonos marrón/beige, fondo claro.\n\n' +
+            'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>`, `<input>`/`<select>`/`<textarea>` y el botón.',
+        }],
+      },
+      {
+        theme_name: 'Simón Bolívar', order_index: 3,
+        statement_type: 'pdf',
+        statement_pdf_url: '/uploads/playground-statements/b9c3b2c5-b417-447b-9a77-5f3f405a99d5.pdf',
+        statement_pdf_original_name: 'simon-bolivar.pdf',
+        questions: [{
+          order: 1, points: 10, title: 'Maquetación de página de inicio — Simón Bolívar',
+          statement:
+            '### Diseño a replicar: Simón Bolívar — Historia y Legado\n\n' +
+            'Armá una página educativa sobre Simón Bolívar, con estos elementos obligatorios:\n\n' +
+            '1. **Encabezado:** un `<header>` con el título "Simón Bolívar — Historia y Legado" y la bajada "El Libertador de América • Independencia de varios países sudamericanos".\n' +
+            '2. **Imagen destacada** (banner ancho), con el pie de foto "Imagen ilustrativa con fines educativos":\n   `https://francisco-higuera.netlify.app/bpolivar.jpg`\n' +
+            '3. **Biografía breve** (párrafo) y una cita destacada (blockquote): "Un pueblo ignorante es instrumento ciego de su propia destrucción."\n' +
+            '4. **Tabla** titulada "Línea del tiempo" con columnas **Año / Evento / Descripción** y estas 4 filas: 1810–12 — Inicio del movimiento — Primeras acciones hacia la independencia venezolana; 1819 — Campaña Libertadora — Cruce de los Andes y Batalla de Boyacá, nace la Gran Colombia; 1821–24 — Consolidación — Carabobo, Pichincha, Junín y Ayacucho; 1825 — República de Bolivia — Se crea Bolivia y se promulga su Constitución.\n' +
+            '5. **Tabla** titulada "Aportes clave" con columnas **Campo / Contribución** y estas 3 filas: Político — Impulso a la integración regional y formas republicanas; Militar — Estrategias en altura y campañas simultáneas en varias regiones; Ideario — Libertad, educación cívica y fortalecimiento institucional.\n' +
+            '6. **Formulario** titulado "Envía tu reseña" con estos campos: Nombre completo (texto), Correo electrónico (email), Calificación (lista desplegable), Tu reseña (área de texto), una casilla "Acepto que mi reseña sea utilizada con fines académicos" (checkbox), y un botón "Enviar reseña".\n\n' +
+            '**Estilo:** usá Flexbox y/o Grid para organizar las tablas, y los colores del modelo (PDF adjunto): tonos azul marino/naranja, fondo claro.\n\n' +
+            'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>`, `<input>`/`<select>`/`<textarea>` y el botón.',
+        }],
+      },
+      {
+        theme_name: 'Atahualpa', order_index: 4,
+        statement_type: 'pdf',
+        statement_pdf_url: '/uploads/playground-statements/e97ba3ee-2aad-4902-8b95-b7186cc42ae0.pdf',
+        statement_pdf_original_name: 'atahualpa.pdf',
+        questions: [{
+          order: 1, points: 10, title: 'Maquetación de página de inicio — Atahualpa',
+          statement:
+            '### Diseño a replicar: Atahualpa — Último Sapa Inca\n\n' +
+            'Armá una página educativa sobre Atahualpa, con estos elementos obligatorios:\n\n' +
+            '1. **Encabezado:** un `<header>` con el título "Atahualpa — Último Sapa Inca" y la bajada "Historia y legado" + "Imperio Inca • Siglo XVI • Encuentro de dos mundos".\n' +
+            '2. **Imagen destacada**, junto a una barra lateral con "Datos clave" (Título: Sapa Inca, Período: c. 1532, Capital: Cuzco, Idioma: Quechua) y "Contexto" (lista con: Guerra civil Huáscar–Atahualpa, Organización imperial avanzada, Contacto con conquistadores):\n   `https://francisco-higuera.netlify.app/atahualpa.webp`\n' +
+            '3. **Biografía breve** (párrafo) y una sección "Legado cultural" con una **lista** de 3 ítems: Símbolo de resistencia y dignidad andina, Inspiración en la literatura e identidad nacional, Figura clave en la memoria del continente.\n' +
+            '4. **Tabla** titulada "Momentos destacados" con columnas **Año / Evento / Descripción** y estas 3 filas: c. 1520s — Consolidación del poder — Fortalecimiento militar y expansión territorial; 1532 — Encuentro con Pizarro — Choque de culturas y declive del Tahuantinsuyo; Siglo XVI — Transición histórica — Inicio del dominio colonial en los Andes.\n' +
+            '5. **Formulario** titulado "Preguntas sobre el contenido" con 5 campos de respuesta abierta (texto) para estas preguntas: ¿Cuál fue el título que ostentaba Atahualpa?, ¿En qué año aproximado ocurrió el encuentro con Pizarro?, ¿Qué idioma hablaba el Imperio Inca?, ¿Contra quién mantuvo Atahualpa una guerra civil?, ¿Qué representa Atahualpa en la memoria cultural andina?; y un botón "Enviar Respuestas".\n\n' +
+            '**Estilo:** maquetá en dos columnas (barra lateral + contenido principal) con Flexbox y/o Grid, y usá los colores del modelo (PDF adjunto): tonos vino/rojo oscuro para encabezados, fondo claro.\n\n' +
+            'El formulario no necesita enviar datos a ningún lado (no hay backend): alcanza con los `<label>` y los `<input>` de texto.',
         }],
       },
     ];
