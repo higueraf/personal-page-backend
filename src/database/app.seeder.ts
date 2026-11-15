@@ -92,6 +92,7 @@ export class AppSeeder {
     await this.seedPlaygroundTemplates(adminUser);
     await this.seedExamTemplates(adminUser);
     await this.seedExamTemplateTypeScriptV2(adminUser);
+    await this.seedExamTemplateTypeScriptIntermedio(adminUser);
     await this.seedExamTemplateFlutter(adminUser);
     await this.seedExamTemplateFlutterSingle(adminUser);
     await this.seedExamTemplateFlutterRealApi(adminUser);
@@ -3008,6 +3009,36 @@ const { data: user } = useQuery({
   }
 
   /**
+   * Crea una plantilla de examen "fija" (sin lógica de actualización/merge: si ya existe por
+   * `name`, no hace nada) a partir de su lista de variantes ya armada. Evita repetir en cada
+   * `seedExamTemplate*` el mismo bloque de "buscar por nombre, crear template, crear versions".
+   */
+  private async seedFixedExamTemplate(
+    admin: User,
+    templateName: string,
+    description: string,
+    language: string,
+    versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[],
+  ): Promise<void> {
+    const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
+    if (exists) return;
+
+    const template = await this.examTemplatesRepo.save(
+      this.examTemplatesRepo.create({ name: templateName, description, language, created_by: admin.id }),
+    );
+    await this.examVersionsRepo.save(
+      versions.map((v) =>
+        this.examVersionsRepo.create({
+          exam_template_id: template.id,
+          theme_name: v.theme_name,
+          order_index: v.order_index,
+          questions: v.questions,
+        }),
+      ),
+    );
+  }
+
+  /**
    * Examen intermedio de Python: 4 ejercicios (2.5 pts c/u) más exigentes que el básico —
    * ninguno se resuelve solo declarando variables, los 4 exigen cómputo con varios pasos.
    * 5 variantes temáticas para evitar copias entre alumnos.
@@ -3022,9 +3053,6 @@ const { data: user } = useQuery({
    */
   private async seedExamTemplatePythonIntermedio(admin: User) {
     const templateName = 'Python Intermedio — Switch, Funciones y Ciclos con Cómputo';
-    const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
-    if (exists) return;
-
     const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
       {
         theme_name: 'Tienda de Electrónica', order_index: 0,
@@ -3133,31 +3161,17 @@ const { data: user } = useQuery({
       },
     ];
 
-    const template = await this.examTemplatesRepo.save(
-      this.examTemplatesRepo.create({
-        name: templateName,
-        description: 'Examen intermedio de Python con 4 ejercicios de cómputo real (match/case, funciones y ciclos) y 5 variantes temáticas para evitar copias entre alumnos.',
-        language: 'python',
-        created_by: admin.id,
-      }),
-    );
-
-    await this.examVersionsRepo.save(
-      versions.map((v) =>
-        this.examVersionsRepo.create({
-          exam_template_id: template.id,
-          theme_name: v.theme_name,
-          order_index: v.order_index,
-          questions: v.questions,
-        }),
-      ),
+    await this.seedFixedExamTemplate(
+      admin,
+      templateName,
+      'Examen intermedio de Python con 4 ejercicios de cómputo real (match/case, funciones y ciclos) y 5 variantes temáticas para evitar copias entre alumnos.',
+      'python',
+      versions,
     );
   }
 
   private async seedExamTemplateTypeScriptV2(admin: User) {
     const templateName = 'Estructuras de Control, Ciclos y Switch (Variante 2)';
-    const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
-    if (exists) return;
 
     // Misma dificultad/estructura/números que la plantilla original, con vocabulario nuevo:
     //   Q1: for + if/else if — tarifa por horas (0h gratis, 1-2h $1.50/h, 3-5h $1.00/h, >5h $8.00 fijo)
@@ -3251,24 +3265,145 @@ const { data: user } = useQuery({
       },
     ];
 
-    const template = await this.examTemplatesRepo.save(
-      this.examTemplatesRepo.create({
-        name: templateName,
-        description: 'Segunda plantilla de TypeScript con 4 ejercicios (for+if, switch, for+if, while) y 4 variantes temáticas nuevas, misma dificultad que la plantilla original.',
-        language: 'typescript',
-        created_by: admin.id,
-      }),
+    await this.seedFixedExamTemplate(
+      admin,
+      templateName,
+      'Segunda plantilla de TypeScript con 4 ejercicios (for+if, switch, for+if, while) y 4 variantes temáticas nuevas, misma dificultad que la plantilla original.',
+      'typescript',
+      versions,
     );
+  }
 
-    await this.examVersionsRepo.save(
-      versions.map((v) =>
-        this.examVersionsRepo.create({
-          exam_template_id: template.id,
-          theme_name: v.theme_name,
-          order_index: v.order_index,
-          questions: v.questions,
-        }),
-      ),
+  /**
+   * Examen intermedio de TypeScript, misma dificultad y forma que `seedExamTemplatePythonIntermedio`
+   * (switch, funciones y ciclos con cómputo real), traducido a los modismos de TypeScript:
+   *   Q1: switch — costo con una fórmula matemática DISTINTA en cada caso, con un recargo
+   *       condicional (if) en al menos un caso
+   *   Q2: switch — comisión por nivel, con un bono condicional (if) en al menos dos niveles
+   *   Q3: función con ciclo for sobre number[] — acumula un total, cuenta cuántos superan un
+   *       umbral, y calcula un porcentaje de cumplimiento; retorna un objeto con los 3 valores
+   *   Q4: función con ciclo for sobre un array de objetos — valor total (precio × cantidad),
+   *       promedio, y el elemento de mayor valor individual; retorna un objeto con los 3 valores
+   * 5 variantes temáticas nuevas (pedidos a domicilio de distintos negocios), para evitar
+   * copias entre alumnos.
+   */
+  private async seedExamTemplateTypeScriptIntermedio(admin: User) {
+    const templateName = 'TypeScript Intermedio — Switch, Funciones y Ciclos con Cómputo';
+
+    const versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[] = [
+      {
+        theme_name: 'Librería', order_index: 0,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Costo de envío de pedido de libros',
+            statement: 'Una librería calcula el costo de envío de un pedido según el tipo de envío elegido (código 1 a 4: Normal, Express, Internacional, Mismo Día), el peso del paquete en kilogramos y la distancia de entrega en kilómetros. Declara las variables `tipoEnvio`, `pesoKg` y `distanciaKm` con los valores asignados, y usando `switch`, calcula el costo de envío según estas fórmulas: Normal (1): `pesoKg * 0.5 + distanciaKm * 0.1`; Express (2): `pesoKg * 0.8 + distanciaKm * 0.2 + 5.00` (cargo fijo); Internacional (3): `pesoKg * 2.5 + distanciaKm * 0.05`, y si el peso supera los 20 kg se aplica un recargo adicional del 15% sobre ese resultado; Mismo Día (4): `(pesoKg * 1.0 + distanciaKm * 0.3) * 1.2`. Imprime el tipo de envío, el peso, la distancia y el costo final calculado. Debes usar: declaración de variables, `switch` con un cálculo distinto en cada caso, y un condicional `if` dentro del caso correspondiente para aplicar el recargo.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Comisión de vendedor por nivel',
+            statement: 'La librería paga comisiones a sus vendedores según su nivel (código 1 a 4: Junior, Intermedio, Senior, Experto) y el monto total vendido en el mes. Declara las variables `nivelVendedor` y `montoVendido`, y usando `switch`, calcula la comisión: Junior (1): 4% del monto vendido; Intermedio (2): 6% del monto vendido; Senior (3): 8% del monto vendido, más un bono de $50 si el monto vendido supera los $1000; Experto (4): 10% del monto vendido, más un bono de $100 si el monto vendido supera los $1500. Imprime el nivel, el monto vendido y la comisión total (porcentaje más bono, si aplica). Debes usar: `switch`, y un condicional `if` dentro de al menos un caso para aplicar el bono.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cumplimiento de meta de ventas',
+            statement: 'La librería registró el monto vendido por 5 vendedores distintos durante el mes, guardado en un arreglo. Define una función `procesarVentas(montos: number[], metaIndividual: number, metaTotal: number)` que, usando un ciclo `for`, recorra el arreglo para calcular el total vendido por todo el equipo, cuente cuántos vendedores superaron su `metaIndividual`, y calcule el porcentaje de cumplimiento del equipo respecto a la `metaTotal` (`totalVendido / metaTotal * 100`). La función debe retornar un objeto con `total`, `conteo` y `porcentaje`. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función, un ciclo `for` sobre un arreglo, un condicional `if` dentro del ciclo para contar los que superan el umbral, y el objeto de retorno con los 3 valores.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Libro más valioso del inventario',
+            statement: 'La librería representa su inventario con un arreglo de objetos, donde cada objeto tiene las propiedades `nombre`, `precio` y `cantidad` (incluye al menos 4 libros). Define una función `analizarInventario(libros: { nombre: string; precio: number; cantidad: number }[])` que, usando un ciclo `for`, recorra el arreglo para calcular el valor total del inventario (la suma de `precio * cantidad` de cada libro), el precio promedio de los libros, y determine cuál libro tiene el mayor valor total individual (`precio * cantidad`). La función debe retornar un objeto con `valorTotal`, `promedio` y `nombreMasValioso`. Imprime los resultados. Debes usar: una función, un ciclo `for` sobre un arreglo de objetos, un condicional `if` dentro del ciclo para comparar y determinar el de mayor valor, y el objeto de retorno con los 3 valores.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Tienda de Mascotas', order_index: 1,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Costo de envío de pedido de alimento',
+            statement: 'Una tienda de mascotas calcula el costo de envío de un pedido de alimento según el tipo de envío elegido (código 1 a 4: Normal, Express, Internacional, Mismo Día), el peso del paquete en kilogramos y la distancia de entrega en kilómetros. Declara las variables `tipoEnvio`, `pesoKg` y `distanciaKm`, y usando `switch`, calcula el costo de envío según estas fórmulas: Normal (1): `pesoKg * 0.5 + distanciaKm * 0.1`; Express (2): `pesoKg * 0.8 + distanciaKm * 0.2 + 5.00` (cargo fijo); Internacional (3): `pesoKg * 2.5 + distanciaKm * 0.05`, y si el peso supera los 20 kg se aplica un recargo adicional del 15% sobre ese resultado; Mismo Día (4): `(pesoKg * 1.0 + distanciaKm * 0.3) * 1.2`. Imprime el tipo de envío, el peso, la distancia y el costo final calculado. Debes usar: declaración de variables, `switch` con un cálculo distinto en cada caso, y un condicional `if` dentro del caso correspondiente para aplicar el recargo.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Comisión de vendedor por nivel',
+            statement: 'La tienda de mascotas paga comisiones a sus vendedores según su nivel (código 1 a 4: Junior, Intermedio, Senior, Experto) y el monto total vendido en el mes. Declara las variables `nivelVendedor` y `montoVendido`, y usando `switch`, calcula la comisión: Junior (1): 4% del monto vendido; Intermedio (2): 6% del monto vendido; Senior (3): 8% del monto vendido, más un bono de $50 si el monto vendido supera los $1000; Experto (4): 10% del monto vendido, más un bono de $100 si el monto vendido supera los $1500. Imprime el nivel, el monto vendido y la comisión total (porcentaje más bono, si aplica). Debes usar: `switch`, y un condicional `if` dentro de al menos un caso para aplicar el bono.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cumplimiento de meta de ventas',
+            statement: 'La tienda de mascotas registró el monto vendido por 5 vendedores distintos durante el mes, guardado en un arreglo. Define una función `procesarVentas(montos: number[], metaIndividual: number, metaTotal: number)` que, usando un ciclo `for`, recorra el arreglo para calcular el total vendido por todo el equipo, cuente cuántos vendedores superaron su `metaIndividual`, y calcule el porcentaje de cumplimiento del equipo respecto a la `metaTotal` (`totalVendido / metaTotal * 100`). La función debe retornar un objeto con `total`, `conteo` y `porcentaje`. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función, un ciclo `for` sobre un arreglo, un condicional `if` dentro del ciclo para contar los que superan el umbral, y el objeto de retorno con los 3 valores.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Producto más valioso del inventario',
+            statement: 'La tienda de mascotas representa su inventario con un arreglo de objetos, donde cada objeto tiene las propiedades `nombre`, `precio` y `cantidad` (incluye al menos 4 productos). Define una función `analizarInventario(productos: { nombre: string; precio: number; cantidad: number }[])` que, usando un ciclo `for`, recorra el arreglo para calcular el valor total del inventario (la suma de `precio * cantidad` de cada producto), el precio promedio de los productos, y determine cuál producto tiene el mayor valor total individual (`precio * cantidad`). La función debe retornar un objeto con `valorTotal`, `promedio` y `nombreMasValioso`. Imprime los resultados. Debes usar: una función, un ciclo `for` sobre un arreglo de objetos, un condicional `if` dentro del ciclo para comparar y determinar el de mayor valor, y el objeto de retorno con los 3 valores.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Papelería', order_index: 2,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Costo de envío de pedido de útiles escolares',
+            statement: 'Una papelería calcula el costo de envío de un pedido de útiles escolares según el tipo de envío elegido (código 1 a 4: Normal, Express, Internacional, Mismo Día), el peso del paquete en kilogramos y la distancia de entrega en kilómetros. Declara las variables `tipoEnvio`, `pesoKg` y `distanciaKm`, y usando `switch`, calcula el costo de envío según estas fórmulas: Normal (1): `pesoKg * 0.5 + distanciaKm * 0.1`; Express (2): `pesoKg * 0.8 + distanciaKm * 0.2 + 5.00` (cargo fijo); Internacional (3): `pesoKg * 2.5 + distanciaKm * 0.05`, y si el peso supera los 20 kg se aplica un recargo adicional del 15% sobre ese resultado; Mismo Día (4): `(pesoKg * 1.0 + distanciaKm * 0.3) * 1.2`. Imprime el tipo de envío, el peso, la distancia y el costo final calculado. Debes usar: declaración de variables, `switch` con un cálculo distinto en cada caso, y un condicional `if` dentro del caso correspondiente para aplicar el recargo.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Comisión de vendedor por nivel',
+            statement: 'La papelería paga comisiones a sus vendedores según su nivel (código 1 a 4: Junior, Intermedio, Senior, Experto) y el monto total vendido en el mes. Declara las variables `nivelVendedor` y `montoVendido`, y usando `switch`, calcula la comisión: Junior (1): 4% del monto vendido; Intermedio (2): 6% del monto vendido; Senior (3): 8% del monto vendido, más un bono de $50 si el monto vendido supera los $1000; Experto (4): 10% del monto vendido, más un bono de $100 si el monto vendido supera los $1500. Imprime el nivel, el monto vendido y la comisión total (porcentaje más bono, si aplica). Debes usar: `switch`, y un condicional `if` dentro de al menos un caso para aplicar el bono.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cumplimiento de meta de ventas',
+            statement: 'La papelería registró el monto vendido por 5 vendedores distintos durante el mes, guardado en un arreglo. Define una función `procesarVentas(montos: number[], metaIndividual: number, metaTotal: number)` que, usando un ciclo `for`, recorra el arreglo para calcular el total vendido por todo el equipo, cuente cuántos vendedores superaron su `metaIndividual`, y calcule el porcentaje de cumplimiento del equipo respecto a la `metaTotal` (`totalVendido / metaTotal * 100`). La función debe retornar un objeto con `total`, `conteo` y `porcentaje`. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función, un ciclo `for` sobre un arreglo, un condicional `if` dentro del ciclo para contar los que superan el umbral, y el objeto de retorno con los 3 valores.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Artículo más valioso del inventario',
+            statement: 'La papelería representa su inventario con un arreglo de objetos, donde cada objeto tiene las propiedades `nombre`, `precio` y `cantidad` (incluye al menos 4 artículos). Define una función `analizarInventario(articulos: { nombre: string; precio: number; cantidad: number }[])` que, usando un ciclo `for`, recorra el arreglo para calcular el valor total del inventario (la suma de `precio * cantidad` de cada artículo), el precio promedio de los artículos, y determine cuál artículo tiene el mayor valor total individual (`precio * cantidad`). La función debe retornar un objeto con `valorTotal`, `promedio` y `nombreMasValioso`. Imprime los resultados. Debes usar: una función, un ciclo `for` sobre un arreglo de objetos, un condicional `if` dentro del ciclo para comparar y determinar el de mayor valor, y el objeto de retorno con los 3 valores.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Supermercado', order_index: 3,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Costo de envío de pedido de víveres',
+            statement: 'Un supermercado calcula el costo de envío de un pedido de víveres según el tipo de envío elegido (código 1 a 4: Normal, Express, Internacional, Mismo Día), el peso del paquete en kilogramos y la distancia de entrega en kilómetros. Declara las variables `tipoEnvio`, `pesoKg` y `distanciaKm`, y usando `switch`, calcula el costo de envío según estas fórmulas: Normal (1): `pesoKg * 0.5 + distanciaKm * 0.1`; Express (2): `pesoKg * 0.8 + distanciaKm * 0.2 + 5.00` (cargo fijo); Internacional (3): `pesoKg * 2.5 + distanciaKm * 0.05`, y si el peso supera los 20 kg se aplica un recargo adicional del 15% sobre ese resultado; Mismo Día (4): `(pesoKg * 1.0 + distanciaKm * 0.3) * 1.2`. Imprime el tipo de envío, el peso, la distancia y el costo final calculado. Debes usar: declaración de variables, `switch` con un cálculo distinto en cada caso, y un condicional `if` dentro del caso correspondiente para aplicar el recargo.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Comisión de vendedor por nivel',
+            statement: 'El supermercado paga comisiones a sus vendedores según su nivel (código 1 a 4: Junior, Intermedio, Senior, Experto) y el monto total vendido en el mes. Declara las variables `nivelVendedor` y `montoVendido`, y usando `switch`, calcula la comisión: Junior (1): 4% del monto vendido; Intermedio (2): 6% del monto vendido; Senior (3): 8% del monto vendido, más un bono de $50 si el monto vendido supera los $1000; Experto (4): 10% del monto vendido, más un bono de $100 si el monto vendido supera los $1500. Imprime el nivel, el monto vendido y la comisión total (porcentaje más bono, si aplica). Debes usar: `switch`, y un condicional `if` dentro de al menos un caso para aplicar el bono.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cumplimiento de meta de ventas',
+            statement: 'El supermercado registró el monto vendido por 5 vendedores distintos durante el mes, guardado en un arreglo. Define una función `procesarVentas(montos: number[], metaIndividual: number, metaTotal: number)` que, usando un ciclo `for`, recorra el arreglo para calcular el total vendido por todo el equipo, cuente cuántos vendedores superaron su `metaIndividual`, y calcule el porcentaje de cumplimiento del equipo respecto a la `metaTotal` (`totalVendido / metaTotal * 100`). La función debe retornar un objeto con `total`, `conteo` y `porcentaje`. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función, un ciclo `for` sobre un arreglo, un condicional `if` dentro del ciclo para contar los que superan el umbral, y el objeto de retorno con los 3 valores.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Producto más valioso del inventario',
+            statement: 'El supermercado representa su inventario con un arreglo de objetos, donde cada objeto tiene las propiedades `nombre`, `precio` y `cantidad` (incluye al menos 4 productos). Define una función `analizarInventario(productos: { nombre: string; precio: number; cantidad: number }[])` que, usando un ciclo `for`, recorra el arreglo para calcular el valor total del inventario (la suma de `precio * cantidad` de cada producto), el precio promedio de los productos, y determine cuál producto tiene el mayor valor total individual (`precio * cantidad`). La función debe retornar un objeto con `valorTotal`, `promedio` y `nombreMasValioso`. Imprime los resultados. Debes usar: una función, un ciclo `for` sobre un arreglo de objetos, un condicional `if` dentro del ciclo para comparar y determinar el de mayor valor, y el objeto de retorno con los 3 valores.',
+          },
+        ],
+      },
+      {
+        theme_name: 'Juguetería', order_index: 4,
+        questions: [
+          {
+            order: 1, points: 2.5, title: 'Costo de envío de pedido de juguetes',
+            statement: 'Una juguetería calcula el costo de envío de un pedido según el tipo de envío elegido (código 1 a 4: Normal, Express, Internacional, Mismo Día), el peso del paquete en kilogramos y la distancia de entrega en kilómetros. Declara las variables `tipoEnvio`, `pesoKg` y `distanciaKm`, y usando `switch`, calcula el costo de envío según estas fórmulas: Normal (1): `pesoKg * 0.5 + distanciaKm * 0.1`; Express (2): `pesoKg * 0.8 + distanciaKm * 0.2 + 5.00` (cargo fijo); Internacional (3): `pesoKg * 2.5 + distanciaKm * 0.05`, y si el peso supera los 20 kg se aplica un recargo adicional del 15% sobre ese resultado; Mismo Día (4): `(pesoKg * 1.0 + distanciaKm * 0.3) * 1.2`. Imprime el tipo de envío, el peso, la distancia y el costo final calculado. Debes usar: declaración de variables, `switch` con un cálculo distinto en cada caso, y un condicional `if` dentro del caso correspondiente para aplicar el recargo.',
+          },
+          {
+            order: 2, points: 2.5, title: 'Comisión de vendedor por nivel',
+            statement: 'La juguetería paga comisiones a sus vendedores según su nivel (código 1 a 4: Junior, Intermedio, Senior, Experto) y el monto total vendido en el mes. Declara las variables `nivelVendedor` y `montoVendido`, y usando `switch`, calcula la comisión: Junior (1): 4% del monto vendido; Intermedio (2): 6% del monto vendido; Senior (3): 8% del monto vendido, más un bono de $50 si el monto vendido supera los $1000; Experto (4): 10% del monto vendido, más un bono de $100 si el monto vendido supera los $1500. Imprime el nivel, el monto vendido y la comisión total (porcentaje más bono, si aplica). Debes usar: `switch`, y un condicional `if` dentro de al menos un caso para aplicar el bono.',
+          },
+          {
+            order: 3, points: 2.5, title: 'Cumplimiento de meta de ventas',
+            statement: 'La juguetería registró el monto vendido por 5 vendedores distintos durante el mes, guardado en un arreglo. Define una función `procesarVentas(montos: number[], metaIndividual: number, metaTotal: number)` que, usando un ciclo `for`, recorra el arreglo para calcular el total vendido por todo el equipo, cuente cuántos vendedores superaron su `metaIndividual`, y calcule el porcentaje de cumplimiento del equipo respecto a la `metaTotal` (`totalVendido / metaTotal * 100`). La función debe retornar un objeto con `total`, `conteo` y `porcentaje`. Llama a la función al menos 2 veces con distintos valores e imprime los resultados. Debes usar: una función, un ciclo `for` sobre un arreglo, un condicional `if` dentro del ciclo para contar los que superan el umbral, y el objeto de retorno con los 3 valores.',
+          },
+          {
+            order: 4, points: 2.5, title: 'Juguete más valioso del inventario',
+            statement: 'La juguetería representa su inventario con un arreglo de objetos, donde cada objeto tiene las propiedades `nombre`, `precio` y `cantidad` (incluye al menos 4 juguetes). Define una función `analizarInventario(juguetes: { nombre: string; precio: number; cantidad: number }[])` que, usando un ciclo `for`, recorra el arreglo para calcular el valor total del inventario (la suma de `precio * cantidad` de cada juguete), el precio promedio de los juguetes, y determine cuál juguete tiene el mayor valor total individual (`precio * cantidad`). La función debe retornar un objeto con `valorTotal`, `promedio` y `nombreMasValioso`. Imprime los resultados. Debes usar: una función, un ciclo `for` sobre un arreglo de objetos, un condicional `if` dentro del ciclo para comparar y determinar el de mayor valor, y el objeto de retorno con los 3 valores.',
+          },
+        ],
+      },
+    ];
+
+    await this.seedFixedExamTemplate(
+      admin,
+      templateName,
+      'Examen intermedio de TypeScript con 4 ejercicios de cómputo real (switch, funciones y ciclos) y 5 variantes temáticas para evitar copias entre alumnos. Misma dificultad que "Python Intermedio".',
+      'typescript',
+      versions,
     );
   }
 
