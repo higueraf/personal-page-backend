@@ -23,8 +23,9 @@ export class UsersAdminController {
     @Query('status') status?: string,
     @Query('search') search?: string,
     @Query('role') role?: string,
+    @Query('user_type') userType?: string,
   ) {
-    return this.usersService.findAll(page, pageSize, status, search, role);
+    return this.usersService.findAll(page, pageSize, status, search, role, userType);
   }
 
   @Get('roles')
