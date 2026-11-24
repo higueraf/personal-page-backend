@@ -39,6 +39,140 @@ function resolveApiUrl(): string {
   }
 }
 
+/** Una variante temática del examen de Kotlin. Las 4 consignas son siempre las mismas (misma
+ *  estructura exigida y los mismos números, para que las 5 variantes pesen igual); lo único que
+ *  cambia es el negocio, así que cada variante se declara como una fila de datos y los enunciados
+ *  salen de `buildKotlinExamQuestions`. */
+interface KotlinExamTheme {
+  theme_name: string;
+  /** Sujeto con artículo, para arrancar las frases: 'La heladería', 'El vivero'. */
+  negocio: string;
+  /** Q1: qué se registra, cómo se llama cada registro y qué codifica el número del 1 al 4. */
+  registroQ1: string;
+  itemQ1: string;
+  itemsQ1: string;
+  /** "cuántas ventas" vs. "cuántos pedidos": concordancia con `itemsQ1`. */
+  cuantosQ1: string;
+  codigoQ1: string;
+  opcionesQ1: [string, string, string, string];
+  /** Q2: título de la pregunta y la métrica de 6 valores que se clasifica por rangos. */
+  tituloQ2: string;
+  metricaQ2: string;
+  /** Q4: la `data class` de la lista, su campo de texto (el que se cuenta) y su campo numérico. */
+  claseQ4: string;
+  elementoQ4: string;
+  elementosQ4: string;
+  /** Concordancia con `elementosQ4`, igual que `cuantosQ1`. */
+  cuantosQ4: string;
+  listaQ4: string;
+  campoQ4: string;
+  valoresQ4: string;
+  numeroQ4: string;
+  totalQ4: string;
+}
+
+const KOTLIN_EXAM_THEMES: KotlinExamTheme[] = [
+  {
+    theme_name: 'Heladería', negocio: 'La heladería',
+    registroQ1: 'las ventas del día', itemQ1: 'venta', itemsQ1: 'ventas', cuantosQ1: 'cuántas', codigoQ1: 'tipo de helado',
+    opcionesQ1: ['Cono Simple', 'Cono Doble', 'Copa Especial', 'Banana Split'],
+    tituloQ2: 'Clasificación de los turnos por helados vendidos',
+    metricaQ2: 'la cantidad de helados vendidos en cada uno de sus 6 turnos de atención',
+    claseQ4: 'Pedido', elementoQ4: 'pedido', elementosQ4: 'pedidos', cuantosQ4: 'cuántos', listaQ4: 'los pedidos del día',
+    campoQ4: 'sabor', valoresQ4: 'Vainilla, Chocolate, Fresa o Mora',
+    numeroQ4: 'bolas', totalQ4: 'totalBolas',
+  },
+  {
+    theme_name: 'Pizzería', negocio: 'La pizzería',
+    registroQ1: 'los pedidos del día', itemQ1: 'pedido', itemsQ1: 'pedidos', cuantosQ1: 'cuántos', codigoQ1: 'tamaño de pizza',
+    opcionesQ1: ['Personal', 'Mediana', 'Familiar', 'Gigante'],
+    tituloQ2: 'Clasificación de los repartidores por pizzas entregadas',
+    metricaQ2: 'la cantidad de pizzas entregadas por cada uno de sus 6 repartidores',
+    claseQ4: 'Pedido', elementoQ4: 'pedido', elementosQ4: 'pedidos', cuantosQ4: 'cuántos', listaQ4: 'los pedidos del día',
+    campoQ4: 'sabor', valoresQ4: 'Hawaiana, Pepperoni, Vegetariana o Cuatro Quesos',
+    numeroQ4: 'porciones', totalQ4: 'totalPorciones',
+  },
+  {
+    theme_name: 'Vivero', negocio: 'El vivero',
+    registroQ1: 'las ventas de plantas del día', itemQ1: 'venta', itemsQ1: 'ventas', cuantosQ1: 'cuántas', codigoQ1: 'tipo de planta',
+    opcionesQ1: ['Suculenta', 'Helecho', 'Arbusto', 'Árbol Frutal'],
+    tituloQ2: 'Clasificación de los días de feria por plantas vendidas',
+    metricaQ2: 'la cantidad de plantas vendidas en cada uno de sus 6 días de feria',
+    claseQ4: 'Venta', elementoQ4: 'venta', elementosQ4: 'ventas', cuantosQ4: 'cuántas', listaQ4: 'las ventas de la semana',
+    campoQ4: 'categoria', valoresQ4: 'Interior, Exterior, Medicinal u Ornamental',
+    numeroQ4: 'unidades', totalQ4: 'totalUnidades',
+  },
+  {
+    theme_name: 'Taller de Bicicletas', negocio: 'El taller de bicicletas',
+    registroQ1: 'los servicios realizados en el día', itemQ1: 'servicio', itemsQ1: 'servicios', cuantosQ1: 'cuántos', codigoQ1: 'tipo de servicio',
+    opcionesQ1: ['Pinchazo', 'Ajuste de Frenos', 'Cambio de Cadena', 'Mantenimiento Completo'],
+    tituloQ2: 'Clasificación de los días por bicicletas atendidas',
+    metricaQ2: 'la cantidad de bicicletas atendidas en cada uno de los 6 días de la semana',
+    claseQ4: 'Reparacion', elementoQ4: 'reparación', elementosQ4: 'reparaciones', cuantosQ4: 'cuántas', listaQ4: 'las reparaciones del mes',
+    campoQ4: 'tipoBicicleta', valoresQ4: 'Urbana, Montaña, Ruta o Infantil',
+    numeroQ4: 'repuestos', totalQ4: 'totalRepuestos',
+  },
+  {
+    theme_name: 'Óptica', negocio: 'La óptica',
+    registroQ1: 'las ventas de lentes del día', itemQ1: 'venta', itemsQ1: 'ventas', cuantosQ1: 'cuántas', codigoQ1: 'tipo de lente',
+    opcionesQ1: ['Monofocal', 'Bifocal', 'Progresivo', 'Fotocromático'],
+    tituloQ2: 'Clasificación de los consultorios por exámenes realizados',
+    metricaQ2: 'la cantidad de exámenes visuales realizados en cada uno de sus 6 consultorios',
+    claseQ4: 'Venta', elementoQ4: 'venta', elementosQ4: 'ventas', cuantosQ4: 'cuántas', listaQ4: 'las ventas del mes',
+    campoQ4: 'marca', valoresQ4: 'Vision, Clarity, Optimo o Lumina',
+    numeroQ4: 'unidades', totalQ4: 'totalUnidades',
+  },
+];
+
+/** Las 4 consignas del examen de Kotlin, re-tematizadas para una variante. Mismo orden y mismas
+ *  estructuras exigidas en las 5: Q1 y Q2 (2 pts c/u) condicionales + ciclos, Q3 y Q4 (3 pts c/u)
+ *  funciones + ciclos. */
+function buildKotlinExamQuestions(t: KotlinExamTheme): ExamQuestion[] {
+  const [op1, op2, op3, op4] = t.opcionesQ1;
+  const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+  const funcionQ4 = `analizar${cap(t.elementosQ4)}`;
+
+  return [
+    {
+      order: 1, points: 2, title: `Recaudación del día por ${t.codigoQ1}`,
+      statement:
+        `${t.negocio} registra ${t.registroQ1} en una lista de códigos enteros, donde cada código indica el ${t.codigoQ1} (1: ${op1}, 2: ${op2}, 3: ${op3}, 4: ${op4}). ` +
+        `Declara la lista con \`listOf\` e incluye al menos 6 ${t.itemsQ1}. Usando un ciclo \`for\` sobre la lista y una expresión \`when\` dentro del ciclo, calcula el precio de cada ${t.itemQ1} según esta tarifa: ` +
+        `${op1} (1): $2.50; ${op2} (2): $4.00; ${op3} (3): $6.75; ${op4} (4): $9.50. ` +
+        `Dentro del mismo ciclo, y usando un \`if\`, aplica un recargo del 10% sobre el precio cuando el código sea 4 (${op4}); acumula además la recaudación total del día y cuenta ${t.cuantosQ1} ${t.itemsQ1} quedaron en más de $5.00. ` +
+        `Imprime el precio de cada ${t.itemQ1}, la recaudación total y el conteo. ` +
+        `Debes usar: declaración de variables (\`val\` para la lista, \`var\` para los acumuladores), un ciclo \`for\` sobre la lista, una expresión \`when\` con un valor distinto en cada caso, y un \`if\` dentro del ciclo para el recargo.`,
+    },
+    {
+      order: 2, points: 2, title: t.tituloQ2,
+      statement:
+        `${t.negocio} registró ${t.metricaQ2}, guardada en una lista de 6 números enteros. Declara la lista con \`listOf\` y, usando un ciclo \`for\` y una cadena \`if / else if / else\` (sin usar \`when\`), clasifica cada valor en: ` +
+        `"Bajo" (menos de 10), "Medio" (de 10 a 24), "Alto" (de 25 a 49) y "Excelente" (50 o más). ` +
+        `Dentro del mismo ciclo acumula el total de los 6 valores y cuenta cuántos quedaron clasificados como "Excelente". ` +
+        `Imprime en cada vuelta el valor y su clasificación, y al final el total acumulado y el conteo de "Excelente". ` +
+        `Debes usar: una lista (\`listOf\`), un ciclo \`for\` sobre esa lista, una cadena \`if / else if / else\` que compare rangos numéricos (no \`when\`, ni un código del 1 al 4 como en la pregunta anterior), y acumuladores declarados con \`var\` fuera del ciclo.`,
+    },
+    {
+      order: 3, points: 3, title: 'Resumen de ventas del mes',
+      statement:
+        `${t.negocio} registró el monto vendido por 5 vendedores durante el mes, guardado en una lista de \`Double\`. ` +
+        `Define la \`data class ResumenVentas(val total: Double, val sobreMeta: Int, val promedio: Double)\` y una función \`analizarVentas(montos: List<Double>, meta: Double): ResumenVentas\` que, usando un ciclo \`for\` sobre la lista, calcule el total vendido por el equipo, cuente con un \`if\` cuántos montos superan la \`meta\` recibida, y calcule el promedio (\`total / montos.size\`). ` +
+        `La función debe retornar un \`ResumenVentas\` con los 3 valores. Llama a la función al menos 2 veces, con listas y metas distintas, e imprime los resultados. ` +
+        `Todo el cálculo debe hacerse dentro del ciclo: no uses \`sum()\`, \`count()\`, \`average()\` ni \`filter()\`. ` +
+        `Debes usar: una \`data class\`, una función con parámetros y tipo de retorno explícito, un ciclo \`for\` sobre una lista, un \`if\` dentro del ciclo para contar los que superan la meta, y el objeto de retorno con los 3 valores.`,
+    },
+    {
+      order: 4, points: 3, title: `Conteo de ${t.elementosQ4} por ${t.campoQ4}`,
+      statement:
+        `${t.negocio} representa ${t.listaQ4} con una lista de objetos. Define la \`data class ${t.claseQ4}(val ${t.campoQ4}: String, val ${t.numeroQ4}: Int)\` y crea una lista con al menos 6 ${t.elementosQ4}, repitiendo valores de \`${t.campoQ4}\` entre ellos (${t.valoresQ4}). ` +
+        `Define también la \`data class ResumenConteo(val conteos: Map<String, Int>, val masFrecuente: String, val ${t.totalQ4}: Int)\` y una función \`${funcionQ4}(${t.elementosQ4}: List<${t.claseQ4}>): ResumenConteo\` que, usando un ciclo \`for\` sobre la lista y un \`MutableMap<String, Int>\` que empieza vacío, cuente ${t.cuantosQ4} ${t.elementosQ4} hay de cada \`${t.campoQ4}\` — sin \`when\` y sin un \`if\` por cada valor posible: la clave del mapa debe ser el propio valor leído de cada objeto (\`conteos[clave] = (conteos[clave] ?: 0) + 1\`). ` +
+        `En ese mismo recorrido acumula el total de \`${t.numeroQ4}\`. Luego, con un segundo ciclo \`for\` sobre el mapa y un \`if\`, determina cuál \`${t.campoQ4}\` tiene más ${t.elementosQ4}. La función debe retornar el \`ResumenConteo\` con los 3 valores. Imprime los resultados. ` +
+        `No uses \`groupingBy\`, \`eachCount\`, \`maxByOrNull\` ni \`sumOf\`: todo debe resolverse con ciclos e \`if\`. ` +
+        `Debes usar: dos \`data class\`, una función, un ciclo \`for\` sobre una lista de objetos, un \`MutableMap\` como contador dinámico (acceso por clave variable, no por nombre de propiedad fijo), y un \`if\` para determinar el máximo.`,
+    },
+  ];
+}
+
 @Injectable()
 export class AppSeeder {
   constructor(
@@ -121,6 +255,7 @@ export class AppSeeder {
     await this.seedExamTemplateReactCrudSeguroMedico(adminUser);
     await this.seedExamTemplatePythonBasico(adminUser);
     await this.seedExamTemplatePythonIntermedio(adminUser);
+    await this.seedExamTemplateKotlinBasico(adminUser);
     await this.seedLmsTestCourse(teacherUser, [alumno1User, alumno2User]);
 
     return { ok: true };
@@ -3403,6 +3538,38 @@ const { data: user } = useQuery({
       templateName,
       'Examen intermedio de TypeScript con 4 ejercicios de cómputo real (switch, funciones y ciclos) y 5 variantes temáticas para evitar copias entre alumnos. Misma dificultad que "Python Intermedio".',
       'typescript',
+      versions,
+    );
+  }
+
+  /**
+   * Examen básico de Kotlin, con la MISMA dificultad y forma que
+   * `seedExamTemplateTypeScriptIntermedio` (cómputo real con condicionales, ciclos y funciones),
+   * traducido a los modismos de Kotlin y con el reparto de puntaje 2/2/3/3 (10 pts):
+   *   Q1 (2 pts): ciclo `for` + `when` con una tarifa distinta por caso + `if` de recargo
+   *   Q2 (2 pts): ciclo `for` + cadena `if / else if / else` sobre rangos numéricos
+   *   Q3 (3 pts): función + ciclo `for` sobre `List<Double>` → `data class` con total, conteo y promedio
+   *   Q4 (3 pts): función + ciclo `for` sobre una lista de `data class` + `MutableMap` como contador
+   * La rúbrica 50/50 (escritura de código / ejecución) la agrega automáticamente
+   * `buildScriptExamFiles` en el ENUNCIADO.md de cada variante, desde `RUBRIC_ESCRITURA_EJECUCION`.
+   * 5 variantes temáticas (round-robin) con negocios que no usa ninguna otra plantilla.
+   */
+  private async seedExamTemplateKotlinBasico(admin: User) {
+    // Las 4 consignas son las mismas en las 5 variantes — misma estructura exigida y los mismos
+    // números, para que la dificultad sea idéntica — y solo cambia el negocio. Por eso cada
+    // variante es una fila de datos y los enunciados salen de un único builder: ajustar una
+    // consigna no obliga a repetir el cambio 5 veces.
+    const versions = KOTLIN_EXAM_THEMES.map((theme, index) => ({
+      theme_name: theme.theme_name,
+      order_index: index,
+      questions: buildKotlinExamQuestions(theme),
+    }));
+
+    await this.seedFixedExamTemplate(
+      admin,
+      'Kotlin Básico — Condicionales, Ciclos y Funciones',
+      'Examen básico de Kotlin con 4 ejercicios (2 + 2 + 3 + 3 = 10 pts): condicionales y ciclos en los dos primeros, funciones y ciclos en los dos últimos. 5 variantes temáticas para evitar copias entre alumnos. Misma dificultad que "TypeScript Intermedio".',
+      'kotlin',
       versions,
     );
   }

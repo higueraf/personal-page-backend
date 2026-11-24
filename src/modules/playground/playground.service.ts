@@ -49,6 +49,28 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/** Un criterio de la rúbrica de un examen. El peso se usa para las dos formas en que la rúbrica
+ *  aparece en el enunciado: el porcentaje que se explica en prosa y el desglose en puntos que
+ *  acompaña al puntaje de cada pregunta. */
+interface RubricCriterion {
+  label: string;
+  /** Nombre corto para el desglose numérico ("1.5 escritura / 1.5 ejecución"). */
+  short: string;
+  weight: number;
+  description: string;
+}
+
+/** Perfil de un examen "de script": ejercicios algorítmicos sueltos, sin andamiaje de app, un
+ *  archivo por ejercicio. Entre lenguajes solo cambian el nombre, la extensión, el prefijo de
+ *  comentario, el código inicial y la rúbrica — el resto lo arma `buildScriptExamFiles`. */
+interface ScriptExamLang {
+  title: string;
+  ext: string;
+  comment: string;
+  starter: string;
+  rubric: RubricCriterion[];
+}
+
 function wrapStatement(text: string, width = 90, prefix = ' * '): string {
   const words = text.split(/\s+/);
   const lines: string[] = [];
@@ -103,31 +125,79 @@ export class PlaygroundService {
     private mailService: MailService,
   ) {}
 
-  /** Explicación general de la rúbrica (60/20/20), insertada una vez en cada ENUNCIADO.md. */
-  private static readonly RUBRIC_EXPLICATION = `## Rúbrica de evaluación
+  /** Rúbrica por defecto (60/20/20) de los exámenes que entregan una app navegable en el preview:
+   *  el criterio "Funcional" (que corra) es el de mayor peso. */
+  private static readonly RUBRIC_FUNCIONAL: RubricCriterion[] = [
+    {
+      label: 'Funcional', short: 'funcional', weight: 0.6,
+      description: 'el código corre sin errores y se puede usar/navegar en el preview.',
+    },
+    {
+      label: 'Lógica implementada', short: 'lógica', weight: 0.2,
+      description: 'los cálculos y las reglas de negocio (incluyendo el manejo de\n  errores de negocio, ej. mensajes de conflicto) dan el resultado correcto.',
+    },
+    {
+      label: 'Codificación', short: 'codificación', weight: 0.2,
+      description: 'nombres y organización según lo pedido (ej. renombrado de\n  archivos/funciones), separación en componentes, estilo, y que se siga el patrón solicitado en\n  el enunciado.',
+    },
+  ];
 
-Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exacto de su puntaje:
+  /** Rúbrica 50/50 de los exámenes algorítmicos de consola: escribir bien el código pesa lo mismo
+   *  que que el programa efectivamente corra cumpliendo TODOS los requerimientos del enunciado. */
+  private static readonly RUBRIC_ESCRITURA_EJECUCION: RubricCriterion[] = [
+    {
+      label: 'Escritura de código', short: 'escritura', weight: 0.5,
+      description: 'el código está correctamente escrito y usa exactamente las\n  estructuras exigidas por el enunciado (las de la línea "Debes usar"), con los nombres, los\n  tipos y la organización que se piden.',
+    },
+    {
+      label: 'Ejecución', short: 'ejecución', weight: 0.5,
+      description: 'el programa compila y corre sin errores, e imprime todos los\n  resultados solicitados con los valores correctos — cumpliendo todos los requerimientos del\n  enunciado, no solo una parte.',
+    },
+  ];
 
-- **Funcional (60%):** el código corre sin errores y se puede usar/navegar en el preview.
-- **Lógica implementada (20%):** los cálculos y las reglas de negocio (incluyendo el manejo de
-  errores de negocio, ej. mensajes de conflicto) dan el resultado correcto.
-- **Codificación (20%):** nombres y organización según lo pedido (ej. renombrado de
-  archivos/funciones), separación en componentes, estilo, y que se siga el patrón solicitado en
-  el enunciado.
-`;
+  /** Explicación en prosa de una rúbrica, insertada una vez en cada ENUNCIADO.md. */
+  private static buildRubricExplication(criteria: RubricCriterion[]): string {
+    return [
+      '## Rúbrica de evaluación',
+      '',
+      `Cada pregunta se califica con estos ${criteria.length} criterios, aplicados como porcentaje exacto de su puntaje:`,
+      '',
+      ...criteria.map((c) => `- **${c.label} (${Math.round(c.weight * 100)}%):** ${c.description}`),
+      '',
+    ].join('\n');
+  }
 
-  /** Desglose numérico (60/20/20 exacto, sin redondear) del puntaje de una pregunta. */
-  private buildRubricBreakdown(points: number): string {
+  /** Explicación de la rúbrica por defecto (60/20/20), usada por los exámenes con app. */
+  private static readonly RUBRIC_EXPLICATION = PlaygroundService.buildRubricExplication(
+    PlaygroundService.RUBRIC_FUNCIONAL,
+  );
+
+  /** Desglose numérico exacto (sin redondear) del puntaje de una pregunta según su rúbrica. */
+  private buildRubricBreakdown(points: number, criteria: RubricCriterion[] = PlaygroundService.RUBRIC_FUNCIONAL): string {
     const round2 = (n: number) => Math.round(n * 100) / 100;
     const fmt = (n: number) => {
       const r = round2(n);
       return Number.isInteger(r) ? `${r}` : `${r}`.replace(/0+$/, '').replace(/\.$/, '');
     };
-    const funcional = fmt(points * 0.6);
-    const logica = fmt(points * 0.2);
-    const codificacion = fmt(points * 0.2);
-    return `${funcional} funcional / ${logica} lógica / ${codificacion} codificación`;
+    return criteria.map((c) => `${fmt(points * c.weight)} ${c.short}`).join(' / ');
   }
+
+  /** Lenguajes que usan el generador de examen "de script" (ver `buildScriptExamFiles`). Es un
+   *  `Map` y no un objeto porque la clave es el `language` que escribe el docente: con un objeto,
+   *  un valor como "constructor" encontraría una propiedad heredada de `Object`. */
+  private static readonly SCRIPT_EXAM_LANGS = new Map<string, ScriptExamLang>([
+    ['python', {
+      title: 'Python', ext: 'py', comment: '# ', starter: '',
+      rubric: PlaygroundService.RUBRIC_FUNCIONAL,
+    }],
+    ['kotlin', {
+      title: 'Kotlin', ext: 'kt', comment: '// ',
+      // Kotlin necesita sí o sí un punto de entrada; dejarlo escrito evita que un examen
+      // pierda puntos de "Ejecución" por algo que no es el ejercicio en sí.
+      starter: 'fun main() {\n    // Escribe aquí tu solución\n}\n',
+      rubric: PlaygroundService.RUBRIC_ESCRITURA_EJECUCION,
+    }],
+  ]);
 
   /**
    * Devuelve el archivo de enunciado de una variante de examen: el markdown generado
@@ -162,7 +232,8 @@ Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exact
     if (language === 'html') return this.buildHtmlDomExamFiles(version);
     if (language === 'html-array') return this.buildHtmlArrayExamFiles(version);
     if (language === 'html-design') return this.buildHtmlStaticLayoutExamFiles(version);
-    if (language === 'python') return this.buildPythonExamFiles(version, fileMode);
+    const scriptLang = PlaygroundService.SCRIPT_EXAM_LANGS.get(language ?? '');
+    if (scriptLang) return this.buildScriptExamFiles(version, fileMode, scriptLang);
 
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
 
@@ -201,59 +272,54 @@ Cada pregunta se califica con estos 3 criterios, aplicados como porcentaje exact
   }
 
   /**
-   * Examen de Python: sin andamiaje de app (son ejercicios algorítmicos sueltos, no una
-   * aplicación), pero a diferencia del fallback genérico de TS sí arma un ENUNCIADO.md con la
-   * rúbrica estándar (60/20/20) — el criterio "Funcional" (que el script corra sin errores) queda
-   * como el de mayor peso. Cada archivo de ejercicio arranca solo con el enunciado como comentario
-   * `#`, igual de en blanco que el resto de la familia "genérica" (TS, etc.).
+   * Examen "de script" (Python, Kotlin): sin andamiaje de app — son ejercicios algorítmicos
+   * sueltos, no una aplicación —, pero a diferencia del fallback genérico de TS sí arma un
+   * ENUNCIADO.md con la rúbrica del lenguaje (ver `SCRIPT_EXAM_LANGS`). Cada archivo de ejercicio
+   * arranca solo con el enunciado como comentario — más el punto de entrada vacío en los
+   * lenguajes que lo exigen —, igual de en blanco que el resto de la familia "genérica" (TS, etc.).
    */
-  private buildPythonExamFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion') {
+  private buildScriptExamFiles(version: ExamVersion, fileMode: 'single' | 'perQuestion', lang: ScriptExamLang) {
     const questions = [...(version.questions ?? [])].sort((a, b) => a.order - b.order);
     const totalPoints = questions.reduce((sum, q) => sum + (q.points ?? 0), 0);
+    const breakdown = (q: ExamQuestion) => `${q.points} pts — ${this.buildRubricBreakdown(q.points, lang.rubric)}`;
 
     const enunciado = [
-      `# Examen Python — ${version.theme_name}`,
+      `# Examen ${lang.title} — ${version.theme_name}`,
       '',
       `Puntaje total: ${totalPoints} pts`,
       '',
-      PlaygroundService.RUBRIC_EXPLICATION,
+      PlaygroundService.buildRubricExplication(lang.rubric),
       '',
       '## Preguntas',
       '',
-      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n\n${q.statement}\n`),
+      ...questions.map((q) => `### Pregunta ${q.order}: ${q.title} (${breakdown(q)})\n\n${q.statement}\n`),
     ].join('\n');
 
+    /** Un archivo por ejercicio, o uno solo con todo concatenado, según el modo pedido. El punto
+     *  de entrada (`lang.starter`) se agrega una sola vez por archivo: en modo `single` los 4
+     *  ejercicios comparten uno, porque declararlo varias veces no compilaría. */
+    const codeFiles = (block: (q: ExamQuestion) => string, separator: string) => {
+      const file = (name: string, content: string) => ({ name, path: `/${name}`, content: content + lang.starter, is_folder: false });
+      if (fileMode === 'single') {
+        return [file(`examen.${lang.ext}`, questions.map((q, i) => (i > 0 ? separator + block(q) : block(q))).join(''))];
+      }
+      return questions.map((q) => file(`ejercicio-${q.order}.${lang.ext}`, block(q)));
+    };
+
+    // Enunciado en PDF: el código arranca solo con un comentario que apunta al PDF.
     if (version.statement_type === 'pdf' && version.statement_pdf_url) {
-      const placeholder = '# Ver el enunciado completo en ENUNCIADO.pdf.\n\n';
-      const codeFiles =
-        fileMode === 'single'
-          ? [{ name: 'examen.py', path: '/examen.py', content: placeholder, is_folder: false }]
-          : questions.map((q) => ({
-              name: `ejercicio-${q.order}.py`,
-              path: `/ejercicio-${q.order}.py`,
-              content: placeholder,
-              is_folder: false,
-            }));
-      return [this.buildEnunciadoFile('', version), ...codeFiles];
+      const placeholder = `${lang.comment}Ver el enunciado completo en ENUNCIADO.pdf.\n\n`;
+      return [this.buildEnunciadoFile('', version), ...codeFiles(() => placeholder, '')];
     }
 
     const block = (q: ExamQuestion) =>
-      `# Ejercicio ${q.order}: ${q.title} (${q.points} pts — ${this.buildRubricBreakdown(q.points)})\n#\n${wrapStatement(q.statement, 90, '# ')}\n\n`;
+      `${lang.comment}Ejercicio ${q.order}: ${q.title} (${breakdown(q)})\n${lang.comment.trimEnd()}\n`
+      + `${wrapStatement(q.statement, 90, lang.comment)}\n\n`;
 
-    const codeFiles =
-      fileMode === 'single'
-        ? [{
-            name: 'examen.py', path: '/examen.py', is_folder: false,
-            content: questions.map((q, i) => (i > 0 ? `# ─────────────────────────────\n\n${block(q)}` : block(q))).join(''),
-          }]
-        : questions.map((q) => ({
-            name: `ejercicio-${q.order}.py`,
-            path: `/ejercicio-${q.order}.py`,
-            content: block(q),
-            is_folder: false,
-          }));
-
-    return [this.buildEnunciadoFile(enunciado, version), ...codeFiles];
+    return [
+      this.buildEnunciadoFile(enunciado, version),
+      ...codeFiles(block, `${lang.comment}─────────────────────────────\n\n`),
+    ];
   }
 
   /**
