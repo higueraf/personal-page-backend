@@ -447,9 +447,16 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     const className = this.kotlinClassName(relFile);
     const localJar  = relFile.replace(/\.kt$/, '.jar');
 
-    // JVM flags forwarded to both kotlinc and kotlin via -J prefix
+    // JVM flags forwarded to both kotlinc and kotlin via -J prefix.
+    //
+    // `-Xshare:auto` y no `:on`: el archivo CDS lo genera una build concreta de HotSpot, así que
+    // cualquier actualización del paquete openjdk del servidor lo invalida. Con `:on` eso es un
+    // error fatal ("The shared archive file was created by a different version or build of
+    // HotSpot") y la JVM ni siquiera arranca: el alumno compila bien y el programa muere al
+    // ejecutarse. Con `:auto` la JVM lo descarta en silencio —sin una línea en stderr— y corre
+    // sin compartir clases, que a lo sumo cuesta ~0.1 s de arranque.
     const cdsFlags = existsSync(this.KOTLIN_CDS_ARCHIVE)
-      ? `-J-Xshare:on -J-XX:SharedArchiveFile=${this.KOTLIN_CDS_ARCHIVE}`
+      ? `-J-Xshare:auto -J-XX:SharedArchiveFile=${this.KOTLIN_CDS_ARCHIVE}`
       : '';
     const runFlags  = [`-J-XX:TieredStopAtLevel=1`, `-J-Xss512k`, cdsFlags].filter(Boolean).join(' ');
     const compFlags = '-J-XX:TieredStopAtLevel=1';
