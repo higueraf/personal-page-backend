@@ -22,6 +22,15 @@ import { PlaygroundProject } from '../../entities/playground-project.entity';
 interface RunningSession {
   process: ChildProcessWithoutNullStreams;
   sessionDir: string;
+  /** Corta la ejecución si se pasa de `EXEC_TIMEOUT_MS`. Se limpia al terminar. */
+  temporizador: NodeJS.Timeout;
+}
+
+/** Ejecución que llegó con el servidor lleno y espera turno (ver `MAX_CONCURRENT`). */
+interface EjecucionEnCola {
+  clientId: string;
+  sessionDir: string;
+  arrancar: () => void;
 }
 
 interface RuntimeConfig {
@@ -168,6 +177,19 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
   private readonly KOTLIN_CDS_ARCHIVE = '/opt/kotlin-cds/kotlin.jsa';
   private readonly READLINE_SYNC_SHIM = join(__dirname, 'readline-sync-shim.js');
   private readonly sessions = new Map<string, RunningSession>();
+
+  /** Ejecuciones simultáneas permitidas en todo el servidor. Cada compilación de Kotlin levanta
+   *  una JVM de varios cientos de MB; sin tope, un examen con 20 alumnos ejecutando a la vez
+   *  comprometía más memoria que la que tiene la máquina y el servidor se hundía en swap —
+   *  nadie terminaba, todos reintentaban y la cosa se realimentaba. Ajustable sin desplegar. */
+  private readonly MAX_CONCURRENT = Number(process.env.PLAYGROUND_MAX_CONCURRENT ?? 2);
+
+  /** Tope de vida de una ejecución. Generoso a propósito: los programas pueden quedarse
+   *  legítimamente esperando `readLine()` del alumno, así que esto no es un límite de cómputo
+   *  sino una red de seguridad contra procesos que ya no van a terminar nunca. */
+  private readonly EXEC_TIMEOUT_MS = Number(process.env.PLAYGROUND_EXEC_TIMEOUT_MS ?? 10 * 60_000);
+
+  private readonly cola: EjecucionEnCola[] = [];
 
   constructor(
     private readonly jwtService: JwtService,
@@ -459,7 +481,11 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
       ? `-J-Xshare:auto -J-XX:SharedArchiveFile=${this.KOTLIN_CDS_ARCHIVE}`
       : '';
     const runFlags  = [`-J-XX:TieredStopAtLevel=1`, `-J-Xss512k`, cdsFlags].filter(Boolean).join(' ');
-    const compFlags = '-J-XX:TieredStopAtLevel=1';
+    // El wrapper de kotlinc arranca por defecto con -Xms128M -Xmx512M. Para estos ejercicios
+    // sobra con mucho menos, y lo que importa es el heap COMPROMETIDO: con varias compilaciones
+    // a la vez, 128 MB iniciales cada una agotaban la RAM de la máquina antes de empezar.
+    // Verificado compilando los ejercicios del examen con este tope.
+    const compFlags = '-J-XX:TieredStopAtLevel=1 -J-Xms32m -J-Xmx256m';
 
     // Guarantee the cache dir exists (gets wiped on reboot since it's in /tmp)
     await fs.mkdir(this.KOTLIN_CACHE_DIR, { recursive: true }).catch(() => {});
@@ -628,13 +654,44 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     // todavía dueño de los pipes de stdout/stderr — por eso el evento `close` nunca llegaba a
     // disparar `execution_done` y tanto "Ejecutar" como "Detener" se quedaban colgados para
     // siempre (verificado: un `python3` bloqueado en `input()` sobrevivía al kill del padre).
+    const arrancar = () => this.lanzarProceso(client, sessionDir, shellCmd, execEnv);
+
+    if (this.sessions.size >= this.MAX_CONCURRENT) {
+      this.cola.push({ clientId: client.id, sessionDir, arrancar });
+      client.emit(
+        'terminal_output',
+        `\x1b[33m⏳ Servidor ocupado — tu ejecución está en cola (puesto ${this.cola.length}). ` +
+          `Arranca sola en cuanto se libere un turno.\x1b[0m\r\n`,
+      );
+      return;
+    }
+    arrancar();
+  }
+
+  /** Lanza de verdad el proceso, ya con turno asignado. */
+  private lanzarProceso(
+    client: Socket,
+    sessionDir: string,
+    shellCmd: string,
+    execEnv: NodeJS.ProcessEnv,
+  ) {
     const child = spawn('sh', ['-c', shellCmd], {
       cwd: sessionDir,
       env: execEnv,
       detached: true,
     });
 
-    this.sessions.set(client.id, { process: child, sessionDir });
+    const temporizador = setTimeout(() => {
+      client.emit(
+        'terminal_output',
+        `\r\n\x1b[31m⏱ Ejecución detenida: superó el límite de ` +
+          `${Math.round(this.EXEC_TIMEOUT_MS / 60000)} minutos.\x1b[0m\r\n`,
+      );
+      // Mata el grupo entero; el `close` que provoca emite el `execution_done` y libera el turno.
+      try { if (child.pid) process.kill(-child.pid, 'SIGKILL'); } catch { /* ya murió */ }
+    }, this.EXEC_TIMEOUT_MS);
+
+    this.sessions.set(client.id, { process: child, sessionDir, temporizador });
 
     child.stdout.on('data', (data: Buffer) => {
       client.emit('terminal_output', data.toString());
@@ -644,8 +701,11 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
       client.emit('terminal_output', data.toString());
     });
 
-    child.on('close', (code: number | null) => {
-      client.emit('execution_done', { code: code ?? 0 });
+    child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
+      // Un proceso muerto por señal (timeout, Detener) llega con code=null: reportarlo como 0
+      // le pintaba al alumno un "✔ terminado con código 0" en verde justo detrás del aviso
+      // rojo de que se lo cortamos.
+      client.emit('execution_done', { code: code ?? (signal ? 1 : 0) });
       this.cleanupSession(client.id, sessionDir);
     });
 
@@ -656,12 +716,38 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
   }
 
+  /** Arranca las que esperan turno, hasta llenar los cupos. Las de clientes que ya se fueron
+   *  (o que cancelaron) se descartan limpiando su directorio temporal. */
+  private atenderCola() {
+    while (this.cola.length > 0 && this.sessions.size < this.MAX_CONCURRENT) {
+      const siguiente = this.cola.shift();
+      if (!siguiente) return;
+      siguiente.arrancar();
+    }
+  }
+
+  /** Saca de la cola lo que estuviera esperando para este cliente (se desconectó, pulsó Detener
+   *  o lanzó otra ejecución) y borra su directorio temporal. */
+  private sacarDeLaCola(clientId: string) {
+    for (let i = this.cola.length - 1; i >= 0; i--) {
+      if (this.cola[i].clientId === clientId) {
+        this.cleanupDir(this.cola[i].sessionDir);
+        this.cola.splice(i, 1);
+      }
+    }
+  }
+
   /** Mata el grupo de procesos completo (PID negativo = señal a todo el grupo, ver el
    *  comentario en `spawnAndStream`), no solo el `sh` que Node ve como hijo directo —
    *  si no, el intérprete real (python3, node, etc.) sobrevive huérfano. */
   private killSession(clientId: string) {
+    // Puede estar esperando turno en vez de corriendo: en ese caso no hay proceso que matar,
+    // pero sí hay que sacarla de la cola para que no arranque después de que el alumno se fue.
+    this.sacarDeLaCola(clientId);
+
     const session = this.sessions.get(clientId);
     if (!session) return;
+    clearTimeout(session.temporizador);
     const pid = session.process.pid;
     try {
       if (pid) process.kill(-pid, 'SIGTERM');
@@ -671,11 +757,15 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
     this.sessions.delete(clientId);
     this.cleanupDir(session.sessionDir);
+    this.atenderCola();
   }
 
   private cleanupSession(clientId: string, sessionDir: string) {
+    const session = this.sessions.get(clientId);
+    if (session) clearTimeout(session.temporizador);
     this.sessions.delete(clientId);
     this.cleanupDir(sessionDir);
+    this.atenderCola();
   }
 
   private async cleanupDir(dir: string) {
