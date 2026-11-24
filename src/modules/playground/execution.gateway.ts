@@ -406,13 +406,18 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
-  /** Derive the Kotlin entry class name from a file name.
-   *  "calculadora.kt" → "CalculadoraKt", "my_util.kt" → "MyUtilKt" */
+  /** Nombre de la clase JVM que kotlinc genera para un archivo .kt sin `package`:
+   *  el nombre base del archivo con los caracteres que no valen en un identificador JVM
+   *  reemplazados por "_", un "_" delante si empieza con dígito, la primera letra en
+   *  mayúscula y el sufijo "Kt".
+   *  "main.kt" → "MainKt", "ejercicio-1.kt" → "Ejercicio_1Kt", "my_util.kt" → "My_utilKt",
+   *  "mi.archivo.kt" → "Mi_archivoKt", "1ejercicio.kt" → "_1ejercicioKt".
+   *  Ojo: kotlinc NO convierte "my_util" a camelCase — deja el "_" tal cual. */
   private kotlinClassName(fileName: string): string {
-    return fileName
-      .replace('.kt', '')
-      .replace(/[-_](.)/g, (_: string, c: string) => c.toUpperCase())
-      .replace(/^(.)/, (c: string) => c.toUpperCase())
+    const base = fileName.replace(/^.*\//, '').replace(/\.kt$/, '');
+    const identificador = base.replace(/[^A-Za-z0-9_]/g, '_');
+    return (/^\d/.test(identificador) ? '_' + identificador : identificador)
+      .replace(/^([a-z])/, (c: string) => c.toUpperCase())
       + 'Kt';
   }
 
@@ -429,12 +434,18 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     sessionDir: string,
     mainFile: string,
     _allFileNames: string[],
-    ktSources: { name: string; content: string }[],
+    ktSources: { name: string; path?: string; content: string }[],
   ): Promise<string> {
     // Compile ONLY the target file — compiling all files together means that
     // a syntax error in any other file blocks every run, even unrelated ones.
-    const className = this.kotlinClassName(mainFile);
-    const localJar  = mainFile.replace('.kt', '.jar');
+    //
+    // Los paths usan la convención de raíz virtual del proyecto ("/ejercicio-1.kt"): esa barra
+    // inicial NO es la raíz del sistema de archivos, es relativa al directorio de la sesión.
+    // kotlinc la toma como ruta absoluta y responde "source file or directory not found", así
+    // que se normaliza igual que en `buildShellCommand`.
+    const relFile   = mainFile.replace(/^\/+/, '');
+    const className = this.kotlinClassName(relFile);
+    const localJar  = relFile.replace(/\.kt$/, '.jar');
 
     // JVM flags forwarded to both kotlinc and kotlin via -J prefix
     const cdsFlags = existsSync(this.KOTLIN_CDS_ARCHIVE)
@@ -449,9 +460,27 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     // Cache key: target file name + content only.
     // Failed compiles never produce a cached JAR because the cp only runs
     // after a successful (&&-chained) kotlinc.
-    const targetSource = ktSources.find((f) => f.name === mainFile);
+    //
+    // El contenido es parte imprescindible de la clave: la búsqueda se hace contra el path
+    // normalizado (y el nombre como respaldo) porque `mainFile` llega con la barra inicial y
+    // `name` no. Si no se encuentra la fuente se corre SIN caché: con la clave calculada sobre
+    // un contenido vacío, dos alumnos con distinto "ejercicio-1.kt" compartirían entrada y el
+    // segundo ejecutaría el JAR del primero.
+    const targetSource =
+      ktSources.find((f) => (f.path ?? f.name).replace(/^\/+/, '') === relFile)
+      ?? ktSources.find((f) => f.name === relFile);
+
+    const compilarYCorrer = (guardarEnCache?: string) =>
+      `kotlinc ${compFlags} "./${relFile}" -d "${localJar}" 2>&1 && ` +
+      // El cp va con `|| true` para que un fallo de escritura en caché (permisos, disco
+      // lleno, directorio ausente) nunca impida correr el programa.
+      (guardarEnCache ? `(cp "${localJar}" "${guardarEnCache}" 2>/dev/null || true) && ` : '') +
+      `kotlin ${runFlags} -cp "${localJar}" ${className}`;
+
+    if (!targetSource) return compilarYCorrer();
+
     const hash = createHash('sha256');
-    hash.update(mainFile + '\0' + (targetSource?.content ?? ''));
+    hash.update(relFile + '\0' + targetSource.content);
     const cacheKey  = hash.digest('hex');
     const cachedJar = join(this.KOTLIN_CACHE_DIR, `${cacheKey}.jar`);
 
@@ -460,14 +489,7 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
       // Cache HIT — skip compilation entirely
       return `kotlin ${runFlags} -cp "${cachedJar}" ${className}`;
     } catch {
-      // Cache MISS — compile then run.
-      // The cp is wrapped with `|| true` so that a cache-write failure
-      // (permissions, disk full, dir missing) never blocks the kotlin run.
-      return (
-        `kotlinc ${compFlags} "${mainFile}" -d "${localJar}" 2>&1 && ` +
-        `(cp "${localJar}" "${cachedJar}" 2>/dev/null || true) && ` +
-        `kotlin ${runFlags} -cp "${localJar}" ${className}`
-      );
+      return compilarYCorrer(cachedJar);
     }
   }
 
