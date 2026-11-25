@@ -20,6 +20,7 @@ import { Resource, ResourceType } from '../entities/resource.entity';
 import { PlaygroundTemplate } from '../entities/playground-template.entity';
 import { ExamTemplate } from '../entities/exam-template.entity';
 import { ExamVersion, ExamQuestion } from '../entities/exam-version.entity';
+import { JS_DOM_CRUD_TEMAS, buildJsDomCrudQuestions } from '../modules/playground/js-dom-crud-exam';
 import { LmsCourse, LmsCourseStatus } from '../entities/lms-course.entity';
 import { LmsCourseUnit } from '../entities/lms-course-unit.entity';
 import { LmsActivity } from '../entities/lms-activity.entity';
@@ -256,6 +257,7 @@ export class AppSeeder {
     await this.seedExamTemplatePythonBasico(adminUser);
     await this.seedExamTemplatePythonIntermedio(adminUser);
     await this.seedExamTemplateKotlinBasico(adminUser);
+    await this.seedExamTemplateJsDomCrud(adminUser);
     await this.seedLmsTestCourse(teacherUser, [alumno1User, alumno2User]);
 
     return { ok: true };
@@ -3570,6 +3572,32 @@ const { data: user } = useQuery({
       'Kotlin Básico — Condicionales, Ciclos y Funciones',
       'Examen básico de Kotlin con 4 ejercicios (2 + 2 + 3 + 3 = 10 pts): condicionales y ciclos en los dos primeros, funciones y ciclos en los dos últimos. 5 variantes temáticas para evitar copias entre alumnos. Misma dificultad que "TypeScript Intermedio".',
       'kotlin',
+      versions,
+    );
+  }
+
+  /**
+   * Examen de JavaScript sobre DOM, ciclos y CRUD: 3 ejercicios (2.5 + 2.5 + 5 = 10 pts) y 5
+   * variantes temáticas. Mismo esqueleto que el "Taller práctico de JavaScript" de Programación III.
+   *
+   * Los tres ejercicios viven en UNA sola página con menú (`nav.js`), igual que los exámenes
+   * `html` y `html-array`: la vista previa del playground renderiza siempre el primer `.html` del
+   * proyecto, así que una carpeta por ejercicio dejaría al alumno sin poder ver el 2 y el 3.
+   * El andamiaje y las consignas salen de la misma tabla de temas (`js-dom-crud-exam.ts`), para
+   * que enunciado y archivos no puedan desincronizarse.
+   */
+  private async seedExamTemplateJsDomCrud(admin: User) {
+    const versions = JS_DOM_CRUD_TEMAS.map((tema, index) => ({
+      theme_name: tema,
+      order_index: index,
+      questions: buildJsDomCrudQuestions(tema),
+    }));
+
+    await this.seedFixedExamTemplate(
+      admin,
+      'JavaScript — DOM, Ciclos y CRUD',
+      'Examen de JavaScript con 3 ejercicios (manipulación del DOM con condicionales y ciclos, tabla dinámica sobre un arreglo de objetos, y CRUD completo en memoria) y 5 variantes temáticas. El CRUD trae resuelta la función que renderiza la lista; el alumno escribe crear, editar y eliminar.',
+      'js-dom-crud',
       versions,
     );
   }

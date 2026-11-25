@@ -15,6 +15,7 @@ import { LmsActivity } from '../../entities/lms-activity.entity';
 import { MailService } from '../mail/mail.service';
 import { getVariantConfig, DartFieldType } from '../practice-api/practice-variants.config';
 import { assertTeacherOwnsCourse } from '../../common/lms-access';
+import { buildJsDomCrudExamFiles } from './js-dom-crud-exam';
 
 function dartType(type: DartFieldType): string {
   return type === 'string' ? 'String' : type === 'int' ? 'int' : type === 'double' ? 'double' : 'bool';
@@ -232,6 +233,7 @@ export class PlaygroundService {
     if (language === 'html') return this.buildHtmlDomExamFiles(version);
     if (language === 'html-array') return this.buildHtmlArrayExamFiles(version);
     if (language === 'html-design') return this.buildHtmlStaticLayoutExamFiles(version);
+    if (language === 'js-dom-crud') return buildJsDomCrudExamFiles(version);
     const scriptLang = PlaygroundService.SCRIPT_EXAM_LANGS.get(language ?? '');
     if (scriptLang) return this.buildScriptExamFiles(version, fileMode, scriptLang);
 
