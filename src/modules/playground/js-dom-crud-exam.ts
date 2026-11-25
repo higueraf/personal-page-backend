@@ -167,6 +167,9 @@ export function buildJsDomCrudExamFiles(version: ExamVersion) {
   const Plural = cap(t.e3EntidadPlural);
   const Entidad = cap(t.e3Entidad);
 
+  // El orden de los ejercicios es CRUD (5 pts) → simulación (2.5) → tabla (2.5). Los prefijos de
+  // ids y variables son semánticos (`crud`, `sim`, `tab`) y no el número de ejercicio, para que
+  // reordenar el examen no obligue a renombrar nada.
   const indexHtml = [
     '<!DOCTYPE html>',
     '<html lang="es">',
@@ -190,55 +193,56 @@ export function buildJsDomCrudExamFiles(version: ExamVersion) {
     '    <p>Usa el menú de arriba para moverte entre los tres ejercicios.</p>',
     '    <p>El HTML y el CSS ya están completos: <b>no hay que tocarlos</b>. Tu trabajo va en los',
     '       tres archivos de la carpeta <code>src/</code>, uno por ejercicio.</p>',
-    `    <p>Ejercicio 1: ${t.e1Titulo} (2.5 pts) · Ejercicio 2: ${t.e2Titulo} (2.5 pts) ·`,
-    `       Ejercicio 3: ${t.e3Titulo} (5 pts)</p>`,
+    '    <p>El enunciado completo está en <code>ENUNCIADO.pdf</code>.</p>',
+    `    <p>Ejercicio 1: ${t.e3Titulo} (5 pts) · Ejercicio 2: ${t.e1Titulo} (2.5 pts) ·`,
+    `       Ejercicio 3: ${t.e2Titulo} (2.5 pts)</p>`,
     '  </section>',
     '',
     '  <section id="seccion-ejercicio1" class="seccion" hidden>',
-    `    <h2>Ejercicio 1: ${t.e1Titulo}</h2>`,
-    `    <p>${t.e1Historia}</p>`,
-    `    <label for="e1-recurso">${t.e1RecursoLabel}:</label>`,
-    '    <input type="number" id="e1-recurso">',
-    `    <label for="e1-cantidad">${t.e1CantidadLabel}:</label>`,
-    '    <input type="number" id="e1-cantidad">',
-    '    <button id="e1-simular">Simular</button>',
-    '    <div id="e1-resultado"></div>',
-    '    <h3 id="e1-resumen"></h3>',
+    `    <h2>Ejercicio 1: ${t.e3Titulo}</h2>`,
+    '    <form id="crud-formulario">',
+    `      <h3 id="crud-titulo">Nueva ${t.e3Entidad}</h3>`,
+    '      <label for="crud-nombre">Nombre:</label>',
+    `      <input type="text" id="crud-nombre" placeholder="${t.e3PlaceholderNombre}">`,
+    `      <label for="crud-campoTexto">${t.e3CampoTextoLabel}:</label>`,
+    `      <input type="text" id="crud-campoTexto" placeholder="${t.e3PlaceholderTexto}">`,
+    `      <label for="crud-campoNumero">${t.e3CampoNumLabel}:</label>`,
+    '      <input type="number" id="crud-campoNumero" min="0" max="100">',
+    '      <div class="acciones-formulario">',
+    '        <button type="submit" id="crud-guardar">Guardar</button>',
+    '        <button type="button" id="crud-cancelar">Cancelar</button>',
+    '      </div>',
+    '    </form>',
+    '    <p id="crud-mensaje"></p>',
+    '    <div id="crud-contenedor"></div>',
+    '    <p id="crud-cantidad"></p>',
     '  </section>',
     '',
     '  <section id="seccion-ejercicio2" class="seccion" hidden>',
-    `    <h2>Ejercicio 2: ${t.e2Titulo}</h2>`,
+    `    <h2>Ejercicio 2: ${t.e1Titulo}</h2>`,
+    `    <p>${t.e1Historia}</p>`,
+    `    <label for="sim-recurso">${t.e1RecursoLabel}:</label>`,
+    '    <input type="number" id="sim-recurso">',
+    `    <label for="sim-cantidad">${t.e1CantidadLabel}:</label>`,
+    '    <input type="number" id="sim-cantidad">',
+    '    <button id="sim-simular">Simular</button>',
+    '    <div id="sim-resultado"></div>',
+    '    <h3 id="sim-resumen"></h3>',
+    '  </section>',
+    '',
+    '  <section id="seccion-ejercicio3" class="seccion" hidden>',
+    `    <h2>Ejercicio 3: ${t.e2Titulo}</h2>`,
     `    <p>${t.e2Historia}</p>`,
-    `    <button id="e2-evaluar">Evaluar ${t.e2EntidadPlural}</button>`,
+    `    <button id="tab-evaluar">Evaluar ${t.e2EntidadPlural}</button>`,
     '    <table>',
     '      <thead><tr>',
     `        <th>${t.e2Entidad}</th>`,
     ...t.e2Labels.map((l) => `        <th>${l}</th>`),
     '        <th>Promedio</th><th>Clasificación</th>',
     '      </tr></thead>',
-    '      <tbody id="e2-tabla"></tbody>',
+    '      <tbody id="tab-cuerpo"></tbody>',
     '    </table>',
-    '    <h3 id="e2-resumen"></h3>',
-    '  </section>',
-    '',
-    '  <section id="seccion-ejercicio3" class="seccion" hidden>',
-    `    <h2>Ejercicio 3: ${t.e3Titulo}</h2>`,
-    '    <form id="e3-formulario">',
-    `      <h3 id="e3-titulo">Nueva ${t.e3Entidad}</h3>`,
-    '      <label for="e3-nombre">Nombre:</label>',
-    `      <input type="text" id="e3-nombre" placeholder="${t.e3PlaceholderNombre}">`,
-    `      <label for="e3-campoTexto">${t.e3CampoTextoLabel}:</label>`,
-    `      <input type="text" id="e3-campoTexto" placeholder="${t.e3PlaceholderTexto}">`,
-    `      <label for="e3-campoNumero">${t.e3CampoNumLabel}:</label>`,
-    '      <input type="number" id="e3-campoNumero" min="0" max="100">',
-    '      <div class="acciones-formulario">',
-    '        <button type="submit" id="e3-guardar">Guardar</button>',
-    '        <button type="button" id="e3-cancelar">Cancelar</button>',
-    '      </div>',
-    '    </form>',
-    '    <p id="e3-mensaje"></p>',
-    '    <div id="e3-contenedor"></div>',
-    '    <p id="e3-cantidad"></p>',
+    '    <h3 id="tab-resumen"></h3>',
     '  </section>',
     '',
     '  <script src="nav.js"></script>',
@@ -267,25 +271,24 @@ export function buildJsDomCrudExamFiles(version: ExamVersion) {
     'h2 { font-size: 18px; color: #2b4a7d; }',
     'code { background: #e8eef7; padding: 1px 4px; border-radius: 3px; }',
     '.menu { display: flex; gap: 8px; margin: 16px 0 20px; flex-wrap: wrap; }',
-    '.menu button { background: #4a6fa5; }',
     'label { display: block; margin-top: 12px; font-weight: bold; font-size: 14px; }',
     'input { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #c6d0de;',
     '        border-radius: 4px; font-size: 14px; }',
     'button { margin-top: 14px; padding: 9px 16px; border: 0; border-radius: 4px;',
     '         background: #4a6fa5; color: #fff; font-size: 14px; cursor: pointer; }',
     'button:hover { filter: brightness(0.92); }',
-    '#e1-resultado p { margin: 4px 0; padding: 6px 10px; background: #fff; border-radius: 4px;',
-    '                  border-left: 4px solid #c6d0de; }',
-    '#e1-resumen, #e2-resumen { margin-top: 16px; padding: 10px 12px; background: #e8eef7;',
-    '                           border-radius: 4px; font-size: 15px; }',
+    '#sim-resultado p { margin: 4px 0; padding: 6px 10px; background: #fff; border-radius: 4px;',
+    '                   border-left: 4px solid #c6d0de; }',
+    '#sim-resumen, #tab-resumen { margin-top: 16px; padding: 10px 12px; background: #e8eef7;',
+    '                             border-radius: 4px; font-size: 15px; }',
     'table { width: 100%; border-collapse: collapse; margin-top: 16px; background: #fff; font-size: 14px; }',
     'th, td { border: 1px solid #c6d0de; padding: 8px 10px; text-align: left; }',
     'th { background: #e8eef7; }',
-    '#e3-formulario { background: #fff; padding: 16px; border: 1px solid #c6d0de; border-radius: 6px; }',
+    '#crud-formulario { background: #fff; padding: 16px; border: 1px solid #c6d0de; border-radius: 6px; }',
     '.acciones-formulario { display: flex; gap: 10px; }',
-    '#e3-cancelar { background: #8894a6; }',
-    '#e3-contenedor { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));',
-    '                 gap: 12px; margin-top: 18px; }',
+    '#crud-cancelar { background: #8894a6; }',
+    '#crud-contenedor { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));',
+    '                   gap: 12px; margin-top: 18px; }',
     '.tarjeta { background: #fff; border: 1px solid #c6d0de; border-left: 4px solid #4a6fa5;',
     '           border-radius: 6px; padding: 12px 14px; }',
     '.tarjeta h3 { margin: 0 0 6px; font-size: 16px; color: #2b4a7d; }',
@@ -294,102 +297,48 @@ export function buildJsDomCrudExamFiles(version: ExamVersion) {
     '.acciones button { margin-top: 0; padding: 6px 12px; font-size: 13px; }',
     '.editar { background: #c98a1b; }',
     '.eliminar { background: #b3392f; }',
-    '#e3-cantidad { margin-top: 14px; font-size: 14px; color: #555; }',
-    '#e3-mensaje { margin-top: 10px; font-size: 14px; color: #b3392f; min-height: 18px; }',
+    '#crud-cantidad { margin-top: 14px; font-size: 14px; color: #555; }',
+    '#crud-mensaje { margin-top: 10px; font-size: 14px; color: #b3392f; min-height: 18px; }',
     '',
   ].join('\n');
 
-  const ejercicio1Js = [
-    `// Ejercicio 1: ${t.e1Titulo}`,
-    `// ${t.e1Historia}`,
-    '//',
-    '// Los elementos del DOM ya están tomados. Te toca escribir la lógica.',
-    '',
-    'const e1Recurso = document.getElementById("e1-recurso");',
-    'const e1Cantidad = document.getElementById("e1-cantidad");',
-    'const e1Simular = document.getElementById("e1-simular");',
-    'const e1Resultado = document.getElementById("e1-resultado");',
-    'const e1Resumen = document.getElementById("e1-resumen");',
-    '',
-    '// TODO 1: escucha el clic de e1Simular.',
-    '// TODO 2: lee los dos valores con Number() y limpia lo anterior',
-    '//         (e1Resultado.replaceChildren() y e1Resumen.textContent = "").',
-    '// TODO 3: valida que ambos sean enteros positivos. Si no lo son, escribe',
-    '//         "Ingrese enteros positivos" en e1Resumen y corta con return.',
-    '// TODO 4: recorre con un ciclo for. En cada vuelta, si quedan 15 unidades o más,',
-    '//         descuéntalas y cuenta un acierto; si no, cuenta un fallo. Crea un <p>',
-    '//         con createElement y agrégalo a e1Resultado: verde si se logra, rojo si no.',
-    '// TODO 5: al terminar, escribe en e1Resumen los tres totales.',
-    '',
-  ].join('\n');
-
-  const arregloE2 = t.e2Datos
-    .map(([nombre, a, b, c]) =>
-      `  { nombre: "${nombre}", ${t.e2Campos[0]}: ${a},\n` +
-      `    ${t.e2Campos[1]}: ${b}, ${t.e2Campos[2]}: ${c} }`)
-    .join(',\n');
-
-  const ejercicio2Js = [
-    `// Ejercicio 2: ${t.e2Titulo}`,
-    `// ${t.e2Historia}`,
-    '//',
-    `// Criterios: promedio >= 80 → "${t.e2Clases[0]}" (verde);`,
-    `//            promedio >= 60 y < 80 → "${t.e2Clases[1]}" (naranja);`,
-    `//            promedio < 60 → "${t.e2Clases[2]}" (rojo).`,
-    '',
-    `const e2Datos = [`,
-    arregloE2,
-    '];',
-    '',
-    'const e2Evaluar = document.getElementById("e2-evaluar");',
-    'const e2Tabla = document.getElementById("e2-tabla");',
-    'const e2Resumen = document.getElementById("e2-resumen");',
-    '',
-    '// TODO 1: escucha el clic de e2Evaluar y limpia la tabla con e2Tabla.replaceChildren().',
-    '// TODO 2: recorre e2Datos con un ciclo for y calcula el promedio de los tres valores.',
-    '// TODO 3: clasifica según los criterios de arriba y lleva un contador por clasificación.',
-    '// TODO 4: por cada elemento crea un <tr> y, dentro, un <td> por columna (nombre, los tres',
-    '//         valores, el promedio con toFixed(2) y la clasificación en su color y en negrita).',
-    '// TODO 5: al terminar, escribe en e2Resumen los totales de cada clasificación.',
-    '',
-  ].join('\n');
-
-  const arregloE3 = t.e3Datos
+  // ── Ejercicio 1 (5 pts): CRUD. El render viene hecho; el alumno escribe el resto. ──
+  const arregloCrud = t.e3Datos
     .map(([id, nombre, texto, numero]) =>
       `  { id: ${id}, nombre: "${nombre}", ${t.e3CampoTexto}: "${texto}", ${t.e3CampoNum}: ${numero} }`)
     .join(',\n');
 
-  const ejercicio3Js = [
-    `// Ejercicio 3: ${t.e3Titulo}`,
+  const ejercicio1Js = [
+    `// Ejercicio 1 (5 pts): ${t.e3Titulo}`,
     '//',
     `// La función mostrar${Plural}() ya está escrita: pinta la lista completa y deja listos los`,
     '// botones Editar y Eliminar de cada tarjeta. Tú escribes el CRUD que falta. El formulario',
     '// del HTML todavía no tiene NADA asociado.',
     '',
-    `let e3Datos = [`,
-    arregloE3,
+    'let crudDatos = [',
+    arregloCrud,
     '];',
     '',
-    'let e3SiguienteId = 4;',
-    'let e3IdEditando = null;',
+    'let crudSiguienteId = 4;',
+    'let crudIdEditando = null;',
     '',
     '// ELEMENTOS DEL DOM',
-    'const e3Formulario = document.getElementById("e3-formulario");',
-    'const e3Nombre = document.getElementById("e3-nombre");',
-    'const e3CampoTexto = document.getElementById("e3-campoTexto");',
-    'const e3CampoNumero = document.getElementById("e3-campoNumero");',
-    'const e3Cancelar = document.getElementById("e3-cancelar");',
-    'const e3Titulo = document.getElementById("e3-titulo");',
-    'const e3Contenedor = document.getElementById("e3-contenedor");',
-    'const e3Mensaje = document.getElementById("e3-mensaje");',
-    'const e3Cantidad = document.getElementById("e3-cantidad");',
+    'const crudFormulario = document.getElementById("crud-formulario");',
+    'const crudNombre = document.getElementById("crud-nombre");',
+    'const crudCampoTexto = document.getElementById("crud-campoTexto");',
+    'const crudCampoNumero = document.getElementById("crud-campoNumero");',
+    'const crudCancelar = document.getElementById("crud-cancelar");',
+    'const crudTitulo = document.getElementById("crud-titulo");',
+    'const crudContenedor = document.getElementById("crud-contenedor");',
+    'const crudMensaje = document.getElementById("crud-mensaje");',
+    'const crudCantidad = document.getElementById("crud-cantidad");',
     '',
     `// READ: MOSTRAR ${t.e3EntidadPlural.toUpperCase()} — ya resuelto, no hay que modificarlo`,
     `function mostrar${Plural}() {`,
     '',
-    '    e3Contenedor.replaceChildren();',
+    '    crudContenedor.replaceChildren();',
     '',
-    `    e3Datos.forEach(function (${t.e3Entidad}) {`,
+    `    crudDatos.forEach(function (${t.e3Entidad}) {`,
     '',
     '        const tarjeta = document.createElement("div");',
     '        tarjeta.classList.add("tarjeta");',
@@ -426,24 +375,24 @@ export function buildJsDomCrudExamFiles(version: ExamVersion) {
     '',
     '        acciones.append(botonEditar, botonEliminar);',
     '        tarjeta.append(titulo, parrafoTexto, parrafoNumero, acciones);',
-    '        e3Contenedor.appendChild(tarjeta);',
+    '        crudContenedor.appendChild(tarjeta);',
     '',
     '    });',
     '',
-    `    e3Cantidad.textContent = "Total: " + e3Datos.length + " ${t.e3EntidadPlural}";`,
+    `    crudCantidad.textContent = "Total: " + crudDatos.length + " ${t.e3EntidadPlural}";`,
     '',
     '}',
     '',
     '// ─── A PARTIR DE AQUÍ TE TOCA A TI ─────────────────────────────────────────',
     '',
-    '// TODO 1 — CREATE y UPDATE: escucha el "submit" de e3Formulario (con preventDefault).',
+    '// TODO 1 — CREATE y UPDATE: escucha el "submit" de crudFormulario (con preventDefault).',
     `//   Valida que el nombre y la ${t.e3CampoTexto} no estén vacíos y que el número esté entre`,
-    '//   0 y 100; si algo falla, muéstralo en e3Mensaje y no guardes. Si e3IdEditando es null,',
-    '//   agrega un objeto nuevo usando e3SiguienteId y después auméntalo; si no, actualiza el',
+    '//   0 y 100; si algo falla, muéstralo en crudMensaje y no guardes. Si crudIdEditando es null,',
+    '//   agrega un objeto nuevo usando crudSiguienteId y después auméntalo; si no, actualiza el',
     `//   que tenga ese id SIN cambiar su id. Al terminar, limpia el formulario y llama a mostrar${Plural}().`,
     '',
     `// TODO 2 — editar${Entidad}(id): busca el elemento, carga sus datos en los inputs, guarda su`,
-    `//   id en e3IdEditando y cambia e3Titulo a "Editando ${t.e3Entidad}".`,
+    `//   id en crudIdEditando y cambia crudTitulo a "Editando ${t.e3Entidad}".`,
     `function editar${Entidad}(id) {`,
     '',
     '}',
@@ -454,14 +403,85 @@ export function buildJsDomCrudExamFiles(version: ExamVersion) {
     '',
     '}',
     '',
-    '// TODO 4 — Cancelar: limpia el formulario, pone e3IdEditando en null y devuelve el título',
+    '// TODO 4 — Cancelar: limpia el formulario, pone crudIdEditando en null y devuelve el título',
     `//   a "Nueva ${t.e3Entidad}".`,
     '',
     `mostrar${Plural}();`,
     '',
   ].join('\n');
 
-  return [
+  // ── Ejercicio 2 (2.5 pts): condicionales + ciclo for sobre el DOM ──
+  const ejercicio2Js = [
+    `// Ejercicio 2 (2.5 pts): ${t.e1Titulo}`,
+    `// ${t.e1Historia}`,
+    '//',
+    '// Los elementos del DOM ya están tomados. Te toca escribir la lógica.',
+    '',
+    'const simRecurso = document.getElementById("sim-recurso");',
+    'const simCantidad = document.getElementById("sim-cantidad");',
+    'const simSimular = document.getElementById("sim-simular");',
+    'const simResultado = document.getElementById("sim-resultado");',
+    'const simResumen = document.getElementById("sim-resumen");',
+    '',
+    '// TODO 1: escucha el clic de simSimular.',
+    '// TODO 2: lee los dos valores con Number() y limpia lo anterior',
+    '//         (simResultado.replaceChildren() y simResumen.textContent = "").',
+    '// TODO 3: valida que ambos sean enteros positivos. Si no lo son, escribe',
+    '//         "Ingrese enteros positivos" en simResumen y corta con return.',
+    '// TODO 4: recorre con un ciclo for. En cada vuelta, si quedan 15 unidades o más,',
+    '//         descuéntalas y cuenta un acierto; si no, cuenta un fallo. Crea un <p>',
+    '//         con createElement y agrégalo a simResultado: verde si se logra, rojo si no.',
+    '// TODO 5: al terminar, escribe en simResumen los tres totales.',
+    '',
+  ].join('\n');
+
+  // ── Ejercicio 3 (2.5 pts): arreglo de objetos + tabla dinámica ──
+  const arregloTabla = t.e2Datos
+    .map(([nombre, a, b, c]) =>
+      `  { nombre: "${nombre}", ${t.e2Campos[0]}: ${a},\n` +
+      `    ${t.e2Campos[1]}: ${b}, ${t.e2Campos[2]}: ${c} }`)
+    .join(',\n');
+
+  const ejercicio3Js = [
+    `// Ejercicio 3 (2.5 pts): ${t.e2Titulo}`,
+    `// ${t.e2Historia}`,
+    '//',
+    `// Criterios: promedio >= 80 → "${t.e2Clases[0]}" (verde);`,
+    `//            promedio >= 60 y < 80 → "${t.e2Clases[1]}" (naranja);`,
+    `//            promedio < 60 → "${t.e2Clases[2]}" (rojo).`,
+    '',
+    'const tabDatos = [',
+    arregloTabla,
+    '];',
+    '',
+    'const tabEvaluar = document.getElementById("tab-evaluar");',
+    'const tabCuerpo = document.getElementById("tab-cuerpo");',
+    'const tabResumen = document.getElementById("tab-resumen");',
+    '',
+    '// TODO 1: escucha el clic de tabEvaluar y limpia la tabla con tabCuerpo.replaceChildren().',
+    '// TODO 2: recorre tabDatos con un ciclo for y calcula el promedio de los tres valores.',
+    '// TODO 3: clasifica según los criterios de arriba y lleva un contador por clasificación.',
+    '// TODO 4: por cada elemento crea un <tr> y, dentro, un <td> por columna (nombre, los tres',
+    '//         valores, el promedio con toFixed(2) y la clasificación en su color y en negrita).',
+    '// TODO 5: al terminar, escribe en tabResumen los totales de cada clasificación.',
+    '',
+  ].join('\n');
+
+  const archivos: {
+    name: string; path: string; content: string; is_folder: boolean;
+    file_type?: 'pdf'; external_url?: string;
+  }[] = [];
+
+  // El enunciado va como PDF dentro del proyecto, igual que en el examen de maquetación:
+  // la variante trae la URL del archivo subido y el IDE lo abre en su visor.
+  if (version.statement_type === 'pdf' && version.statement_pdf_url) {
+    archivos.push({
+      name: 'ENUNCIADO.pdf', path: '/ENUNCIADO.pdf', content: '', is_folder: false,
+      file_type: 'pdf', external_url: version.statement_pdf_url,
+    });
+  }
+
+  archivos.push(
     { name: 'index.html', path: '/index.html', content: indexHtml, is_folder: false },
     { name: 'estilos.css', path: '/estilos.css', content: estilosCss, is_folder: false },
     { name: 'nav.js', path: '/nav.js', content: navJs, is_folder: false },
@@ -469,7 +489,9 @@ export function buildJsDomCrudExamFiles(version: ExamVersion) {
     { name: 'ejercicio-1.js', path: '/src/ejercicio-1.js', content: ejercicio1Js, is_folder: false },
     { name: 'ejercicio-2.js', path: '/src/ejercicio-2.js', content: ejercicio2Js, is_folder: false },
     { name: 'ejercicio-3.js', path: '/src/ejercicio-3.js', content: ejercicio3Js, is_folder: false },
-  ];
+  );
+
+  return archivos;
 }
 
 /** Los nombres de los cinco temas, en el orden en que se reparten por rotación. */
@@ -486,11 +508,11 @@ export function buildJsDomCrudQuestions(themeName: string): ExamQuestion[] {
   const Plural = cap(t.e3EntidadPlural);
   const Entidad = cap(t.e3Entidad);
 
-  return [
+  const preguntas: ExamQuestion[] = [
     {
-      order: 1, points: 2.5, title: t.e1Titulo,
+      order: 2, points: 2.5, title: t.e1Titulo,
       statement:
-        `${t.e1Historia} Resuélvelo en \`src/ejercicio-1.js\`. ` +
+        `${t.e1Historia} Resuélvelo en \`src/ejercicio-2.js\`. ` +
         'Al pulsar **Simular**, valida que los dos valores sean enteros positivos; si no lo son, ' +
         'muestra `Ingrese enteros positivos` en el resumen y no sigas. Después recorre con un ciclo ' +
         '`for`: en cada vuelta, si queda suficiente, descuenta las 15 unidades y cuenta un acierto; ' +
@@ -502,9 +524,9 @@ export function buildJsDomCrudQuestions(themeName: string): ExamQuestion[] {
         '`createElement` y `appendChild`.',
     },
     {
-      order: 2, points: 2.5, title: t.e2Titulo,
+      order: 3, points: 2.5, title: t.e2Titulo,
       statement:
-        `${t.e2Historia} Resuélvelo en \`src/ejercicio-2.js\`, donde el arreglo ya está declarado. ` +
+        `${t.e2Historia} Resuélvelo en \`src/ejercicio-3.js\`, donde el arreglo ya está declarado. ` +
         'Al pulsar **Evaluar**, recorre el arreglo con un ciclo `for`, calcula el promedio de los tres ' +
         'valores y genera una fila de tabla por elemento con `createElement`. Clasifica según el ' +
         `promedio: "${t.e2Clases[0]}" si es mayor o igual a 80 (verde); "${t.e2Clases[1]}" si está ` +
@@ -515,9 +537,9 @@ export function buildJsDomCrudQuestions(themeName: string): ExamQuestion[] {
         '`createElement` y `appendChild`.',
     },
     {
-      order: 3, points: 5, title: t.e3Titulo,
+      order: 1, points: 5, title: t.e3Titulo,
       statement:
-        `Administra las ${t.e3EntidadPlural} en \`src/ejercicio-3.js\`. Cada ${t.e3Entidad} tiene ` +
+        `Administra las ${t.e3EntidadPlural} en \`src/ejercicio-1.js\`. Cada ${t.e3Entidad} tiene ` +
         `\`id\` único, \`nombre\`, \`${t.e3CampoTexto}\` (texto) y \`${t.e3CampoNum}\` (entero de 0 a 100). ` +
         `Ya están hechos el arreglo, los elementos del DOM y la función \`mostrar${Plural}()\`, que pinta ` +
         'la lista y deja funcionando los botones Editar y Eliminar de cada tarjeta: no la modifiques, ' +
@@ -526,12 +548,13 @@ export function buildJsDomCrudQuestions(themeName: string): ExamQuestion[] {
         `nombre y la ${t.e3CampoTexto} no estén vacíos y que el número esté entre 0 y 100; si algo falla, ` +
         'muéstralo en el mensaje y no guardes. Si `e3IdEditando` es `null`, agrega un objeto nuevo con ' +
         '`e3SiguienteId` y auméntalo después; si no, actualiza el que tenga ese id sin cambiar su `id`. ' +
-        `(2) \`editar${Entidad}(id)\`: carga los datos en los inputs, guarda el id en \`e3IdEditando\` y ` +
+        `(2) \`editar${Entidad}(id)\`: carga los datos en los inputs, guarda el id en \`crudIdEditando\` y ` +
         `cambia el título a "Editando ${t.e3Entidad}". (3) \`eliminar${Entidad}(id)\`: pide confirmación ` +
         'con `confirm()` y, si acepta, quita el elemento del arreglo y vuelve a mostrar la lista. ' +
-        `(4) Cancelar: limpia el formulario, pone \`e3IdEditando\` en \`null\` y devuelve el título a ` +
+        `(4) Cancelar: limpia el formulario, pone \`crudIdEditando\` en \`null\` y devuelve el título a ` +
         `"Nueva ${t.e3Entidad}". ` +
         'Debes usar: `addEventListener("submit", ...)` con `preventDefault()`, `push`, `find`, `filter` y `confirm`.',
     },
   ];
+  return preguntas.sort((a, b) => a.order - b.order);
 }

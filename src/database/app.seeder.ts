@@ -19,7 +19,7 @@ import { Project, ProjectStatus } from '../entities/project.entity';
 import { Resource, ResourceType } from '../entities/resource.entity';
 import { PlaygroundTemplate } from '../entities/playground-template.entity';
 import { ExamTemplate } from '../entities/exam-template.entity';
-import { ExamVersion, ExamQuestion } from '../entities/exam-version.entity';
+import { ExamVersion, ExamQuestion, StatementType } from '../entities/exam-version.entity';
 import { JS_DOM_CRUD_TEMAS, buildJsDomCrudQuestions } from '../modules/playground/js-dom-crud-exam';
 import { LmsCourse, LmsCourseStatus } from '../entities/lms-course.entity';
 import { LmsCourseUnit } from '../entities/lms-course-unit.entity';
@@ -3155,7 +3155,15 @@ const { data: user } = useQuery({
     templateName: string,
     description: string,
     language: string,
-    versions: { theme_name: string; order_index: number; questions: ExamQuestion[] }[],
+    versions: {
+      theme_name: string;
+      order_index: number;
+      questions: ExamQuestion[];
+      /** Opcionales: para las plantillas cuyo enunciado se entrega como PDF ya subido. */
+      statement_type?: StatementType;
+      statement_pdf_url?: string;
+      statement_pdf_original_name?: string;
+    }[],
   ): Promise<void> {
     const exists = await this.examTemplatesRepo.findOne({ where: { name: templateName } });
     if (exists) return;
@@ -3170,6 +3178,11 @@ const { data: user } = useQuery({
           theme_name: v.theme_name,
           order_index: v.order_index,
           questions: v.questions,
+          ...(v.statement_type ? {
+            statement_type: v.statement_type,
+            statement_pdf_url: v.statement_pdf_url,
+            statement_pdf_original_name: v.statement_pdf_original_name,
+          } : {}),
         }),
       ),
     );
@@ -3587,10 +3600,23 @@ const { data: user } = useQuery({
    * que enunciado y archivos no puedan desincronizarse.
    */
   private async seedExamTemplateJsDomCrud(admin: User) {
+    // El enunciado se entrega como PDF dentro del proyecto, igual que el examen de maquetación:
+    // los archivos viven en `uploads/playground-statements/` versionados junto al código.
+    const pdfs: Record<string, [string, string]> = {
+      'Estación de Bomberos': ['/uploads/playground-statements/2647814c-099a-40d9-a2da-239526695318.pdf', 'examen-js-bomberos.pdf'],
+      'Refugio de Animales': ['/uploads/playground-statements/013ee592-9694-48e6-bbb9-6d60230ea885.pdf', 'examen-js-refugio.pdf'],
+      'Museo': ['/uploads/playground-statements/38361e34-223e-4d3a-b739-663c3c9ad1a5.pdf', 'examen-js-museo.pdf'],
+      'Aerolínea': ['/uploads/playground-statements/5249372c-3900-48c2-87f7-52aef0ff29f5.pdf', 'examen-js-aerolinea.pdf'],
+      'Laboratorio': ['/uploads/playground-statements/1713d6ea-a6e1-4c53-b3e0-ebd352092517.pdf', 'examen-js-laboratorio.pdf'],
+    };
+
     const versions = JS_DOM_CRUD_TEMAS.map((tema, index) => ({
       theme_name: tema,
       order_index: index,
       questions: buildJsDomCrudQuestions(tema),
+      statement_type: 'pdf' as const,
+      statement_pdf_url: pdfs[tema][0],
+      statement_pdf_original_name: pdfs[tema][1],
     }));
 
     await this.seedFixedExamTemplate(
