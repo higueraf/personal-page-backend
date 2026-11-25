@@ -174,6 +174,12 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   private readonly TEMP_DIR = '/tmp/playground';
   private readonly KOTLIN_CACHE_DIR = '/tmp/playground-kotlin-cache';
+  /** Archivo CDS de la JVM: acelera el arranque del compilador. Lo genera una build concreta de
+   *  HotSpot, así que una actualización del paquete openjdk lo invalida; por eso se pasa con
+   *  `-Xshare:auto`, que lo descarta en silencio en vez de impedir el arranque. Para regenerarlo
+   *  en el servidor después de actualizar el JDK:
+   *    kotlinc -J-XX:ArchiveClassesAtExit=/opt/kotlin-cds/kotlin.jsa <cualquier.kt> -d /tmp/x.jar
+   */
   private readonly KOTLIN_CDS_ARCHIVE = '/opt/kotlin-cds/kotlin.jsa';
   private readonly READLINE_SYNC_SHIM = join(__dirname, 'readline-sync-shim.js');
   private readonly sessions = new Map<string, RunningSession>();
@@ -485,7 +491,11 @@ export class ExecutionGateway implements OnGatewayConnection, OnGatewayDisconnec
     // sobra con mucho menos, y lo que importa es el heap COMPROMETIDO: con varias compilaciones
     // a la vez, 128 MB iniciales cada una agotaban la RAM de la máquina antes de empezar.
     // Verificado compilando los ejercicios del examen con este tope.
-    const compFlags = '-J-XX:TieredStopAtLevel=1 -J-Xms32m -J-Xmx256m';
+    // El CDS también en la compilación, que es el paso caro: arrancar el compilador domina los
+    // ~5 s de un kotlinc. Medido en el VPS sobre 5 vueltas alternadas: mediana 4.85 s sin archivo
+    // y 3.82 s con él (-21%). El paso de ejecución ya costaba 0.25 s, así que ahí aportaba poco.
+    const compFlags = ['-J-XX:TieredStopAtLevel=1', '-J-Xms32m', '-J-Xmx256m', cdsFlags]
+      .filter(Boolean).join(' ');
 
     // Guarantee the cache dir exists (gets wiped on reboot since it's in /tmp)
     await fs.mkdir(this.KOTLIN_CACHE_DIR, { recursive: true }).catch(() => {});
